@@ -1,0 +1,58 @@
+import type { Scholarship, UrgencyColor } from "@/types";
+import { deriveUrgency, radarBadge } from "@/lib/ledger";
+import { RadarIcon } from "@/components/UI/icons";
+
+/** Literal class strings per urgency band (kept whole for Tailwind scanning). */
+const BADGE: Record<UrgencyColor, string> = {
+  emerald: "border-emerald/30 bg-emerald/10 text-emerald",
+  amber: "border-amber/30 bg-amber/10 text-amber",
+  red: "border-red/30 bg-red/10 text-red",
+  muted: "border-line bg-bg/40 text-muted",
+};
+
+const DOT: Record<UrgencyColor, string> = {
+  emerald: "bg-emerald",
+  amber: "bg-amber",
+  red: "bg-red",
+  muted: "bg-muted",
+};
+
+export function ScholarshipRadar({
+  scholarships,
+}: {
+  scholarships: Scholarship[];
+}) {
+  return (
+    <section className="rounded-2xl border border-line bg-card p-5">
+      <div className="flex items-center gap-2">
+        <h2 className="text-base font-semibold">Scholarship Radar</h2>
+        <RadarIcon className="h-4 w-4 text-muted" />
+      </div>
+
+      <ul className="mt-4 space-y-1">
+        {scholarships.map((s) => {
+          const urgency = deriveUrgency(s);
+          return (
+            <li
+              key={s.id}
+              className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-bg/40"
+            >
+              <span
+                className={`mt-1 h-2 w-2 shrink-0 rounded-full ${DOT[urgency]}`}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{s.name}</p>
+                <p className="truncate text-xs text-muted">{s.statusLabel}</p>
+              </div>
+              <span
+                className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium tabular-nums ${BADGE[urgency]}`}
+              >
+                {radarBadge(s)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
