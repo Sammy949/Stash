@@ -52,7 +52,7 @@ export function ChatWindow({
 
       {/* Composer */}
       <div className="space-y-3 border-t border-line px-5 py-4">
-        <QuickChips onPick={onSend} />
+        <QuickChips onPick={onSend} disabled={isThinking} />
         <InputBar onSend={onSend} disabled={isThinking} />
         <p className="text-center text-[11px] text-muted">
           Powered by 0G Compute
