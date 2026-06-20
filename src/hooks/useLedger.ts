@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import type { Ledger, ParsedExpense, SyncPhase } from "@/types";
 import { SEED_LEDGER, addExpense } from "@/lib/ledger";
 import {
@@ -8,10 +9,10 @@ import {
   saveLedger,
 } from "@/lib/ogStorage";
 
-export interface ToastState {
-  message: string;
-  rootHash: string;
-  kind: "success" | "error";
+/** Short root-hash badge: "#a7f3c2b1…". */
+function shortRoot(rootHash: string): string {
+  const hex = rootHash.replace(/^0x/, "");
+  return hex ? `#${hex.slice(0, 8)}…` : "";
 }
 
 /**
@@ -28,7 +29,6 @@ export function useLedger() {
     isStorageConfigured() && Boolean(getStoredRootHash()),
   );
   const [syncPhase, setSyncPhase] = useState<SyncPhase>("idle");
-  const [toast, setToast] = useState<ToastState | null>(null);
 
   const setLedger = (next: Ledger) => {
     ref.current = next;
@@ -66,21 +66,16 @@ export function useLedger() {
       const result = await saveLedger(current, () => setSyncPhase("uploading"));
       setLedger({ ...ref.current, lastSyncedAt: result.syncedAt });
       setSyncPhase("confirmed");
-      setToast({
-        message: "Ledger synced to 0G Storage",
-        rootHash: result.rootHash,
-        kind: "success",
+      toast.success("Ledger synced to 0G Storage", {
+        description: `Encrypted · Root: ${shortRoot(result.rootHash)}`,
       });
       window.setTimeout(() => setSyncPhase("idle"), 1800);
       return true;
     } catch (e) {
       console.error("0G Storage sync failed:", e);
       setSyncPhase("error");
-      setToast({
-        message:
-          e instanceof Error ? `Sync failed — ${e.message}` : "Sync failed",
-        rootHash: "",
-        kind: "error",
+      toast.error("0G Storage sync failed", {
+        description: e instanceof Error ? e.message : "Upload didn't go through.",
       });
       window.setTimeout(() => setSyncPhase("idle"), 2800);
       return false;
@@ -94,14 +89,10 @@ export function useLedger() {
     return next;
   }, []);
 
-  const clearToast = useCallback(() => setToast(null), []);
-
   return {
     ledger,
     hydrating,
     syncPhase,
-    toast,
-    clearToast,
     sync,
     logExpense,
   };

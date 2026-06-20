@@ -1,9 +1,9 @@
 import { VaultCard } from "@/components/Dashboard/VaultCard";
 import { ScholarshipRadar } from "@/components/Dashboard/ScholarshipRadar";
 import { HustleLedger } from "@/components/Dashboard/HustleLedger";
+import { Toaster } from "sonner";
 import { ChatWindow } from "@/components/Agent/ChatWindow";
 import { SYNC_CHIP } from "@/components/Agent/QuickChips";
-import { Toast } from "@/components/UI/Toast";
 import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
 import { parseExpense } from "@/lib/ledger";
@@ -12,8 +12,7 @@ const SYNC_CONFIRMATION =
   "Your financial data is encrypted and stored on 0G's decentralized network. Nobody else can access it. It'll be here next time you open Stash.";
 
 export default function App() {
-  const { ledger, hydrating, syncPhase, toast, clearToast, sync, logExpense } =
-    useLedger();
+  const { ledger, hydrating, syncPhase, sync, logExpense } = useLedger();
   const { messages, isThinking, send, pushAssistant } = useAgent();
 
   async function handleSend(text: string) {
@@ -79,7 +78,18 @@ export default function App() {
         </div>
       </main>
 
-      {toast && <Toast toast={toast} onClose={clearToast} />}
+      <Toaster
+        theme="dark"
+        position="bottom-right"
+        richColors
+        toastOptions={{
+          style: {
+            background: "#1A1D27",
+            border: "1px solid #2A2D3A",
+            color: "#FFFFFF",
+          },
+        }}
+      />
     </div>
   );
 }
