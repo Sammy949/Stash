@@ -143,4 +143,4 @@ vite.config.ts.timestamp-*
 .vite/
 
 # Personal
-CONTEXT.md
+notes/
