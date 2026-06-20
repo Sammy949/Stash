@@ -1,7 +1,27 @@
 import type { SyncPhase } from "@/types";
 
-/** STUB — animated 0G sync sequence built in step 3. */
+const PHASE: Record<
+  Exclude<SyncPhase, "idle">,
+  { label: string; color: string }
+> = {
+  encrypting: { label: "Encrypting ledger…", color: "text-amber" },
+  uploading: { label: "Uploading to 0G…", color: "text-amber" },
+  confirmed: { label: "Synced to 0G ✓", color: "text-emerald" },
+  error: { label: "Sync failed", color: "text-red" },
+};
+
+/** Live sync status pill; renders nothing when idle. */
 export function SyncIndicator({ phase }: { phase: SyncPhase }) {
   if (phase === "idle") return null;
-  return <span className="text-xs text-muted">{phase}…</span>;
+  const { label, color } = PHASE[phase];
+  const busy = phase === "encrypting" || phase === "uploading";
+
+  return (
+    <span className={`flex items-center gap-1.5 text-xs ${color}`}>
+      {busy && (
+        <span className="h-1.5 w-1.5 animate-blink rounded-full bg-current" />
+      )}
+      {label}
+    </span>
+  );
 }
