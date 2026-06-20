@@ -2,16 +2,44 @@ import { VaultCard } from "@/components/Dashboard/VaultCard";
 import { ScholarshipRadar } from "@/components/Dashboard/ScholarshipRadar";
 import { HustleLedger } from "@/components/Dashboard/HustleLedger";
 import { ChatWindow } from "@/components/Agent/ChatWindow";
+import { SYNC_CHIP } from "@/components/Agent/QuickChips";
+import { Toast } from "@/components/UI/Toast";
 import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
+import { parseExpense } from "@/lib/ledger";
+
+const SYNC_CONFIRMATION =
+  "Your financial data is encrypted and stored on 0G's decentralized network. Nobody else can access it. It'll be here next time you open Stash.";
 
 export default function App() {
-  const { ledger } = useLedger();
-  const { messages, isThinking, send } = useAgent();
+  const { ledger, hydrating, syncPhase, toast, clearToast, sync, logExpense } =
+    useLedger();
+  const { messages, isThinking, send, pushAssistant } = useAgent();
 
-  const handleSend = (text: string) => {
+  async function handleSend(text: string) {
+    // 1. "Sync to 0G" chip → real storage sync, no Compute needed.
+    if (text === SYNC_CHIP) {
+      const ok = await sync();
+      pushAssistant(
+        ok
+          ? SYNC_CONFIRMATION
+          : "I couldn't reach 0G Storage just now — check the wallet key in your .env and try again.",
+      );
+      return;
+    }
+
+    // 2. Natural-language expense → update dashboard + sync, agent acks.
+    const expense = parseExpense(text);
+    if (expense) {
+      const updated = logExpense(expense);
+      void sync(updated);
+      void send(text, updated);
+      return;
+    }
+
+    // 3. Everything else → the agent, with live ledger context.
     void send(text, ledger);
-  };
+  }
 
   return (
     <div className="min-h-screen bg-bg text-ink">
@@ -31,7 +59,11 @@ export default function App() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
           {/* LEFT: Dashboard — 40% */}
           <div className="space-y-6 lg:col-span-2">
-            <VaultCard ledger={ledger} />
+            <VaultCard
+              ledger={ledger}
+              syncPhase={syncPhase}
+              hydrating={hydrating}
+            />
             <ScholarshipRadar scholarships={ledger.scholarships} />
             <HustleLedger hustles={ledger.hustles} />
           </div>
@@ -46,6 +78,8 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      {toast && <Toast toast={toast} onClose={clearToast} />}
     </div>
   );
 }
