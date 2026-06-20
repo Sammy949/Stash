@@ -23,7 +23,7 @@ export default function App() {
       pushAssistant(
         ok
           ? SYNC_CONFIRMATION
-          : "I couldn't reach 0G Storage just now — check the wallet key in your .env and try again.",
+          : "I couldn't sync to 0G Storage just now — the upload didn't go through. Check the toast for details and try again.",
       );
       return;
     }
