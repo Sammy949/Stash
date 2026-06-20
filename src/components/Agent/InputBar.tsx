@@ -1,13 +1,18 @@
 import { useState } from "react";
 
-/** STUB — full input bar built in step 4. */
-export function InputBar({ onSend }: { onSend: (text: string) => void }) {
+export function InputBar({
+  onSend,
+  disabled = false,
+}: {
+  onSend: (text: string) => void;
+  disabled?: boolean;
+}) {
   const [text, setText] = useState("");
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const t = text.trim();
-    if (!t) return;
+    if (!t || disabled) return;
     onSend(t);
     setText("");
   }
@@ -17,12 +22,14 @@ export function InputBar({ onSend }: { onSend: (text: string) => void }) {
       <input
         value={text}
         onChange={(e) => setText(e.target.value)}
+        disabled={disabled}
         placeholder="Ask Stash anything..."
-        className="flex-1 rounded-xl border border-line bg-card px-3 py-2 text-sm outline-none placeholder:text-muted"
+        className="flex-1 rounded-xl border border-line bg-bg px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-muted focus:border-emerald/50 disabled:opacity-50"
       />
       <button
         type="submit"
-        className="rounded-xl bg-emerald px-4 py-2 text-sm font-medium text-bg"
+        disabled={disabled || !text.trim()}
+        className="rounded-xl bg-emerald px-4 py-2.5 text-sm font-medium text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
       >
         Send
       </button>
