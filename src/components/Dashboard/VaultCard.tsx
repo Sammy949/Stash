@@ -1,4 +1,4 @@
-import type { Ledger } from "@/types";
+import type { Ledger, SyncPhase } from "@/types";
 import {
   formatNaira,
   formatSyncedAt,
@@ -6,6 +6,7 @@ import {
   spentPct,
 } from "@/lib/ledger";
 import { AnimatedNumber } from "@/components/UI/AnimatedNumber";
+import { SyncIndicator } from "@/components/UI/SyncIndicator";
 import { LockIcon } from "@/components/UI/icons";
 
 const RING_SIZE = 168;
@@ -13,7 +14,15 @@ const STROKE = 12;
 const RADIUS = (RING_SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-export function VaultCard({ ledger }: { ledger: Ledger }) {
+export function VaultCard({
+  ledger,
+  syncPhase = "idle",
+  hydrating = false,
+}: {
+  ledger: Ledger;
+  syncPhase?: SyncPhase;
+  hydrating?: boolean;
+}) {
   const { budget } = ledger;
   const pct = spentPct(budget);
   const left = remaining(budget);
@@ -25,7 +34,13 @@ export function VaultCard({ ledger }: { ledger: Ledger }) {
       <div className="flex items-center gap-2">
         <h2 className="text-base font-semibold">Stash Vault</h2>
         <LockIcon className="h-4 w-4 text-emerald" />
-        <span className="ml-auto text-xs text-muted">Secured on 0G Storage</span>
+        <span className="ml-auto">
+          {syncPhase === "idle" ? (
+            <span className="text-xs text-muted">Secured on 0G Storage</span>
+          ) : (
+            <SyncIndicator phase={syncPhase} />
+          )}
+        </span>
       </div>
 
       {/* Ring */}
@@ -83,7 +98,9 @@ export function VaultCard({ ledger }: { ledger: Ledger }) {
 
       {/* Footer */}
       <p className="mt-4 text-center text-[11px] text-muted">
-        {formatSyncedAt(ledger.lastSyncedAt)}
+        {hydrating
+          ? "Restoring from 0G Storage…"
+          : formatSyncedAt(ledger.lastSyncedAt)}
       </p>
     </section>
   );
