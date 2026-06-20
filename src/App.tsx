@@ -78,18 +78,9 @@ export default function App() {
         </div>
       </main>
 
-      <Toaster
-        theme="dark"
-        position="bottom-right"
-        richColors
-        toastOptions={{
-          style: {
-            background: "#1A1D27",
-            border: "1px solid #2A2D3A",
-            color: "#FFFFFF",
-          },
-        }}
-      />
+      {/* richColors gives full vibrant success/error fills — no custom
+          style override (that would defeat richColors). */}
+      <Toaster theme="dark" position="bottom-right" richColors closeButton />
     </div>
   );
 }
