@@ -15,7 +15,10 @@ import {
  */
 
 export const ROUTER_URL = "https://router-api.0g.ai/v1";
-export const STASH_MODEL = "zai-org/GLM-5-FP8";
+// Verified against the live /v1/models catalog — the spec's
+// "zai-org/GLM-5-FP8" does not exist on the Router. glm-5 is the
+// general-purpose flagship; swap to glm-5.1 / deepseek-v3 if desired.
+export const STASH_MODEL = "glm-5";
 
 const API_KEY = import.meta.env.VITE_OG_COMPUTE_API_KEY;
 
