@@ -1,8 +1,11 @@
 import type {
   Budget,
+  ExpenseCategory,
   Hustle,
   Ledger,
+  ParsedExpense,
   Scholarship,
+  Transaction,
   UrgencyColor,
 } from "@/types";
 
@@ -173,4 +176,83 @@ export function totalActiveIncome(hustles: Hustle[]): number {
   return hustles
     .filter((h) => h.status === "active")
     .reduce((sum, h) => sum + h.monthlyValue, 0);
+}
+
+/** ───────────────── Expense parsing ───────────────── */
+
+/** Keyword → category. First match wins. */
+const CATEGORY_KEYWORDS: [ExpenseCategory, string[]][] = [
+  ["transport", ["transport", "transit", "bus", "uber", "bolt", "taxi", "fuel", "fare", "ride", "cab"]],
+  ["data", ["data", "subscription", "internet", "wifi", "mtn", "airtel", "glo", "9mobile"]],
+  ["airtime", ["airtime", "recharge", "call credit"]],
+  ["printing", ["print", "printing", "photocopy", "binding"]],
+  ["food", ["food", "lunch", "dinner", "breakfast", "snack", "meal", "eat"]],
+  ["rent", ["rent", "accommodation", "hostel"]],
+];
+
+function categorize(lower: string): { category: ExpenseCategory; label: string } {
+  let category: ExpenseCategory = "other";
+  for (const [cat, words] of CATEGORY_KEYWORDS) {
+    if (words.some((w) => lower.includes(w))) {
+      category = cat;
+      break;
+    }
+  }
+
+  // Prefer the noun after "on"/"for" as the human label.
+  const noun = lower.match(/\b(?:on|for)\s+([a-z][a-z\s]{1,30})/);
+  const label = noun
+    ? noun[1].trim().replace(/\s+(today|now|please)$/, "")
+    : category === "other"
+      ? "expense"
+      : category;
+
+  return { category, label: label.charAt(0).toUpperCase() + label.slice(1) };
+}
+
+/**
+ * Parse a natural-language expense like "Spent ₦2,000 on transport" or
+ * "₦3.5k for data". Returns null when the message isn't an expense
+ * (no amount, or no spend signal) so it can fall through to the agent.
+ */
+export function parseExpense(text: string): ParsedExpense | null {
+  const lower = text.toLowerCase();
+
+  const amountMatch = lower.match(
+    /(?:₦|ngn|naira)?\s*(\d[\d,]*(?:\.\d+)?)\s*(k|m)?\b/,
+  );
+  if (!amountMatch) return null;
+
+  let amount = parseFloat(amountMatch[1].replace(/,/g, ""));
+  if (amountMatch[2] === "k") amount *= 1_000;
+  if (amountMatch[2] === "m") amount *= 1_000_000;
+  if (!isFinite(amount) || amount <= 0) return null;
+
+  const hasSpendVerb = /\b(spent|spend|paid|pay|bought|buy|cost|used)\b/.test(
+    lower,
+  );
+  const hasCurrency = /₦|ngn|naira/.test(lower);
+  // Need a spend signal so questions like "how much have I spent?" (no
+  // amount) and statements like "I have 5000 left" don't get logged.
+  if (!hasSpendVerb && !hasCurrency) return null;
+
+  const { category, label } = categorize(lower);
+  return { amount: Math.round(amount), label, category };
+}
+
+/** Append an expense and update the spent total. Returns a new ledger. */
+export function addExpense(ledger: Ledger, parsed: ParsedExpense): Ledger {
+  const tx: Transaction = {
+    id: crypto.randomUUID(),
+    type: "expense",
+    amount: parsed.amount,
+    label: parsed.label,
+    category: parsed.category,
+    createdAt: new Date().toISOString(),
+  };
+  return {
+    ...ledger,
+    transactions: [...ledger.transactions, tx],
+    budget: { ...ledger.budget, spent: ledger.budget.spent + parsed.amount },
+  };
 }
