@@ -7,11 +7,10 @@ import { useAgent } from "@/hooks/useAgent";
 
 export default function App() {
   const { ledger } = useLedger();
-  const { messages } = useAgent();
+  const { messages, isThinking, send } = useAgent();
 
-  // Placeholder until step 5 wires the agent + ledger together.
   const handleSend = (text: string) => {
-    console.log("send:", text);
+    void send(text, ledger);
   };
 
   return (
@@ -39,7 +38,11 @@ export default function App() {
 
           {/* RIGHT: Stash Agent — 60% */}
           <div className="lg:col-span-3 lg:h-[calc(100vh-9rem)]">
-            <ChatWindow messages={messages} onSend={handleSend} />
+            <ChatWindow
+              messages={messages}
+              onSend={handleSend}
+              isThinking={isThinking}
+            />
           </div>
         </div>
       </main>
