@@ -10,19 +10,40 @@ import {
 /**
  * 0G Compute integration — the Stash AI agent.
  *
- * Calls the 0G Compute Router (OpenAI-compatible) with the live ledger
- * injected into the system prompt, so every reply is specific to Samuel.
+ * Calls an OpenAI-compatible chat endpoint with the live ledger injected
+ * into the system prompt, so every reply is specific to Samuel.
+ *
+ * PROVIDER: defaults to the 0G Compute Router (router-api.0g.ai). The
+ * Router is billed against a mainnet 0G balance; for a testnet/hackathon
+ * build where that balance isn't available, point VITE_AI_BASE_URL /
+ * VITE_AI_API_KEY / VITE_AI_MODEL at any OpenAI-compatible provider
+ * (Anthropic, OpenAI, Together, …). The request shape, system prompt,
+ * ledger injection, and error handling are identical either way — only
+ * the endpoint, key, and model name change. Set VITE_AI_BASE_URL back to
+ * "https://router-api.0g.ai/v1" (model glm-5) once the mainnet Router
+ * balance is funded to run fully on 0G Compute.
  */
 
+/** 0G Compute Router defaults — used when no fallback provider is set. */
 export const ROUTER_URL = "https://router-api.0g.ai/v1";
 // Verified against the live /v1/models catalog — the spec's
 // "zai-org/GLM-5-FP8" does not exist on the Router. glm-5 is the
 // general-purpose flagship; swap to glm-5.1 / deepseek-v3 if desired.
-export const STASH_MODEL = "glm-5";
+export const ROUTER_MODEL = "glm-5";
 
-const API_KEY = import.meta.env.VITE_OG_COMPUTE_API_KEY;
+/**
+ * Resolved provider config: the optional OpenAI-compatible fallback
+ * (VITE_AI_*) takes precedence; otherwise the 0G Router (VITE_OG_*).
+ */
+const BASE_URL = import.meta.env.VITE_AI_BASE_URL?.replace(/\/$/, "") || ROUTER_URL;
+const API_KEY =
+  import.meta.env.VITE_AI_API_KEY || import.meta.env.VITE_OG_COMPUTE_API_KEY;
+export const STASH_MODEL = import.meta.env.VITE_AI_MODEL || ROUTER_MODEL;
 
-/** True when the Router API key is present. */
+/** Whether the active provider is the 0G Router (vs a fallback). */
+export const usingRouter = BASE_URL === ROUTER_URL;
+
+/** True when an API key is present for the active provider. */
 export function isComputeConfigured(): boolean {
   return Boolean(API_KEY);
 }
@@ -130,7 +151,11 @@ export async function askStash(
 
   let res: Response;
   try {
-    res = await fetch(`${ROUTER_URL}/chat/completions`, {
+    // OpenAI-compatible chat completion. Endpoint/key/model come from the
+    // resolved provider config above — the 0G Compute Router by default,
+    // or a VITE_AI_* fallback for testnet builds without a mainnet Router
+    // balance. Point VITE_AI_BASE_URL at router-api.0g.ai/v1 to go native.
+    res = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${API_KEY}`,
@@ -145,7 +170,7 @@ export async function askStash(
     });
   } catch (e) {
     throw new StashComputeError(
-      "Couldn't reach 0G Compute. Check your connection and try again.",
+      "Couldn't reach the AI provider. Check your connection and try again.",
       { cause: e },
     );
   }
@@ -153,12 +178,13 @@ export async function askStash(
   if (!res.ok) {
     const detail = await res.json().catch(() => null);
     const code = detail?.error?.code;
-    if (res.status === 402 || code === "insufficient_balance") {
+    if (usingRouter && (res.status === 402 || code === "insufficient_balance")) {
       throw new StashComputeError(
         "Stash's 0G Compute balance is empty. Top it up at pc.0g.ai to keep chatting.",
       );
     }
-    const msg = detail?.error?.message ?? `Router error (${res.status}).`;
+    const msg =
+      detail?.error?.message ?? `AI provider error (${res.status}).`;
     throw new StashComputeError(msg);
   }
 
