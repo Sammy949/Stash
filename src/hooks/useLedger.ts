@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Ledger, ParsedTransaction, SyncPhase } from "@/types";
-import { SEED_LEDGER, addTransaction, migrateLedger } from "@/lib/ledger";
+import { EMPTY_LEDGER, addTransaction, migrateLedger } from "@/lib/ledger";
 import {
   getStoredRootHash,
   isStorageConfigured,
@@ -23,8 +23,8 @@ function shortRoot(rootHash: string): string {
  * always read the latest ledger.
  */
 export function useLedger() {
-  const ref = useRef<Ledger>(SEED_LEDGER);
-  const [ledger, setLedgerState] = useState<Ledger>(SEED_LEDGER);
+  const ref = useRef<Ledger>(EMPTY_LEDGER);
+  const [ledger, setLedgerState] = useState<Ledger>(EMPTY_LEDGER);
   const [hydrating, setHydrating] = useState<boolean>(
     isStorageConfigured() && Boolean(getStoredRootHash()),
   );
@@ -89,11 +89,19 @@ export function useLedger() {
     return next;
   }, []);
 
+  /** Set the owner (from onboarding); returns the updated ledger. */
+  const setOwner = useCallback((name: string): Ledger => {
+    const next = { ...ref.current, owner: name };
+    setLedger(next);
+    return next;
+  }, []);
+
   return {
     ledger,
     hydrating,
     syncPhase,
     sync,
     logTransaction,
+    setOwner,
   };
 }

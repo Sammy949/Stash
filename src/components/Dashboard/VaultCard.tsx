@@ -106,7 +106,9 @@ export function VaultCard({
       <p className="mt-4 text-center text-[11px] text-muted">
         {hydrating
           ? "Restoring from 0G Storage…"
-          : formatSyncedAt(ledger.lastSyncedAt)}
+          : ledger.transactions.length === 0
+            ? "Tell Stash about your money below to get started."
+            : formatSyncedAt(ledger.lastSyncedAt)}
       </p>
     </section>
   );

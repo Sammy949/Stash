@@ -29,6 +29,12 @@ export function ScholarshipRadar({
         <RadarIcon className="h-4 w-4 text-muted" />
       </div>
 
+      {scholarships.length === 0 && (
+        <p className="mt-4 rounded-xl border border-dashed border-line px-3 py-4 text-center text-xs text-muted">
+          No scholarships tracked yet.
+        </p>
+      )}
+
       <ul className="mt-4 space-y-1">
         {scholarships.map((s) => {
           const urgency = deriveUrgency(s);

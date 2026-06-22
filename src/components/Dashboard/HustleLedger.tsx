@@ -27,6 +27,12 @@ export function HustleLedger({ hustles }: { hustles: Hustle[] }) {
         <BoltIcon className="h-4 w-4 text-amber" />
       </div>
 
+      {hustles.length === 0 && (
+        <p className="mt-4 rounded-xl border border-dashed border-line px-3 py-4 text-center text-xs text-muted">
+          No income streams yet.
+        </p>
+      )}
+
       <ul className="mt-4 space-y-1">
         {hustles.map((h) => (
           <li
