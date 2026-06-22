@@ -1,7 +1,5 @@
 import type {
-  ExpenseCategory,
   Hustle,
-  IncomeTag,
   Ledger,
   ParsedTransaction,
   Scholarship,
@@ -121,80 +119,6 @@ export function totalActiveIncome(hustles: Hustle[]): number {
   return hustles
     .filter((h) => h.status === "active")
     .reduce((sum, h) => sum + h.monthlyValue, 0);
-}
-
-/** ───────────────── Natural-language parsing ───────────────── */
-
-/** Keyword → category. First match wins. */
-const CATEGORY_KEYWORDS: [ExpenseCategory, string[]][] = [
-  ["transport", ["transport", "transit", "bus", "uber", "bolt", "taxi", "fuel", "fare", "ride", "cab"]],
-  ["data", ["data", "subscription", "internet", "wifi", "mtn", "airtel", "glo", "9mobile"]],
-  ["airtime", ["airtime", "recharge", "call credit"]],
-  ["printing", ["print", "printing", "photocopy", "binding"]],
-  ["food", ["food", "lunch", "dinner", "breakfast", "snack", "meal", "eat"]],
-  ["rent", ["rent", "accommodation", "hostel"]],
-];
-
-function categorize(lower: string): { category: ExpenseCategory; label: string } {
-  let category: ExpenseCategory = "other";
-  for (const [cat, words] of CATEGORY_KEYWORDS) {
-    if (words.some((w) => lower.includes(w))) {
-      category = cat;
-      break;
-    }
-  }
-  const noun = lower.match(/\b(?:on|for|from)\s+([a-z][a-z\s]{1,30})/);
-  const label = noun
-    ? noun[1].trim().replace(/\s+(today|now|please)$/, "")
-    : category === "other"
-      ? "expense"
-      : category;
-  return { category, label: label.charAt(0).toUpperCase() + label.slice(1) };
-}
-
-/**
- * Parse a natural-language money statement into a transaction. Handles
- * both expenses ("Spent ₦2,000 on transport") and income ("got paid
- * ₦50k from a client"). Returns null when it isn't a money statement, so
- * it falls through to the conversational agent.
- */
-export function parseTransaction(text: string): ParsedTransaction | null {
-  const lower = text.toLowerCase();
-
-  const amountMatch = lower.match(/(?:₦|ngn|naira)?\s*(\d[\d,]*(?:\.\d+)?)\s*(k|m)?\b/);
-  if (!amountMatch) return null;
-
-  let amount = parseFloat(amountMatch[1].replace(/,/g, ""));
-  if (amountMatch[2] === "k") amount *= 1_000;
-  if (amountMatch[2] === "m") amount *= 1_000_000;
-  if (!isFinite(amount) || amount <= 0) return null;
-
-  const incomeSignal =
-    /\b(got paid|paid me|received|earned|made|income|deposit(?:ed)?|credited|salary|stipend|disbursed|sent me|cash(?:ed)? in)\b/.test(
-      lower,
-    );
-  const expenseSignal = /\b(spent|spend|paid|pay|bought|buy|cost|used)\b/.test(lower);
-  const hasCurrency = /₦|ngn|naira/.test(lower);
-
-  // Income wins if an income phrase is present; otherwise treat as an
-  // expense when there's a spend verb or a currency amount.
-  if (incomeSignal) {
-    const after = lower.match(/\bfrom\s+([a-z][a-z0-9\s]{1,30})/);
-    const label = after
-      ? after[1].trim().replace(/\s+(today|now|please)$/, "")
-      : "income";
-    return {
-      type: "income",
-      amount: Math.round(amount),
-      label: label.charAt(0).toUpperCase() + label.slice(1),
-      tag: "Other" as IncomeTag,
-    };
-  }
-
-  if (!expenseSignal && !hasCurrency) return null;
-
-  const { category, label } = categorize(lower);
-  return { type: "expense", amount: Math.round(amount), label, category };
 }
 
 /** ───────────────── Mutations (pure) ───────────────── */

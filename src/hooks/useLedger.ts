@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { Currency, Ledger, ParsedTransaction, SyncPhase } from "@/types";
-import { EMPTY_LEDGER, addTransaction, migrateLedger } from "@/lib/ledger";
+import type { Currency, Ledger, SyncPhase } from "@/types";
+import { EMPTY_LEDGER, migrateLedger } from "@/lib/ledger";
 import {
   getStoredRootHash,
   isStorageConfigured,
@@ -83,13 +83,6 @@ export function useLedger() {
     }
   }, []);
 
-  /** Log a parsed transaction (income or expense); returns updated ledger. */
-  const logTransaction = useCallback((parsed: ParsedTransaction): Ledger => {
-    const next = addTransaction(ref.current, parsed);
-    setLedger(next);
-    return next;
-  }, []);
-
   /** Replace the ledger wholesale (used when the agent mutates via tools). */
   const applyLedger = useCallback((next: Ledger) => {
     setLedger(next);
@@ -119,7 +112,6 @@ export function useLedger() {
     hydrating,
     syncPhase,
     sync,
-    logTransaction,
     applyLedger,
     initProfile,
   };
