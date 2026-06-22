@@ -68,16 +68,13 @@ A conversational agent with full ledger context. It knows your balance, deadline
 
 ---
 
-## Tech stack
+## Tech Stack
 
-| Layer | Choice |
-|---|---|
-| Frontend | React 18 + TypeScript (strict) + Vite 6 |
-| Styling | Tailwind CSS v4 (`@theme` design tokens, dark mode only) |
-| Decentralized storage | `@0gfoundation/0g-storage-ts-sdk@1.2.10` |
-| Chain / signing | `ethers@6.13.1` (pinned — SDK peer requirement) |
-| AI inference | OpenAI-compatible (0G Compute Router by default; Groq fallback) |
-| Network | 0G Galileo Testnet (Chain ID `16602`) |
+- React 18 + TypeScript + Vite 6
+- 0G Storage (AES-256 encrypted ledger persistence)
+- 0G Compute Router (OpenAI-compatible inference)
+- Groq llama-3.3-70b (demo inference provider)
+- Tailwind CSS v4, ethers.js
 
 ---
 
