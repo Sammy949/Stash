@@ -16,7 +16,11 @@ import type {
  * balance is always DERIVED (never stored): see `balance()`.
  */
 
-/** A brand-new user's ledger — the empty-first starting point (onboarding). */
+/**
+ * A brand-new user's ledger — the empty-first starting point. Onboarding
+ * fills in owner/currency/openingBalance; everything else grows from the
+ * user's own entries. No hardcoded demo data anywhere.
+ */
 export const EMPTY_LEDGER: Ledger = {
   version: 2,
   owner: "",
@@ -26,40 +30,6 @@ export const EMPTY_LEDGER: Ledger = {
   transactions: [],
   scholarships: [],
   hustles: [],
-  lastSyncedAt: null,
-};
-
-/** Realistic demo ledger — balance is computed from these transactions. */
-export const SEED_LEDGER: Ledger = {
-  version: 2,
-  owner: "Samuel",
-  currency: "NGN",
-  openingBalance: 0,
-  monthlyBudget: 45_000,
-  transactions: [
-    // Income
-    { id: "tx-cbhf", type: "income", amount: 150_000, label: "Brand Identity — CBHF Project", tag: "Design", createdAt: "2026-06-10T10:00:00.000Z" },
-    { id: "tx-bootcamp", type: "income", amount: 25_000, label: "Coding Bootcamp Teaching", tag: "Teaching", createdAt: "2026-06-15T09:00:00.000Z" },
-    // Expenses (sum ₦21,400)
-    { id: "tx-e1", type: "expense", amount: 9_000, label: "Food", category: "food", createdAt: "2026-06-12T13:00:00.000Z" },
-    { id: "tx-e2", type: "expense", amount: 5_000, label: "Data", category: "data", createdAt: "2026-06-13T08:00:00.000Z" },
-    { id: "tx-e3", type: "expense", amount: 4_000, label: "Transport", category: "transport", createdAt: "2026-06-16T17:00:00.000Z" },
-    { id: "tx-e4", type: "expense", amount: 2_400, label: "Printing", category: "printing", createdAt: "2026-06-17T11:00:00.000Z" },
-    { id: "tx-e5", type: "expense", amount: 1_000, label: "Airtime", category: "airtime", createdAt: "2026-06-18T19:00:00.000Z" },
-  ],
-  scholarships: [
-    { id: "mext", name: "MEXT Japanese Government Scholarship 2027", status: "documents_submitted", statusLabel: "Documents Submitted", color: "emerald" },
-    { id: "mastercard", name: "Mastercard Foundation Scholars Program", status: "deadline", statusLabel: "Deadline", deadline: "2026-07-15", color: "amber" },
-    { id: "alu", name: "ALU Rwanda BSc Software Engineering", status: "pending_confirmation", statusLabel: "Pending Confirmation", color: "amber" },
-    { id: "turkiye", name: "Türkiye Burslari Scholarship", status: "opens_later", statusLabel: "Opens Early 2027", color: "muted" },
-    { id: "kgsp", name: "KGSP Korean Government Scholarship", status: "deadline", statusLabel: "Deadline", deadline: "2026-09-30", color: "emerald" },
-  ],
-  hustles: [
-    { id: "cbhf", name: "Brand Identity — CBHF Project", amountLabel: "₦150,000", monthlyValue: 0, status: "received", tag: "Design" },
-    { id: "bootcamp", name: "Coding Bootcamp Teaching", amountLabel: "₦25,000/mo", monthlyValue: 25_000, status: "active", tag: "Teaching" },
-    { id: "logo", name: "Freelance Logo Design", amountLabel: "₦35,000", monthlyValue: 0, status: "pending", tag: "Design" },
-    { id: "medium", name: "Medium Writing (@samywrites)", amountLabel: "₦0", monthlyValue: 0, status: "building", tag: "Writing" },
-  ],
   lastSyncedAt: null,
 };
 
