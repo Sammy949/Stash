@@ -6,17 +6,21 @@
    border-line, text-emerald, etc.) via @theme.
 ─────────────────────────────────────────────── */
 @theme {
-  --color-bg: #0f1117;
-  --color-card: #1a1d27;
-  --color-line: #2a2d3a;
+  /* Calm deep-navy surfaces — one accent (blue). */
+  --color-bg: #080c14;
+  --color-card: #0f172a;
+  --color-line: #1e293b;
 
-  --color-ink: #ffffff;
-  --color-muted: #a0a8b8;
+  --color-ink: #f8fafc;
+  --color-muted: #8a94a8;
 
-  --color-emerald: #10b981;
+  /* NOTE: `emerald` is now the BLUE brand accent (interim name — the
+     whole app references `*-emerald`; we rename the token in a later
+     cosmetic pass). Amber/red stay strictly for urgency/warnings. */
+  --color-emerald: #3b82f6;
   --color-amber: #f59e0b;
   --color-red: #ef4444;
-  --color-slate: #2f3343;
+  --color-slate: #1e293b;
 
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -58,16 +62,16 @@
    Micro-animations (smooth, not flashy)
 ─────────────────────────────────────────────── */
 @layer utilities {
-  /* Emerald pulse used on 0G sync confirmations */
+  /* Blue accent pulse used on 0G sync confirmations */
   @keyframes stash-pulse {
     0% {
-      box-shadow: 0 0 0 0 rgb(16 185 129 / 0.45);
+      box-shadow: 0 0 0 0 rgb(59 130 246 / 0.45);
     }
     70% {
-      box-shadow: 0 0 0 10px rgb(16 185 129 / 0);
+      box-shadow: 0 0 0 10px rgb(59 130 246 / 0);
     }
     100% {
-      box-shadow: 0 0 0 0 rgb(16 185 129 / 0);
+      box-shadow: 0 0 0 0 rgb(59 130 246 / 0);
     }
   }
   .animate-stash-pulse {
