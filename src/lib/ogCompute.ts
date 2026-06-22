@@ -1,10 +1,11 @@
 import type { ChatMessage, Ledger } from "@/types";
 import {
+  balance,
   daysUntil,
   formatNaira,
-  remaining,
-  spentPct,
   totalActiveIncome,
+  totalExpenses,
+  totalIncome,
 } from "@/lib/ledger";
 
 /**
@@ -55,16 +56,16 @@ export class StashComputeError extends Error {}
 
 /** Render the ledger into a compact, readable snapshot for the prompt. */
 function renderLedgerSnapshot(ledger: Ledger): string {
-  const { budget } = ledger;
   const lines: string[] = [];
 
   lines.push(
-    `Budget: ${formatNaira(budget.total)} total · ${formatNaira(
-      budget.spent,
-    )} spent · ${formatNaira(remaining(budget))} remaining (${Math.round(
-      spentPct(budget),
-    )}% spent).`,
+    `Balance: ${formatNaira(balance(ledger))} (income ${formatNaira(
+      totalIncome(ledger),
+    )} − expenses ${formatNaira(totalExpenses(ledger))}).`,
   );
+  if (ledger.monthlyBudget) {
+    lines.push(`Monthly budget cap: ${formatNaira(ledger.monthlyBudget)}.`);
+  }
   lines.push(
     `Recurring active income: ${formatNaira(totalActiveIncome(ledger.hustles))}/mo.`,
   );

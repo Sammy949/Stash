@@ -6,13 +6,13 @@ import { ChatWindow } from "@/components/Agent/ChatWindow";
 import { SYNC_CHIP } from "@/components/Agent/QuickChips";
 import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
-import { parseExpense } from "@/lib/ledger";
+import { parseTransaction } from "@/lib/ledger";
 
 const SYNC_CONFIRMATION =
   "Your financial data is encrypted and stored on 0G's decentralized network. Nobody else can access it. It'll be here next time you open Stash.";
 
 export default function App() {
-  const { ledger, hydrating, syncPhase, sync, logExpense } = useLedger();
+  const { ledger, hydrating, syncPhase, sync, logTransaction } = useLedger();
   const { messages, isThinking, send, pushAssistant } = useAgent();
 
   async function handleSend(text: string) {
@@ -27,10 +27,11 @@ export default function App() {
       return;
     }
 
-    // 2. Natural-language expense → update dashboard + sync, agent acks.
-    const expense = parseExpense(text);
-    if (expense) {
-      const updated = logExpense(expense);
+    // 2. Natural-language money statement (income or expense) → update
+    //    dashboard + sync, agent acknowledges with the new numbers.
+    const txn = parseTransaction(text);
+    if (txn) {
+      const updated = logTransaction(txn);
       void sync(updated);
       void send(text, updated);
       return;

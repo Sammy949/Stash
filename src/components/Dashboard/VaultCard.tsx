@@ -1,9 +1,11 @@
 import type { Ledger, SyncPhase } from "@/types";
 import {
+  balance,
   formatNaira,
   formatSyncedAt,
-  remaining,
-  spentPct,
+  outflowPct,
+  totalExpenses,
+  totalIncome,
 } from "@/lib/ledger";
 import { AnimatedNumber } from "@/components/UI/AnimatedNumber";
 import { SyncIndicator } from "@/components/UI/SyncIndicator";
@@ -23,9 +25,11 @@ export function VaultCard({
   syncPhase?: SyncPhase;
   hydrating?: boolean;
 }) {
-  const { budget } = ledger;
-  const pct = spentPct(budget);
-  const left = remaining(budget);
+  const bal = balance(ledger);
+  const income = totalIncome(ledger);
+  const expenses = totalExpenses(ledger);
+  const pct = outflowPct(ledger);
+  const ringLabel = ledger.monthlyBudget ? "of budget spent" : "of income spent";
   const offset = CIRCUMFERENCE * (1 - pct / 100);
 
   return (
@@ -78,22 +82,24 @@ export function VaultCard({
               }}
             />
           </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
+            <span className="text-[11px] text-muted">Balance</span>
             <AnimatedNumber
-              value={Math.round(pct)}
-              format={(n) => `${n}%`}
-              className="text-3xl font-semibold tabular-nums"
+              value={bal}
+              format={formatNaira}
+              className="text-2xl font-semibold tabular-nums"
             />
-            <span className="mt-0.5 text-xs text-muted">of budget spent</span>
+            <span className="mt-0.5 text-[11px] text-muted">
+              {Math.round(pct)}% {ringLabel}
+            </span>
           </div>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-        <Stat label="Budget" value={budget.total} />
-        <Stat label="Spent" value={budget.spent} accent="amber" />
-        <Stat label="Remaining" value={left} accent="emerald" />
+      <div className="mt-5 grid grid-cols-2 gap-2 text-center">
+        <Stat label="Income" value={income} accent="emerald" />
+        <Stat label="Expenses" value={expenses} accent="amber" />
       </div>
 
       {/* Footer */}

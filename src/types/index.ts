@@ -75,22 +75,26 @@ export interface Hustle {
   tag: IncomeTag;
 }
 
-/** ───────────────── Budget / Vault ───────────────── */
-
-export interface Budget {
-  total: number;
-  /** Sum of expenses; kept denormalized for instant UI, recomputed on load. */
-  spent: number;
-}
-
 /** ───────────────── The persisted ledger ───────────────── */
 
+/**
+ * Expenses and income are the source of truth. The spendable balance is
+ * DERIVED — never stored — as:
+ *
+ *   balance = openingBalance + Σ(income) − Σ(expenses)
+ *
+ * `monthlyBudget` is an optional cap the user sets later (or the agent
+ * suggests); it is not where money "comes from". Null until set.
+ */
 export interface Ledger {
   /** Schema version so we can migrate the stored JSON later. */
   version: number;
   owner: string;
   currency: Currency;
-  budget: Budget;
+  /** Money the user already had before they started logging. */
+  openingBalance: number;
+  /** Optional monthly spending cap. Null until the user sets one. */
+  monthlyBudget: number | null;
   transactions: Transaction[];
   scholarships: Scholarship[];
   hustles: Hustle[];
@@ -125,9 +129,11 @@ export interface ChatMessage {
   pending?: boolean;
 }
 
-/** A parsed expense extracted from natural language. */
-export interface ParsedExpense {
+/** A transaction parsed from natural language (expense or income). */
+export interface ParsedTransaction {
+  type: TransactionType;
   amount: number;
   label: string;
-  category: ExpenseCategory;
+  category?: ExpenseCategory;
+  tag?: IncomeTag;
 }

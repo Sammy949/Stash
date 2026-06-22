@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { Ledger, ParsedExpense, SyncPhase } from "@/types";
-import { SEED_LEDGER, addExpense } from "@/lib/ledger";
+import type { Ledger, ParsedTransaction, SyncPhase } from "@/types";
+import { SEED_LEDGER, addTransaction, migrateLedger } from "@/lib/ledger";
 import {
   getStoredRootHash,
   isStorageConfigured,
@@ -46,7 +46,7 @@ export function useLedger() {
     (async () => {
       try {
         const restored = await loadLedger(root);
-        if (!cancelled) setLedger(restored);
+        if (!cancelled) setLedger(migrateLedger(restored));
       } catch (e) {
         console.warn("Ledger hydrate from 0G failed; using local state.", e);
       } finally {
@@ -82,9 +82,9 @@ export function useLedger() {
     }
   }, []);
 
-  /** Log a parsed expense locally and return the updated ledger. */
-  const logExpense = useCallback((parsed: ParsedExpense): Ledger => {
-    const next = addExpense(ref.current, parsed);
+  /** Log a parsed transaction (income or expense); returns updated ledger. */
+  const logTransaction = useCallback((parsed: ParsedTransaction): Ledger => {
+    const next = addTransaction(ref.current, parsed);
     setLedger(next);
     return next;
   }, []);
@@ -94,6 +94,6 @@ export function useLedger() {
     hydrating,
     syncPhase,
     sync,
-    logExpense,
+    logTransaction,
   };
 }
