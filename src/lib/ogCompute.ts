@@ -7,6 +7,7 @@ import {
   totalIncome,
 } from "@/lib/ledger";
 import { CURRENCIES, formatMoney } from "@/lib/currency";
+import { AGENT_TOOLS, applyAction } from "@/lib/agentTools";
 
 /**
  * 0G Compute integration — the Stash AI agent.
@@ -116,14 +117,26 @@ Your job:
 - Suggest realistic income opportunities that fit their skills.
 - Flag financial risks before they become problems.
 
-When they log an expense or income, confirm it and reflect the updated numbers. Money is in ${cur.name} (${cur.symbol}). Keep replies concise — a few short sentences unless they ask for depth.`;
+Acting on money (IMPORTANT):
+- When ${name} reports money going OUT (spent, paid, bought), you MUST call log_expense.
+- When money comes IN (got paid, a gift, allowance, disbursement), you MUST call log_income.
+- To set a budget cap, call set_monthly_budget. To undo a mistaken entry, call delete_last_transaction.
+- Do these by CALLING THE TOOL — never just describe the change in words.
+- NEVER invent or hand-calculate balances. After a tool runs you get the result; state the new balance only from the snapshot/tool results above, not your own arithmetic.
+
+Money is in ${cur.name} (${cur.symbol}). Keep replies concise — a few short sentences unless they ask for depth.`;
 }
 
 /** ───────────────── inference ───────────────── */
 
+/** Loose message shape — covers system/user/assistant + tool messages. */
+type ChatRole = "system" | "user" | "assistant" | "tool";
 interface RouterMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
+  role: ChatRole;
+  content: string | null;
+  // Present on assistant messages that requested tools, and tool replies.
+  tool_calls?: unknown;
+  tool_call_id?: string;
 }
 
 /** Map the UI transcript to Router messages (drop pending placeholders). */
@@ -133,32 +146,13 @@ function toRouterMessages(history: ChatMessage[]): RouterMessage[] {
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 }
 
-/**
- * Ask Stash. `history` is the full transcript including the latest user
- * turn; `ledger` is injected into the system prompt for personalization.
- * Returns the assistant's reply text.
- */
-export async function askStash(
-  history: ChatMessage[],
-  ledger: Ledger,
-): Promise<string> {
-  if (!isComputeConfigured()) {
-    throw new StashComputeError(
-      "0G Compute is not configured — set VITE_OG_COMPUTE_API_KEY in your .env.",
-    );
-  }
-
-  const messages: RouterMessage[] = [
-    { role: "system", content: buildSystemPrompt(ledger) },
-    ...toRouterMessages(history),
-  ];
-
+/** One OpenAI-compatible chat completion; returns the raw `message` object. */
+async function chatCompletion(
+  messages: RouterMessage[],
+  tools?: unknown,
+): Promise<{ content: string | null; tool_calls?: ToolCall[] }> {
   let res: Response;
   try {
-    // OpenAI-compatible chat completion. Endpoint/key/model come from the
-    // resolved provider config above — the 0G Compute Router by default,
-    // or a VITE_AI_* fallback for testnet builds without a mainnet Router
-    // balance. Point VITE_AI_BASE_URL at router-api.0g.ai/v1 to go native.
     res = await fetch(`${BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
@@ -168,8 +162,9 @@ export async function askStash(
       body: JSON.stringify({
         model: STASH_MODEL,
         messages,
-        temperature: 0.6,
-        max_tokens: 600,
+        temperature: 0.5,
+        max_tokens: 700,
+        ...(tools ? { tools, tool_choice: "auto" } : {}),
       }),
     });
   } catch (e) {
@@ -187,15 +182,83 @@ export async function askStash(
         "Stash's 0G Compute balance is empty. Top it up at pc.0g.ai to keep chatting.",
       );
     }
-    const msg =
-      detail?.error?.message ?? `AI provider error (${res.status}).`;
-    throw new StashComputeError(msg);
+    throw new StashComputeError(
+      detail?.error?.message ?? `AI provider error (${res.status}).`,
+    );
   }
 
   const data = await res.json();
-  const content: string | undefined = data?.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new StashComputeError("0G Compute returned an empty response.");
+  return data?.choices?.[0]?.message ?? { content: null };
+}
+
+interface ToolCall {
+  id: string;
+  function: { name: string; arguments: string };
+}
+
+export interface AgentTurn {
+  reply: string;
+  ledger: Ledger;
+  /** True if any tool actually changed the ledger. */
+  mutated: boolean;
+}
+
+/**
+ * Run one agent turn. The model may call tools (log_expense/income, etc.);
+ * each is applied to a working copy of the ledger via pure reducers, the
+ * results are fed back, and the model writes a final reply grounded in
+ * what actually happened. Returns the updated ledger + reply.
+ */
+export async function runAgentTurn(
+  history: ChatMessage[],
+  ledger: Ledger,
+): Promise<AgentTurn> {
+  if (!isComputeConfigured()) {
+    throw new StashComputeError(
+      "0G Compute is not configured — set VITE_AI_API_KEY (dev) or AI_API_KEY (prod).",
+    );
   }
-  return content.trim();
+
+  let working = ledger;
+  const messages: RouterMessage[] = [
+    { role: "system", content: buildSystemPrompt(ledger), tool_calls: undefined },
+    ...toRouterMessages(history),
+  ];
+
+  let msg = await chatCompletion(messages, AGENT_TOOLS);
+
+  // Tool loop (bounded so a confused model can't spin forever).
+  let rounds = 0;
+  while (msg.tool_calls && msg.tool_calls.length > 0 && rounds < 4) {
+    rounds++;
+    // Echo the assistant's tool-call message back verbatim.
+    messages.push({
+      role: "assistant",
+      content: msg.content ?? "",
+      tool_calls: msg.tool_calls,
+    });
+
+    for (const call of msg.tool_calls) {
+      let args: Record<string, unknown> = {};
+      try {
+        args = JSON.parse(call.function.arguments || "{}");
+      } catch {
+        /* leave args empty on malformed JSON */
+      }
+      const result = applyAction(working, call.function.name, args);
+      working = result.ledger;
+      messages.push({
+        role: "tool",
+        tool_call_id: call.id,
+        content: result.summary,
+      });
+    }
+
+    // Refresh the snapshot so the model's final reply sees the new balance.
+    messages[0] = { role: "system", content: buildSystemPrompt(working) };
+    msg = await chatCompletion(messages, AGENT_TOOLS);
+  }
+
+  const reply = (msg.content ?? "").trim() || "Done.";
+  return { reply, ledger: working, mutated: working !== ledger };
 }

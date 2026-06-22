@@ -213,11 +213,25 @@ export function addTransaction(ledger: Ledger, parsed: ParsedTransaction): Ledge
   return { ...ledger, transactions: [...ledger.transactions, tx] };
 }
 
-/** Remove a transaction by id (for corrections / future agent actions). */
+/** Remove a transaction by id (for corrections / agent actions). */
 export function removeTransaction(ledger: Ledger, id: string): Ledger {
   return {
     ...ledger,
     transactions: ledger.transactions.filter((t) => t.id !== id),
+  };
+}
+
+/** Remove the most recently logged transaction (agent "undo that"). */
+export function removeLastTransaction(ledger: Ledger): Ledger {
+  if (ledger.transactions.length === 0) return ledger;
+  return { ...ledger, transactions: ledger.transactions.slice(0, -1) };
+}
+
+/** Set (or clear) the optional monthly budget cap. */
+export function setMonthlyBudget(ledger: Ledger, amount: number | null): Ledger {
+  return {
+    ...ledger,
+    monthlyBudget: amount && amount > 0 ? Math.round(amount) : null,
   };
 }
 

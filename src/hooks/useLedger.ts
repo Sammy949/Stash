@@ -90,6 +90,11 @@ export function useLedger() {
     return next;
   }, []);
 
+  /** Replace the ledger wholesale (used when the agent mutates via tools). */
+  const applyLedger = useCallback((next: Ledger) => {
+    setLedger(next);
+  }, []);
+
   /** Seed the ledger from onboarding (owner, currency, opening balance). */
   const initProfile = useCallback(
     (profile: {
@@ -115,6 +120,7 @@ export function useLedger() {
     syncPhase,
     sync,
     logTransaction,
+    applyLedger,
     initProfile,
   };
 }

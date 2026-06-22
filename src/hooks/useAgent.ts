@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import type { ChatMessage, Ledger } from "@/types";
-import { askStash, StashComputeError } from "@/lib/ogCompute";
+import { runAgentTurn, StashComputeError } from "@/lib/ogCompute";
 
 const OPENING_MESSAGE = `Hey. I'm Stash — your personal finance agent.
 I know your balance, your deadlines, and your income streams. I remember everything across sessions — your data lives on 0G Storage, encrypted and sovereign.
@@ -42,8 +42,17 @@ export function useAgent() {
     commit([...ref.current, makeMessage("assistant", content)]);
   }, []);
 
-  /** Send a user turn and stream the agent's reply into a pending bubble. */
-  const send = useCallback(async (text: string, ledger: Ledger) => {
+  /**
+   * Send a user turn. The agent may call tools that mutate the ledger; if
+   * so, `onLedgerUpdate` is invoked with the new ledger (App persists +
+   * syncs it). The reply streams into a pending bubble.
+   */
+  const send = useCallback(
+    async (
+      text: string,
+      ledger: Ledger,
+      onLedgerUpdate?: (next: Ledger) => void,
+    ) => {
     const userMsg = makeMessage("user", text);
     const history = [...ref.current, userMsg];
     const pending = makeMessage("assistant", "", { pending: true });
@@ -51,10 +60,13 @@ export function useAgent() {
     setIsThinking(true);
 
     try {
-      const reply = await askStash(history, ledger);
+      const turn = await runAgentTurn(history, ledger);
+      if (turn.mutated) onLedgerUpdate?.(turn.ledger);
       commit(
         ref.current.map((m) =>
-          m.id === pending.id ? { ...m, content: reply, pending: false } : m,
+          m.id === pending.id
+            ? { ...m, content: turn.reply, pending: false }
+            : m,
         ),
       );
     } catch (e) {

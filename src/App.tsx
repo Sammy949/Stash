@@ -9,7 +9,6 @@ import { Onboarding } from "@/components/Onboarding/Onboarding";
 import type { OnboardingProfile } from "@/components/Onboarding/Onboarding";
 import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
-import { parseTransaction } from "@/lib/ledger";
 import { getStoredRootHash } from "@/lib/ogStorage";
 
 const ONBOARDED_KEY = "stash_onboarded";
@@ -18,7 +17,7 @@ const SYNC_CONFIRMATION =
   "Your financial data is encrypted and stored on 0G's decentralized network. Nobody else can access it. It'll be here next time you open Stash.";
 
 export default function App() {
-  const { ledger, hydrating, syncPhase, sync, logTransaction, initProfile } =
+  const { ledger, hydrating, syncPhase, sync, applyLedger, initProfile } =
     useLedger();
   const { messages, isThinking, send, pushAssistant } = useAgent();
 
@@ -57,18 +56,12 @@ export default function App() {
       return;
     }
 
-    // 2. Natural-language money statement (income or expense) → update
-    //    dashboard + sync, agent acknowledges with the new numbers.
-    const txn = parseTransaction(text);
-    if (txn) {
-      const updated = logTransaction(txn);
+    // 2. Everything else → the agent. It may call tools that mutate the
+    //    ledger; when it does, persist the new ledger and sync to 0G.
+    void send(text, ledger, (updated) => {
+      applyLedger(updated);
       void sync(updated);
-      void send(text, updated);
-      return;
-    }
-
-    // 3. Everything else → the agent, with live ledger context.
-    void send(text, ledger);
+    });
   }
 
   return (
