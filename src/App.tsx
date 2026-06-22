@@ -1,8 +1,9 @@
-import { VaultCard } from "@/components/Dashboard/VaultCard";
-import { ScholarshipRadar } from "@/components/Dashboard/ScholarshipRadar";
-import { HustleLedger } from "@/components/Dashboard/HustleLedger";
+import { useState } from "react";
 import { Toaster } from "sonner";
-import { ChatWindow } from "@/components/Agent/ChatWindow";
+import { Dashboard } from "@/components/Dashboard/Dashboard";
+import { DashboardStrip } from "@/components/Dashboard/DashboardStrip";
+import { AgentPanel } from "@/components/Agent/AgentPanel";
+import { CommandBar } from "@/components/Agent/CommandBar";
 import { SYNC_CHIP } from "@/components/Agent/QuickChips";
 import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
@@ -15,7 +16,13 @@ export default function App() {
   const { ledger, hydrating, syncPhase, sync, logTransaction } = useLedger();
   const { messages, isThinking, send, pushAssistant } = useAgent();
 
+  // Split-Shift: dashboard is full by default; asking anything opens the
+  // agent panel (dashboard condenses to a strip). Tap the strip to return.
+  const [agentActive, setAgentActive] = useState(false);
+
   async function handleSend(text: string) {
+    setAgentActive(true);
+
     // 1. "Sync to 0G" chip → real storage sync, no Compute needed.
     if (text === SYNC_CHIP) {
       const ok = await sync();
@@ -42,45 +49,35 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-bg text-ink">
-      <header className="border-b border-line">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-6 py-4">
-          <img src="/vault.svg" alt="" className="h-7 w-7" />
-          <div>
-            <h1 className="text-base font-semibold leading-none">Stash</h1>
-            <p className="mt-1 text-xs text-muted">
-              Know where you stand. See what&apos;s coming. Stay ahead.
-            </p>
-          </div>
+    <div className="flex h-screen flex-col bg-bg text-ink">
+      {/* Top bar */}
+      <header className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-3">
+        <img src="/vault.svg" alt="" className="h-7 w-7" />
+        <div>
+          <h1 className="text-sm font-semibold leading-none">Stash</h1>
+          <p className="mt-1 text-[11px] text-muted">
+            Know where you stand. See what&apos;s coming. Stay ahead.
+          </p>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-6">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-          {/* LEFT: Dashboard — 40% */}
-          <div className="space-y-6 lg:col-span-2">
-            <VaultCard
-              ledger={ledger}
-              syncPhase={syncPhase}
-              hydrating={hydrating}
-            />
-            <ScholarshipRadar scholarships={ledger.scholarships} />
-            <HustleLedger hustles={ledger.hustles} />
-          </div>
-
-          {/* RIGHT: Stash Agent — 60% */}
-          <div className="lg:col-span-3 lg:h-[calc(100vh-9rem)]">
-            <ChatWindow
-              messages={messages}
-              onSend={handleSend}
-              isThinking={isThinking}
-            />
-          </div>
+      {/* Content — Split-Shift */}
+      {agentActive ? (
+        <div className="flex min-h-0 flex-1 animate-slide-up flex-col">
+          <DashboardStrip ledger={ledger} onExpand={() => setAgentActive(false)} />
+          <AgentPanel messages={messages} />
         </div>
-      </main>
+      ) : (
+        <main className="flex-1 overflow-y-auto px-4 py-6">
+          <Dashboard ledger={ledger} syncPhase={syncPhase} hydrating={hydrating} />
+        </main>
+      )}
 
-      {/* richColors gives full vibrant success/error fills — no custom
-          style override (that would defeat richColors). */}
+      {/* Command bar — always present */}
+      <div className="shrink-0">
+        <CommandBar onSend={handleSend} isThinking={isThinking} />
+      </div>
+
       <Toaster theme="dark" position="bottom-right" richColors closeButton />
     </div>
   );
