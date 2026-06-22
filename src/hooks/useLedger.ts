@@ -74,8 +74,9 @@ export function useLedger() {
     } catch (e) {
       console.error("0G Storage sync failed:", e);
       setSyncPhase("error");
-      toast.error("0G Storage sync failed", {
-        description: e instanceof Error ? e.message : "Upload didn't go through.",
+      toast.warning("Couldn't reach 0G just now", {
+        description:
+          e instanceof Error ? e.message : "Tap Sync to 0G again in a moment.",
       });
       window.setTimeout(() => setSyncPhase("idle"), 2800);
       return false;

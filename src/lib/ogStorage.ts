@@ -75,8 +75,31 @@ function deriveAesKey(
 /** ───────────────── save / load ───────────────── */
 
 /**
+/** How many times to attempt the upload before giving up. */
+const MAX_UPLOAD_ATTEMPTS = 3;
+
+const delayMs = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Truly fatal errors (bad key, no gas) — no point retrying these, and we
+ * surface their real message. Everything else (timeouts, unreachable
+ * storage nodes) is treated as a transient network hiccup and retried.
+ */
+function isFatalUploadError(err: unknown): boolean {
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return /insufficient funds|invalid private key|invalid sender|nonce|gas required exceeds|intrinsic gas/.test(
+    msg,
+  );
+}
+
+/**
  * Encrypt the ledger and upload it to 0G Storage. Returns the new root
  * hash (also persisted to localStorage) and the sync timestamp.
+ *
+ * Testnet storage nodes are occasionally flaky, so the upload is retried
+ * with backoff (fresh node selection each attempt). Fatal errors fail
+ * fast; transient failures surface a calm, non-scary message.
  */
 export async function saveLedger(
   ledger: Ledger,
@@ -90,25 +113,47 @@ export async function saveLedger(
   ]);
 
   const bytes = new TextEncoder().encode(JSON.stringify(ledger));
-  const file = new MemData(bytes);
-
   const provider = new ethers.JsonRpcProvider(rpc);
   const signer = new ethers.Wallet(privateKey, provider);
   const indexer = new Indexer(indexerUrl);
   const key = deriveAesKey(ethers, privateKey);
 
-  const [res, err] = await indexer.upload(file, rpc, signer, {
-    encryption: { type: "aes256", key },
-    onProgress,
-  });
-  if (err) throw err;
-  if (!res) throw new Error("0G upload returned no result");
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt++) {
+    try {
+      // Fresh MemData each attempt so no stale internal state carries over.
+      const file = new MemData(bytes);
+      const [res, err] = await indexer.upload(file, rpc, signer, {
+        encryption: { type: "aes256", key },
+        onProgress,
+      });
+      if (err) throw err;
+      if (!res) throw new Error("0G upload returned no result");
 
-  const rootHash = "rootHash" in res ? res.rootHash : res.rootHashes[0];
-  if (!rootHash) throw new Error("0G upload returned no root hash");
+      const rootHash = "rootHash" in res ? res.rootHash : res.rootHashes[0];
+      if (!rootHash) throw new Error("0G upload returned no root hash");
 
-  setStoredRootHash(rootHash);
-  return { rootHash, syncedAt: new Date().toISOString() };
+      setStoredRootHash(rootHash);
+      return { rootHash, syncedAt: new Date().toISOString() };
+    } catch (e) {
+      lastError = e;
+      if (isFatalUploadError(e) || attempt === MAX_UPLOAD_ATTEMPTS) break;
+      onProgress?.(
+        `Storage nodes busy — retrying (${attempt}/${MAX_UPLOAD_ATTEMPTS - 1})…`,
+      );
+      await delayMs(attempt * 1500); // 1.5s, then 3s
+    }
+  }
+
+  // Fatal errors keep their real message; transient ones get a calm note.
+  if (isFatalUploadError(lastError)) {
+    throw lastError instanceof Error
+      ? lastError
+      : new Error(String(lastError));
+  }
+  throw new Error(
+    "0G's storage nodes are busy right now. Your latest changes are still here — tap Sync to 0G again in a moment.",
+  );
 }
 
 /**
