@@ -1,5 +1,6 @@
-import type { Hustle, HustleStatus } from "@/types";
-import { formatNaira, totalActiveIncome } from "@/lib/ledger";
+import type { Currency, Hustle, HustleStatus } from "@/types";
+import { totalActiveIncome } from "@/lib/ledger";
+import { formatMoney } from "@/lib/currency";
 import { BoltIcon } from "@/components/UI/icons";
 
 /** Status → pill styling (literal class strings for Tailwind scanning). */
@@ -17,7 +18,13 @@ const STATUS_LABEL: Record<HustleStatus, string> = {
   building: "Building",
 };
 
-export function HustleLedger({ hustles }: { hustles: Hustle[] }) {
+export function HustleLedger({
+  hustles,
+  currency,
+}: {
+  hustles: Hustle[];
+  currency: Currency;
+}) {
   const activeIncome = totalActiveIncome(hustles);
 
   return (
@@ -59,12 +66,14 @@ export function HustleLedger({ hustles }: { hustles: Hustle[] }) {
         ))}
       </ul>
 
-      <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
-        <span className="text-xs text-muted">Active income</span>
-        <span className="text-sm font-semibold text-emerald tabular-nums">
-          {formatNaira(activeIncome)}/mo
-        </span>
-      </div>
+      {hustles.length > 0 && (
+        <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
+          <span className="text-xs text-muted">Active income</span>
+          <span className="text-sm font-semibold text-emerald tabular-nums">
+            {formatMoney(activeIncome, currency)}/mo
+          </span>
+        </div>
+      )}
     </section>
   );
 }

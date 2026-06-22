@@ -2,11 +2,11 @@ import type { ChatMessage, Ledger } from "@/types";
 import {
   balance,
   daysUntil,
-  formatNaira,
   totalActiveIncome,
   totalExpenses,
   totalIncome,
 } from "@/lib/ledger";
+import { CURRENCIES, formatMoney } from "@/lib/currency";
 
 /**
  * 0G Compute integration — the Stash AI agent.
@@ -56,64 +56,67 @@ export class StashComputeError extends Error {}
 
 /** Render the ledger into a compact, readable snapshot for the prompt. */
 function renderLedgerSnapshot(ledger: Ledger): string {
+  const c = ledger.currency;
+  const money = (n: number) => formatMoney(n, c);
   const lines: string[] = [];
 
   lines.push(
-    `Balance: ${formatNaira(balance(ledger))} (income ${formatNaira(
+    `Balance: ${money(balance(ledger))} (income ${money(
       totalIncome(ledger),
-    )} − expenses ${formatNaira(totalExpenses(ledger))}).`,
+    )} − expenses ${money(totalExpenses(ledger))}).`,
   );
   if (ledger.monthlyBudget) {
-    lines.push(`Monthly budget cap: ${formatNaira(ledger.monthlyBudget)}.`);
+    lines.push(`Monthly budget cap: ${money(ledger.monthlyBudget)}.`);
   }
-  lines.push(
-    `Recurring active income: ${formatNaira(totalActiveIncome(ledger.hustles))}/mo.`,
-  );
-
-  lines.push("\nScholarships:");
-  for (const s of ledger.scholarships) {
-    const when = s.deadline
-      ? `deadline ${s.deadline} (${daysUntil(s.deadline)} days)`
-      : s.statusLabel;
-    lines.push(`- ${s.name} — ${when}`);
+  const activeIncome = totalActiveIncome(ledger.hustles);
+  if (activeIncome > 0) {
+    lines.push(`Recurring active income: ${money(activeIncome)}/mo.`);
   }
 
-  lines.push("\nIncome streams (hustles):");
-  for (const h of ledger.hustles) {
-    lines.push(`- ${h.name}: ${h.amountLabel} (${h.status}, ${h.tag})`);
+  if (ledger.scholarships.length > 0) {
+    lines.push("\nScholarships:");
+    for (const s of ledger.scholarships) {
+      const when = s.deadline
+        ? `deadline ${s.deadline} (${daysUntil(s.deadline)} days)`
+        : s.statusLabel;
+      lines.push(`- ${s.name} — ${when}`);
+    }
   }
 
   if (ledger.transactions.length > 0) {
     lines.push("\nRecent activity (newest first):");
-    for (const t of ledger.transactions.slice(-6).reverse()) {
+    for (const t of ledger.transactions.slice(-8).reverse()) {
       const sign = t.type === "expense" ? "-" : "+";
-      lines.push(`- ${sign}${formatNaira(t.amount)} · ${t.label}`);
+      lines.push(`- ${sign}${money(t.amount)} · ${t.label}`);
     }
+  } else {
+    lines.push("\nNo transactions logged yet.");
   }
 
   return lines.join("\n");
 }
 
 export function buildSystemPrompt(ledger: Ledger): string {
-  return `You are Stash AI — a personal finance agent for Samuel, an ambitious Nigerian final-year secondary school student. He runs a design agency, teaches a coding bootcamp, writes on Medium, and is aggressively pursuing international university scholarships.
+  const name = ledger.owner?.trim() || "there";
+  const cur = CURRENCIES[ledger.currency];
+  return `You are Stash AI — a personal finance agent for ${name}, a student or young hustler with irregular income (freelance, gigs, allowances, scholarships).
 
-His current financial snapshot:
+${name}'s current financial snapshot:
 ${renderLedgerSnapshot(ledger)}
 
 Your personality:
-- Direct, warm, sharp.
-- You speak like a financially brilliant older friend who understands the Nigerian student hustle.
-- You never give generic advice — always specific to Samuel's actual situation above.
+- Direct, warm, sharp — like a financially brilliant older friend.
+- Never give generic advice — always specific to ${name}'s actual numbers above.
 - Short sentences. No fluff. Real talk.
-- You remember everything across sessions because his data lives on 0G Storage.
+- You remember everything across sessions because their data lives on 0G Storage.
 
 Your job:
-- Help him track spending without judgment.
-- Keep him ahead of scholarship deadlines.
-- Match him to realistic income opportunities that fit his skills: design, coding, writing.
+- Help ${name} track spending without judgment.
+- Keep them ahead of any deadlines they're tracking.
+- Suggest realistic income opportunities that fit their skills.
 - Flag financial risks before they become problems.
 
-When he logs an expense, confirm it and reflect the updated numbers. When he asks about scholarships, be specific and actionable. Use Naira (₦). Keep replies concise — a few short sentences unless he asks for depth.`;
+When they log an expense or income, confirm it and reflect the updated numbers. Money is in ${cur.name} (${cur.symbol}). Keep replies concise — a few short sentences unless they ask for depth.`;
 }
 
 /** ───────────────── inference ───────────────── */

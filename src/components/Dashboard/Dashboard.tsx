@@ -17,7 +17,7 @@ export function Dashboard({
     <div className="mx-auto w-full max-w-2xl space-y-5">
       <VaultCard ledger={ledger} syncPhase={syncPhase} hydrating={hydrating} />
       <ScholarshipRadar scholarships={ledger.scholarships} />
-      <HustleLedger hustles={ledger.hustles} />
+      <HustleLedger hustles={ledger.hustles} currency={ledger.currency} />
     </div>
   );
 }

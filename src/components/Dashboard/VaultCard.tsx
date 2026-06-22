@@ -1,12 +1,12 @@
 import type { Ledger, SyncPhase } from "@/types";
 import {
   balance,
-  formatNaira,
   formatSyncedAt,
   outflowPct,
   totalExpenses,
   totalIncome,
 } from "@/lib/ledger";
+import { formatMoney } from "@/lib/currency";
 import { AnimatedNumber } from "@/components/UI/AnimatedNumber";
 import { SyncIndicator } from "@/components/UI/SyncIndicator";
 import { LockIcon } from "@/components/UI/icons";
@@ -86,7 +86,7 @@ export function VaultCard({
             <span className="text-[11px] text-muted">Balance</span>
             <AnimatedNumber
               value={bal}
-              format={formatNaira}
+              format={(n) => formatMoney(n, ledger.currency)}
               className="text-2xl font-semibold tabular-nums"
             />
             <span className="mt-0.5 text-[11px] text-muted">
@@ -98,8 +98,8 @@ export function VaultCard({
 
       {/* Stats */}
       <div className="mt-5 grid grid-cols-2 gap-2 text-center">
-        <Stat label="Income" value={income} accent="emerald" />
-        <Stat label="Expenses" value={expenses} accent="amber" />
+        <Stat label="Income" value={income} accent="emerald" currency={ledger.currency} />
+        <Stat label="Expenses" value={expenses} accent="amber" currency={ledger.currency} />
       </div>
 
       {/* Footer */}
@@ -118,10 +118,12 @@ function Stat({
   label,
   value,
   accent,
+  currency,
 }: {
   label: string;
   value: number;
   accent?: "emerald" | "amber";
+  currency: Ledger["currency"];
 }) {
   const color =
     accent === "emerald"
@@ -133,7 +135,7 @@ function Stat({
     <div className="rounded-xl border border-line bg-bg/40 px-2 py-3">
       <AnimatedNumber
         value={value}
-        format={formatNaira}
+        format={(n) => formatMoney(n, currency)}
         className={`block text-sm font-semibold tabular-nums ${color}`}
       />
       <span className="mt-1 block text-[11px] text-muted">{label}</span>

@@ -7,7 +7,15 @@
  * system prompt on every 0G Compute call.
  */
 
-export type Currency = "NGN";
+export type Currency =
+  | "NGN"
+  | "USD"
+  | "GHS"
+  | "KES"
+  | "ZAR"
+  | "RWF"
+  | "GBP"
+  | "EUR";
 
 /** ───────────────── Transactions ───────────────── */
 

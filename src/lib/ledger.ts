@@ -65,12 +65,6 @@ export const SEED_LEDGER: Ledger = {
 
 /** ───────────────── Formatting ───────────────── */
 
-/** "₦45,000" — Naira with thousands separators, no decimals. */
-export function formatNaira(amount: number): string {
-  const sign = amount < 0 ? "-" : "";
-  return `${sign}₦${Math.abs(Math.round(amount)).toLocaleString("en-US")}`;
-}
-
 /** Human "Last synced" string; null → not yet synced. */
 export function formatSyncedAt(iso: string | null): string {
   if (!iso) return "Not yet synced to 0G";

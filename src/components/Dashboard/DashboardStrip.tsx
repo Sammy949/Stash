@@ -1,10 +1,6 @@
 import type { Ledger } from "@/types";
-import {
-  balance,
-  daysUntil,
-  formatNaira,
-  radarBadge,
-} from "@/lib/ledger";
+import { balance, daysUntil, radarBadge } from "@/lib/ledger";
+import { formatMoney } from "@/lib/currency";
 
 /**
  * Condensed dashboard shown while the agent panel is open (Split-Shift):
@@ -34,7 +30,7 @@ export function DashboardStrip({
       <div className="min-w-0">
         <span className="block text-[11px] text-muted">Balance</span>
         <span className="block text-base font-semibold tabular-nums">
-          {formatNaira(bal)}
+          {formatMoney(bal, ledger.currency)}
         </span>
       </div>
 
