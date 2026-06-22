@@ -6,6 +6,8 @@
 
 **The personal finance agent that knows your financial life — and helps you stay ahead of it.**
 
+### 🔗 [Live demo → heystash.vercel.app](https://heystash.vercel.app)
+
 Built for [Zero Cup 2026](https://0g.ai) · 0G Labs
 by [Samuel Yahaya](https://twitter.com/I_am_SamY01) · [@Sammy949](https://github.com/Sammy949)
 
