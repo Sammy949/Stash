@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { Ledger, ParsedTransaction, SyncPhase } from "@/types";
+import type { Currency, Ledger, ParsedTransaction, SyncPhase } from "@/types";
 import { EMPTY_LEDGER, addTransaction, migrateLedger } from "@/lib/ledger";
 import {
   getStoredRootHash,
@@ -89,12 +89,24 @@ export function useLedger() {
     return next;
   }, []);
 
-  /** Set the owner (from onboarding); returns the updated ledger. */
-  const setOwner = useCallback((name: string): Ledger => {
-    const next = { ...ref.current, owner: name };
-    setLedger(next);
-    return next;
-  }, []);
+  /** Seed the ledger from onboarding (owner, currency, opening balance). */
+  const initProfile = useCallback(
+    (profile: {
+      owner: string;
+      currency: Currency;
+      openingBalance: number;
+    }): Ledger => {
+      const next: Ledger = {
+        ...EMPTY_LEDGER,
+        owner: profile.owner,
+        currency: profile.currency,
+        openingBalance: profile.openingBalance,
+      };
+      setLedger(next);
+      return next;
+    },
+    [],
+  );
 
   return {
     ledger,
@@ -102,6 +114,6 @@ export function useLedger() {
     syncPhase,
     sync,
     logTransaction,
-    setOwner,
+    initProfile,
   };
 }

@@ -6,6 +6,7 @@ import { AgentPanel } from "@/components/Agent/AgentPanel";
 import { CommandBar } from "@/components/Agent/CommandBar";
 import { SYNC_CHIP } from "@/components/Agent/QuickChips";
 import { Onboarding } from "@/components/Onboarding/Onboarding";
+import type { OnboardingProfile } from "@/components/Onboarding/Onboarding";
 import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
 import { parseTransaction } from "@/lib/ledger";
@@ -17,7 +18,7 @@ const SYNC_CONFIRMATION =
   "Your financial data is encrypted and stored on 0G's decentralized network. Nobody else can access it. It'll be here next time you open Stash.";
 
 export default function App() {
-  const { ledger, hydrating, syncPhase, sync, logTransaction, setOwner } =
+  const { ledger, hydrating, syncPhase, sync, logTransaction, initProfile } =
     useLedger();
   const { messages, isThinking, send, pushAssistant } = useAgent();
 
@@ -32,8 +33,8 @@ export default function App() {
   // agent panel (dashboard condenses to a strip). Tap the strip to return.
   const [agentActive, setAgentActive] = useState(false);
 
-  function completeOnboarding(name: string) {
-    setOwner(name);
+  function completeOnboarding(profile: OnboardingProfile) {
+    initProfile(profile);
     localStorage.setItem(ONBOARDED_KEY, "1");
     setOnboarded(true);
   }
@@ -71,33 +72,36 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-bg text-ink">
-      {/* Top bar */}
-      <header className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-3">
-        <img src="/vault.svg" alt="" className="h-7 w-7" />
-        <div>
-          <h1 className="text-sm font-semibold leading-none">Stash</h1>
-          <p className="mt-1 text-[11px] text-muted">
-            Know where you stand. See what&apos;s coming. Stay ahead.
-          </p>
-        </div>
-      </header>
+    <div className="h-screen bg-bg text-ink">
+      {/* Centered platform column — doesn't stretch on wide screens. */}
+      <div className="mx-auto flex h-full max-w-2xl flex-col">
+        {/* Top bar */}
+        <header className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-3">
+          <img src="/vault.svg" alt="" className="h-7 w-7" />
+          <div>
+            <h1 className="text-sm font-semibold leading-none">Stash</h1>
+            <p className="mt-1 text-[11px] text-muted">
+              Know where you stand. See what&apos;s coming. Stay ahead.
+            </p>
+          </div>
+        </header>
 
-      {/* Content — Split-Shift */}
-      {agentActive ? (
-        <div className="flex min-h-0 flex-1 animate-slide-up flex-col">
-          <DashboardStrip ledger={ledger} onExpand={() => setAgentActive(false)} />
-          <AgentPanel messages={messages} />
-        </div>
-      ) : (
-        <main className="flex-1 overflow-y-auto px-4 py-6">
-          <Dashboard ledger={ledger} syncPhase={syncPhase} hydrating={hydrating} />
-        </main>
-      )}
+        {/* Content — Split-Shift */}
+        {agentActive ? (
+          <div className="flex min-h-0 flex-1 animate-slide-up flex-col">
+            <DashboardStrip ledger={ledger} onExpand={() => setAgentActive(false)} />
+            <AgentPanel messages={messages} />
+          </div>
+        ) : (
+          <main className="flex-1 overflow-y-auto px-4 py-6">
+            <Dashboard ledger={ledger} syncPhase={syncPhase} hydrating={hydrating} />
+          </main>
+        )}
 
-      {/* Command bar — always present */}
-      <div className="shrink-0">
-        <CommandBar onSend={handleSend} isThinking={isThinking} />
+        {/* Command bar — always present */}
+        <div className="shrink-0">
+          <CommandBar onSend={handleSend} isThinking={isThinking} />
+        </div>
       </div>
 
       <Toaster theme="dark" position="bottom-right" richColors closeButton />
