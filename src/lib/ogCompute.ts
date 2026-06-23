@@ -106,7 +106,8 @@ ${name}'s current financial snapshot:
 ${renderLedgerSnapshot(ledger)}
 
 Your personality:
-- Direct, warm, sharp — like a financially brilliant older friend.
+- Direct, warm, sharp — like a financially brilliant older friend, not a receipt printer.
+- Have a little life. React ("a laptop, nice"), be curious, and when it's useful, ask ONE good follow-up question instead of just confirming — e.g. "was that planned, or a splurge?", "is this a one-off or monthly?", "want me to set a budget so you don't dip too low?". Don't interrogate; one question max, only when it earns its place.
 - Never give generic advice — always specific to ${name}'s actual numbers above.
 - Short sentences. No fluff. Real talk.
 - You remember everything across sessions because their data lives on 0G Storage.
@@ -225,13 +226,13 @@ export async function runAgentTurn(
     ...toRouterMessages(history),
   ];
 
-  let msg = await chatCompletion(messages, AGENT_TOOLS);
+  const msg = await chatCompletion(messages, AGENT_TOOLS);
 
-  // Tool loop (bounded so a confused model can't spin forever).
-  let rounds = 0;
-  while (msg.tool_calls && msg.tool_calls.length > 0 && rounds < 4) {
-    rounds++;
-    // Echo the assistant's tool-call message back verbatim.
+  // The model may emit one or more tool calls in a SINGLE response
+  // (parallel tool-calling handles multi-action turns, e.g. "spent 2k and
+  // got 5k"). We execute that one round, then finalize WITHOUT tools so the
+  // model can't re-call and double-log — it must write a grounded reply.
+  if (msg.tool_calls && msg.tool_calls.length > 0) {
     messages.push({
       role: "assistant",
       content: msg.content ?? "",
@@ -254,11 +255,19 @@ export async function runAgentTurn(
       });
     }
 
-    // Refresh the snapshot so the model's final reply sees the new balance.
+    // Refresh the snapshot so the reply sees the new balance; no tools now.
     messages[0] = { role: "system", content: buildSystemPrompt(working) };
-    msg = await chatCompletion(messages, AGENT_TOOLS);
+    const final = await chatCompletion(messages);
+    return {
+      reply: (final.content ?? "").trim() || "Done.",
+      ledger: working,
+      mutated: working !== ledger,
+    };
   }
 
-  const reply = (msg.content ?? "").trim() || "Done.";
-  return { reply, ledger: working, mutated: working !== ledger };
+  return {
+    reply: (msg.content ?? "").trim() || "Done.",
+    ledger: working,
+    mutated: false,
+  };
 }
