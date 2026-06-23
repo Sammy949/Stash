@@ -41,3 +41,12 @@ export function BoltIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function SendIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M5 12 20 4l-4 16-4-7-7-1Z" />
+      <path d="m12 13 4-5" />
+    </svg>
+  );
+}

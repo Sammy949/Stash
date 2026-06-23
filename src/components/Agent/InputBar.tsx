@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { SendIcon } from "@/components/UI/icons";
 
 export function InputBar({
   onSend,
@@ -8,31 +9,57 @@ export function InputBar({
   disabled?: boolean;
 }) {
   const [text, setText] = useState("");
+  const taRef = useRef<HTMLTextAreaElement>(null);
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
+  function grow() {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`; // cap ~6 lines
+  }
+
+  function send() {
     const t = text.trim();
     if (!t || disabled) return;
     onSend(t);
     setText("");
+    requestAnimationFrame(() => {
+      if (taRef.current) taRef.current.style.height = "auto";
+    });
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // Enter sends; Shift+Enter inserts a newline (long prompts on mobile).
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
   }
 
   return (
-    <form onSubmit={submit} className="flex gap-2">
-      <input
+    <div className="flex items-end gap-2">
+      <textarea
+        ref={taRef}
+        rows={1}
         value={text}
-        onChange={(e) => setText(e.target.value)}
         disabled={disabled}
-        placeholder="Ask Stash anything..."
-        className="flex-1 rounded-xl border border-line bg-bg px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-muted focus:border-emerald/50 disabled:opacity-50"
+        onChange={(e) => {
+          setText(e.target.value);
+          grow();
+        }}
+        onKeyDown={onKeyDown}
+        placeholder="Ask Stash anything…"
+        className="max-h-40 flex-1 resize-none rounded-xl border border-line bg-bg px-3.5 py-2.5 text-sm leading-relaxed outline-none transition-colors placeholder:text-muted focus:border-emerald/50 disabled:opacity-50"
       />
       <button
-        type="submit"
+        type="button"
+        onClick={send}
         disabled={disabled || !text.trim()}
-        className="rounded-xl bg-emerald px-4 py-2.5 text-sm font-medium text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        aria-label="Send"
+        className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl bg-emerald text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        Send
+        <SendIcon className="h-4 w-4" />
       </button>
-    </form>
+    </div>
   );
 }
