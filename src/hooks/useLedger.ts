@@ -85,7 +85,8 @@ export function useLedger() {
 
   /** Replace the ledger wholesale (used when the agent mutates via tools). */
   const applyLedger = useCallback((next: Ledger) => {
-    setLedger(next);
+    ref.current = next;
+    setLedgerState(next);
   }, []);
 
   /** Seed the ledger from onboarding (owner, currency, opening balance). */
