@@ -3,6 +3,7 @@ import {
   addHustle,
   addScholarship,
   addTransaction,
+  balance,
   removeHustleByName,
   removeLastTransaction,
   removeScholarshipByName,
@@ -179,14 +180,20 @@ export function applyAction(
       const label = String(args.label ?? "expense");
       const category = (args.category as ExpenseCategory) ?? "other";
       const next = addTransaction(ledger, { type: "expense", amount, label, category });
-      return { ledger: next, summary: `Logged expense ${formatMoney(amount, cur)} (${label}).` };
+      return {
+        ledger: next,
+        summary: `Logged expense ${formatMoney(amount, cur)} (${label}). New balance is exactly ${formatMoney(balance(next), cur)} — state this number verbatim; do not add or recalculate.`,
+      };
     }
     case "log_income": {
       if (!isFinite(amount) || amount <= 0)
         return { ledger, summary: "Invalid income amount; nothing logged." };
       const label = String(args.label ?? "income");
       const next = addTransaction(ledger, { type: "income", amount, label, tag: "Other" });
-      return { ledger: next, summary: `Logged income ${formatMoney(amount, cur)} (${label}).` };
+      return {
+        ledger: next,
+        summary: `Logged income ${formatMoney(amount, cur)} (${label}). New balance is exactly ${formatMoney(balance(next), cur)} — state this number verbatim; do not add or recalculate.`,
+      };
     }
     case "set_monthly_budget": {
       if (!isFinite(amount) || amount <= 0)
