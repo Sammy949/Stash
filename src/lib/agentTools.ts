@@ -1,7 +1,11 @@
 import type { ExpenseCategory, Ledger } from "@/types";
 import {
+  addHustle,
+  addScholarship,
   addTransaction,
+  removeHustleByName,
   removeLastTransaction,
+  removeScholarshipByName,
   setMonthlyBudget,
 } from "@/lib/ledger";
 import { formatMoney } from "@/lib/currency";
@@ -81,6 +85,70 @@ export const AGENT_TOOLS = [
       parameters: { type: "object", properties: {} },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "add_scholarship",
+      description:
+        "Add a scholarship or application to the user's radar. Use when they mention one they're tracking or applying to.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Scholarship/program name" },
+          deadline: {
+            type: "string",
+            description:
+              "Application deadline as an ISO date YYYY-MM-DD, if known. Resolve relative dates using today's date from the snapshot.",
+          },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "remove_scholarship",
+      description: "Remove a scholarship from the radar by (partial) name.",
+      parameters: {
+        type: "object",
+        properties: { name: { type: "string" } },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "add_income_stream",
+      description:
+        "Add an income stream / hustle (e.g. a freelance gig, a job, a side project). Use when they mention a source of income they have.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Name of the gig/stream" },
+          amount: { type: "number", description: "Amount it pays, if known" },
+          recurring: {
+            type: "boolean",
+            description: "True if it pays regularly each month (e.g. a monthly job)",
+          },
+        },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "remove_income_stream",
+      description: "Remove an income stream / hustle by (partial) name.",
+      parameters: {
+        type: "object",
+        properties: { name: { type: "string" } },
+        required: ["name"],
+      },
+    },
+  },
 ] as const;
 
 export type ToolName = (typeof AGENT_TOOLS)[number]["function"]["name"];
@@ -134,6 +202,49 @@ export function applyAction(
       return {
         ledger: next,
         summary: `Removed last transaction: ${last.type} ${formatMoney(last.amount, cur)} (${last.label}).`,
+      };
+    }
+    case "add_scholarship": {
+      const schName = String(args.name ?? "").trim();
+      if (!schName) return { ledger, summary: "No scholarship name given." };
+      const next = addScholarship(ledger, {
+        name: schName,
+        deadline: args.deadline ? String(args.deadline) : null,
+      });
+      const added = next.scholarships[next.scholarships.length - 1];
+      return {
+        ledger: next,
+        summary: `Added scholarship "${added.name}"${added.deadline ? ` (deadline ${added.deadline})` : ""}.`,
+      };
+    }
+    case "remove_scholarship": {
+      const next = removeScholarshipByName(ledger, String(args.name ?? ""));
+      return {
+        ledger: next,
+        summary:
+          next === ledger
+            ? "No matching scholarship found."
+            : `Removed scholarship matching "${args.name}".`,
+      };
+    }
+    case "add_income_stream": {
+      const hName = String(args.name ?? "").trim();
+      if (!hName) return { ledger, summary: "No income-stream name given." };
+      const next = addHustle(ledger, {
+        name: hName,
+        amount: args.amount != null ? Number(args.amount) : undefined,
+        recurring: Boolean(args.recurring),
+      });
+      return { ledger: next, summary: `Added income stream "${hName}".` };
+    }
+    case "remove_income_stream": {
+      const next = removeHustleByName(ledger, String(args.name ?? ""));
+      return {
+        ledger: next,
+        summary:
+          next === ledger
+            ? "No matching income stream found."
+            : `Removed income stream matching "${args.name}".`,
       };
     }
     default:

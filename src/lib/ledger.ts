@@ -6,6 +6,7 @@ import type {
   Transaction,
   UrgencyColor,
 } from "@/types";
+import { formatMoney } from "@/lib/currency";
 
 /**
  * Ledger state management — seed data + pure helpers.
@@ -157,6 +158,71 @@ export function setMonthlyBudget(ledger: Ledger, amount: number | null): Ledger 
     ...ledger,
     monthlyBudget: amount && amount > 0 ? Math.round(amount) : null,
   };
+}
+
+/** Normalize a date string to YYYY-MM-DD, or null if unparseable. */
+function normalizeDate(input?: string | null): string | null {
+  if (!input) return null;
+  const t = Date.parse(input);
+  if (Number.isNaN(t)) return null;
+  return new Date(t).toISOString().slice(0, 10);
+}
+
+/** Add a scholarship to the radar (agent action). */
+export function addScholarship(
+  ledger: Ledger,
+  input: { name: string; deadline?: string | null },
+): Ledger {
+  const deadline = normalizeDate(input.deadline);
+  const s: Scholarship = {
+    id: crypto.randomUUID(),
+    name: input.name.trim(),
+    status: deadline ? "deadline" : "pending_confirmation",
+    statusLabel: deadline ? "Deadline" : "Tracking",
+    deadline: deadline ?? undefined,
+    color: deadline ? "amber" : "muted",
+  };
+  return { ...ledger, scholarships: [...ledger.scholarships, s] };
+}
+
+/** Add an income stream / hustle (agent action). */
+export function addHustle(
+  ledger: Ledger,
+  input: { name: string; amount?: number; recurring?: boolean },
+): Ledger {
+  const amount = input.amount && input.amount > 0 ? Math.round(input.amount) : 0;
+  const recurring = Boolean(input.recurring);
+  const h: Hustle = {
+    id: crypto.randomUUID(),
+    name: input.name.trim(),
+    amountLabel: amount
+      ? `${formatMoney(amount, ledger.currency)}${recurring ? "/mo" : ""}`
+      : "—",
+    monthlyValue: recurring ? amount : 0,
+    status: recurring ? "active" : amount ? "received" : "building",
+    tag: "Other",
+  };
+  return { ...ledger, hustles: [...ledger.hustles, h] };
+}
+
+/** Remove the first scholarship/hustle whose name matches (case-insensitive). */
+export function removeScholarshipByName(ledger: Ledger, name: string): Ledger {
+  const q = name.trim().toLowerCase();
+  const idx = ledger.scholarships.findIndex((s) =>
+    s.name.toLowerCase().includes(q),
+  );
+  if (idx < 0) return ledger;
+  return {
+    ...ledger,
+    scholarships: ledger.scholarships.filter((_, i) => i !== idx),
+  };
+}
+
+export function removeHustleByName(ledger: Ledger, name: string): Ledger {
+  const q = name.trim().toLowerCase();
+  const idx = ledger.hustles.findIndex((h) => h.name.toLowerCase().includes(q));
+  if (idx < 0) return ledger;
+  return { ...ledger, hustles: ledger.hustles.filter((_, i) => i !== idx) };
 }
 
 /** ───────────────── Migration ───────────────── */
