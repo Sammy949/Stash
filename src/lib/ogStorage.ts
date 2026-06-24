@@ -28,8 +28,17 @@ const KEY_DOMAIN = "stash-ledger-v1:";
 
 export type SyncProgress = (message: string) => void;
 
-/** True when all env needed for real 0G Storage calls is present. */
+/**
+ * True when storage sync is available. In production the serverless proxy
+ * holds the key/config server-side, so the client just needs to be able to
+ * reach it — always true there. On localhost (direct SDK path) the client
+ * env must be present.
+ */
 export function isStorageConfigured(): boolean {
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host !== "localhost" && host !== "127.0.0.1") return true; // proxy path
+  }
   return Boolean(RPC_URL && INDEXER_URL && PRIVATE_KEY);
 }
 
@@ -74,7 +83,6 @@ function deriveAesKey(
 
 /** ───────────────── save / load ───────────────── */
 
-/**
 /** How many times to attempt the upload before giving up. */
 const MAX_UPLOAD_ATTEMPTS = 3;
 
@@ -94,42 +102,69 @@ function isFatalUploadError(err: unknown): boolean {
 }
 
 /**
- * The 0G testnet storage nodes are served over plain HTTP on bare IPs
- * (e.g. http://34.x.x.x:5678). A browser on an HTTPS page blocks those as
- * mixed content, so uploads can NEVER succeed from the deployed site —
- * only from http://localhost during dev. Detect this so we can tell the
- * truth instead of pretending the nodes are "busy".
+ * Route choice. The 0G testnet storage nodes are plain HTTP on bare IPs,
+ * which a browser on an HTTPS page blocks as mixed content. So in any
+ * non-localhost context we go through the same-origin /api/og-sync
+ * serverless proxy (Node → HTTP nodes is fine). On http://localhost the
+ * direct SDK path works and avoids needing the serverless runtime.
  */
-function isMixedContentBlocked(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    window.location?.protocol === "https:" &&
-    INDEXER_URL.startsWith("http://") === false // indexer is https; nodes are http
-  );
+function useProxy(): boolean {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname;
+  const isLocal = host === "localhost" || host === "127.0.0.1";
+  return !isLocal;
 }
 
-const MIXED_CONTENT_MESSAGE =
-  "0G's testnet storage nodes are HTTP-only, and this page is HTTPS — the browser blocks the upload (mixed content). Sync works when running locally. Changes stay in this session.";
+const PROXY_URL = "/api/og-sync";
 
 /**
  * Encrypt the ledger and upload it to 0G Storage. Returns the new root
  * hash (also persisted to localStorage) and the sync timestamp.
  *
- * Testnet storage nodes are occasionally flaky, so the upload is retried
- * with backoff (fresh node selection each attempt). Fatal errors fail
- * fast; transient failures surface a calm, non-scary message.
+ * In production this calls the serverless proxy; on localhost it runs the
+ * SDK directly with retry/backoff.
  */
 export async function saveLedger(
   ledger: Ledger,
   onProgress?: SyncProgress,
 ): Promise<SyncResult> {
-  const { rpc, indexerUrl, privateKey } = requireConfig();
-
-  // Deterministic block on HTTPS deploys — fail fast with the real reason
-  // instead of retrying something the browser will never allow.
-  if (isMixedContentBlocked()) {
-    throw new Error(MIXED_CONTENT_MESSAGE);
+  if (useProxy()) {
+    onProgress?.("Uploading to 0G…");
+    const result = await saveLedgerViaProxy(ledger);
+    setStoredRootHash(result.rootHash);
+    return result;
   }
+  return saveLedgerDirect(ledger, onProgress);
+}
+
+/** Upload via the same-origin serverless proxy (production path). */
+async function saveLedgerViaProxy(ledger: Ledger): Promise<SyncResult> {
+  let res: Response;
+  try {
+    res = await fetch(PROXY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ledger }),
+    });
+  } catch (e) {
+    throw new Error(
+      "Couldn't reach the 0G sync service. Check your connection and try again.",
+      { cause: e },
+    );
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.rootHash) {
+    throw new Error(data?.error ?? `0G sync failed (${res.status}).`);
+  }
+  return { rootHash: data.rootHash, syncedAt: data.syncedAt };
+}
+
+/** Upload by running the SDK directly in the browser (localhost dev path). */
+async function saveLedgerDirect(
+  ledger: Ledger,
+  onProgress?: SyncProgress,
+): Promise<SyncResult> {
+  const { rpc, indexerUrl, privateKey } = requireConfig();
 
   const [{ ethers }, { Indexer, MemData }] = await Promise.all([
     import("ethers"),
@@ -145,7 +180,6 @@ export async function saveLedger(
   let lastError: unknown;
   for (let attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt++) {
     try {
-      // Fresh MemData each attempt so no stale internal state carries over.
       const file = new MemData(bytes);
       const [res, err] = await indexer.upload(file, rpc, signer, {
         encryption: { type: "aes256", key },
@@ -165,15 +199,12 @@ export async function saveLedger(
       onProgress?.(
         `Storage nodes busy — retrying (${attempt}/${MAX_UPLOAD_ATTEMPTS - 1})…`,
       );
-      await delayMs(attempt * 1500); // 1.5s, then 3s
+      await delayMs(attempt * 1500);
     }
   }
 
-  // Fatal errors keep their real message; transient ones get a calm note.
   if (isFatalUploadError(lastError)) {
-    throw lastError instanceof Error
-      ? lastError
-      : new Error(String(lastError));
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
   }
   throw new Error(
     "0G's storage nodes are busy right now. Your latest changes are still here — tap Sync to 0G again in a moment.",
@@ -182,15 +213,19 @@ export async function saveLedger(
 
 /**
  * Download a ledger from 0G Storage by root hash and decrypt it.
+ * Proxy in production; direct SDK on localhost.
  */
 export async function loadLedger(rootHash: string): Promise<Ledger> {
-  const { indexerUrl, privateKey } = requireConfig();
-
-  // Same HTTPS→HTTP block applies to downloads from the storage nodes.
-  if (isMixedContentBlocked()) {
-    throw new Error(MIXED_CONTENT_MESSAGE);
+  if (useProxy()) {
+    const res = await fetch(`${PROXY_URL}?root=${encodeURIComponent(rootHash)}`);
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ledger) {
+      throw new Error(data?.error ?? `0G restore failed (${res.status}).`);
+    }
+    return data.ledger as Ledger;
   }
 
+  const { indexerUrl, privateKey } = requireConfig();
   const [{ ethers }, { Indexer }] = await Promise.all([
     import("ethers"),
     import("@0gfoundation/0g-storage-ts-sdk"),

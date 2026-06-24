@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/og-sync.ts": {
+      "maxDuration": 60
+    }
+  }
+}
