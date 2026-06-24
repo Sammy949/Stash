@@ -94,6 +94,24 @@ function isFatalUploadError(err: unknown): boolean {
 }
 
 /**
+ * The 0G testnet storage nodes are served over plain HTTP on bare IPs
+ * (e.g. http://34.x.x.x:5678). A browser on an HTTPS page blocks those as
+ * mixed content, so uploads can NEVER succeed from the deployed site —
+ * only from http://localhost during dev. Detect this so we can tell the
+ * truth instead of pretending the nodes are "busy".
+ */
+function isMixedContentBlocked(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.location?.protocol === "https:" &&
+    INDEXER_URL.startsWith("http://") === false // indexer is https; nodes are http
+  );
+}
+
+const MIXED_CONTENT_MESSAGE =
+  "0G's testnet storage nodes are HTTP-only, and this page is HTTPS — the browser blocks the upload (mixed content). Sync works when running locally. Changes stay in this session.";
+
+/**
  * Encrypt the ledger and upload it to 0G Storage. Returns the new root
  * hash (also persisted to localStorage) and the sync timestamp.
  *
@@ -106,6 +124,12 @@ export async function saveLedger(
   onProgress?: SyncProgress,
 ): Promise<SyncResult> {
   const { rpc, indexerUrl, privateKey } = requireConfig();
+
+  // Deterministic block on HTTPS deploys — fail fast with the real reason
+  // instead of retrying something the browser will never allow.
+  if (isMixedContentBlocked()) {
+    throw new Error(MIXED_CONTENT_MESSAGE);
+  }
 
   const [{ ethers }, { Indexer, MemData }] = await Promise.all([
     import("ethers"),
@@ -161,6 +185,11 @@ export async function saveLedger(
  */
 export async function loadLedger(rootHash: string): Promise<Ledger> {
   const { indexerUrl, privateKey } = requireConfig();
+
+  // Same HTTPS→HTTP block applies to downloads from the storage nodes.
+  if (isMixedContentBlocked()) {
+    throw new Error(MIXED_CONTENT_MESSAGE);
+  }
 
   const [{ ethers }, { Indexer }] = await Promise.all([
     import("ethers"),
