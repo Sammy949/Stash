@@ -9,7 +9,11 @@ import { Onboarding } from "@/components/Onboarding/Onboarding";
 import type { OnboardingProfile } from "@/components/Onboarding/Onboarding";
 import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
-import { getStoredRootHash } from "@/lib/ogStorage";
+import { ensureStorageSchema, getStoredRootHash } from "@/lib/ogStorage";
+
+// One-time forced reset onto the new local-first schema (runs once at load,
+// before any hook reads localStorage).
+ensureStorageSchema();
 
 const ONBOARDED_KEY = "stash_onboarded";
 

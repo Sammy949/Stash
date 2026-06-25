@@ -84,6 +84,33 @@ export function clearStoredRootHash(): void {
   localStorage.removeItem(LEDGER_ROOT_KEY);
 }
 
+/**
+ * One-time forced reset when the app's storage schema changes. Bump
+ * STORAGE_SCHEMA to wipe pre-existing local state (old onboarding flags,
+ * stale root hashes, pre-local-first caches) so every existing user starts
+ * clean on the new architecture exactly once. Call this BEFORE any hook
+ * reads localStorage (i.e. at module load).
+ */
+const STORAGE_SCHEMA = 3;
+const SCHEMA_KEY = "stash_schema";
+const STASH_KEYS = [
+  LEDGER_ROOT_KEY,
+  LEDGER_CACHE_KEY,
+  "stash_onboarded",
+];
+
+export function ensureStorageSchema(): void {
+  try {
+    const current = Number(localStorage.getItem(SCHEMA_KEY) || "0");
+    if (current < STORAGE_SCHEMA) {
+      for (const k of STASH_KEYS) localStorage.removeItem(k);
+      localStorage.setItem(SCHEMA_KEY, String(STORAGE_SCHEMA));
+    }
+  } catch {
+    /* private mode / no storage — nothing to reset */
+  }
+}
+
 /** ───────────────── internals ───────────────── */
 
 function requireConfig(): {
