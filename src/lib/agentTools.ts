@@ -30,6 +30,46 @@ const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   "other",
 ];
 
+/**
+ * Map any free-form category the model emits onto our known buckets.
+ *
+ * The schema intentionally does NOT constrain `category` to an enum: a strict
+ * enum is enforced *server-side* by the provider, so a value the model invents
+ * ("tithe", "family", "hospital") makes the provider reject the WHOLE tool
+ * call with a raw validation error — before our code ever runs. Instead we
+ * accept any string and bucket it here: exact matches pass through, a few
+ * common synonyms are mapped, and everything unrecognized falls to "other".
+ * The model can never send a value that crashes the call.
+ */
+const CATEGORY_SYNONYMS: Record<string, ExpenseCategory> = {
+  transportation: "transport",
+  transit: "transport",
+  fare: "transport",
+  fuel: "transport",
+  internet: "data",
+  wifi: "data",
+  groceries: "food",
+  meal: "food",
+  meals: "food",
+  dining: "food",
+  printout: "printing",
+  print: "printing",
+  call: "airtime",
+  calls: "airtime",
+  recharge: "airtime",
+  housing: "rent",
+  accommodation: "rent",
+};
+
+export function normalizeCategory(input: unknown): ExpenseCategory {
+  if (typeof input !== "string") return "other";
+  const key = input.trim().toLowerCase();
+  if ((EXPENSE_CATEGORIES as string[]).includes(key)) {
+    return key as ExpenseCategory;
+  }
+  return CATEGORY_SYNONYMS[key] ?? "other";
+}
+
 export const AGENT_TOOLS = [
   {
     type: "function",
@@ -42,7 +82,11 @@ export const AGENT_TOOLS = [
         properties: {
           amount: { type: ["number", "string"], description: "Amount spent, in the user's currency" },
           label: { type: "string", description: "Short description, e.g. 'new laptop'" },
-          category: { type: "string", enum: EXPENSE_CATEGORIES },
+          category: {
+            type: "string",
+            description:
+              "Optional spending category. Prefer one of: transport, data, food, printing, airtime, rent, other. Anything else is fine too — it's bucketed in code.",
+          },
         },
         required: ["amount", "label"],
       },
@@ -220,7 +264,7 @@ export function applyAction(
       if (!isFinite(amount) || amount <= 0)
         return { ledger, summary: "Invalid expense amount; nothing logged." };
       const label = String(args.label ?? "expense");
-      const category = (args.category as ExpenseCategory) ?? "other";
+      const category = normalizeCategory(args.category);
       const parsed = { type: "expense" as const, amount, label, category };
       if (isDuplicateTransaction(ledger, parsed)) {
         return {
