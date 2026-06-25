@@ -74,14 +74,28 @@ function renderLedgerSnapshot(ledger: Ledger): string {
     lines.push(`Recurring active income: ${money(activeIncome)}/mo.`);
   }
 
+  // Scholarships — ALWAYS state the list, even when empty, so the model
+  // reports the truth instead of inventing entries to fill a silence.
   if (ledger.scholarships.length > 0) {
-    lines.push("\nScholarships:");
+    lines.push("\nScholarships being tracked:");
     for (const s of ledger.scholarships) {
       const when = s.deadline
         ? `deadline ${s.deadline} (${daysUntil(s.deadline)} days)`
         : s.statusLabel;
       lines.push(`- ${s.name} — ${when}`);
     }
+  } else {
+    lines.push("\nScholarships: NONE tracked yet (the list is empty).");
+  }
+
+  // Income streams / hustles — likewise stated explicitly when empty.
+  if (ledger.hustles.length > 0) {
+    lines.push("\nIncome streams:");
+    for (const h of ledger.hustles) {
+      lines.push(`- ${h.name} — ${h.amountLabel}`);
+    }
+  } else {
+    lines.push("Income streams: NONE added yet (the list is empty).");
   }
 
   if (ledger.transactions.length > 0) {
@@ -115,6 +129,7 @@ The division of labour (CRITICAL):
 - CODE does all the math. After any action you receive a "FACTS" line with the exact new balance, runway, and risk flags. Those numbers are ground truth.
 - YOU do the judgement. Use the FACTS verbatim — NEVER calculate, add, subtract, or guess a balance yourself. If no FACTS line is present, pull numbers only from the snapshot above. (Budget *allocations* like "10% for tithe" you may compute as advice; a BALANCE is never your own math.)
 - When the FACTS say runway or "in the red", weave it in like a friend would: "that's about 3 days of money left — worth it?" / "that tips you below zero, heads up."
+- The snapshot is the ONLY truth about what exists. If it says a list is NONE/empty (scholarships, income streams, transactions), then there are none — say so plainly ("you're not tracking any scholarships yet"). NEVER invent entries, deadlines, counts, or history that aren't in the snapshot.
 
 Acting on money:
 - Money OUT (spent, paid, bought) → call log_expense ONCE. Money IN (paid, gift, allowance, disbursement) → call log_income ONCE.
@@ -155,6 +170,7 @@ function toRouterMessages(history: ChatMessage[]): RouterMessage[] {
 async function chatCompletion(
   messages: RouterMessage[],
   tools?: unknown,
+  toolChoice: "auto" | "required" = "auto",
 ): Promise<{ content: string | null; tool_calls?: ToolCall[] }> {
   let res: Response;
   try {
@@ -169,7 +185,7 @@ async function chatCompletion(
         messages,
         temperature: 0.5,
         max_tokens: 700,
-        ...(tools ? { tools, tool_choice: "auto" } : {}),
+        ...(tools ? { tools, tool_choice: toolChoice } : {}),
       }),
     });
   } catch (e) {
@@ -199,6 +215,28 @@ async function chatCompletion(
 interface ToolCall {
   id: string;
   function: { name: string; arguments: string };
+}
+
+/**
+ * Heuristic: does this user message describe money actually MOVING (in or
+ * out), as opposed to a question or general chat?
+ *
+ * When it does, we force the model to emit a tool call (tool_choice
+ * "required") instead of letting it narrate a balance it made up — the
+ * phantom-action bug where the model says "recorded, you've got ₦X now"
+ * while the ledger never changed. Requires BOTH an amount and a
+ * money-movement verb, so questions like "how much have I spent?" (verb but
+ * no amount) and "what's my balance?" (neither) are left on auto.
+ */
+function looksLikeMoneyEvent(text: string): boolean {
+  const t = text.toLowerCase();
+  const hasAmount = /\d/.test(t) || /\b(k|thousand|million|hundred)\b/.test(t);
+  if (!hasAmount) return false;
+  const hasMoneyVerb =
+    /\b(made|make|making|earn|earned|got|gotten|get|receiv|paid|pay|paying|spent|spend|spending|bought|buy|buying|sent|send|gave|gift|gifted|allowance|disburs|withdr|deposit|collect|charged|cost)\b/.test(
+      t,
+    );
+  return hasMoneyVerb;
 }
 
 /**
@@ -259,7 +297,18 @@ export async function runAgentTurn(
     ...toRouterMessages(history),
   ];
 
-  const msg = await chatCompletion(messages, AGENT_TOOLS);
+  // If the latest user message describes money moving, force a tool call so
+  // the model can't narrate a fake mutation. Otherwise leave it on auto.
+  const lastUser = [...history]
+    .reverse()
+    .find((m) => !m.pending && m.role === "user");
+  const forceTool = lastUser ? looksLikeMoneyEvent(lastUser.content) : false;
+
+  const msg = await chatCompletion(
+    messages,
+    AGENT_TOOLS,
+    forceTool ? "required" : "auto",
+  );
 
   // The model may emit one or more tool calls in a SINGLE response
   // (parallel tool-calling handles multi-action turns, e.g. "spent 2k and
