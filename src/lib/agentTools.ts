@@ -3,7 +3,8 @@ import {
   addHustle,
   addScholarship,
   addTransaction,
-  balance,
+  decisionContext,
+  isDuplicateTransaction,
   removeHustleByName,
   removeLastTransaction,
   removeScholarshipByName,
@@ -165,6 +166,35 @@ export interface ActionResult {
 }
 
 /**
+ * Render the post-transaction facts the model should react to (the
+ * "accountant" handing the "friend" ground truth). Every number here is
+ * computed in code; the model must use these verbatim and never compute
+ * its own. Only includes runway/pace when they're meaningful.
+ */
+function factSummary(
+  type: "income" | "expense",
+  amount: number,
+  label: string,
+  ledger: Ledger,
+  cur: Ledger["currency"],
+): string {
+  const ctx = decisionContext(ledger);
+  const facts: string[] = [
+    `Logged ${type} ${formatMoney(amount, cur)} (${label}).`,
+    `FACTS (use these exact numbers, do NOT recompute): new balance ${formatMoney(ctx.balance, cur)}.`,
+  ];
+  if (ctx.inTheRed) {
+    facts.push(`The user is now IN THE RED (below zero) — flag this with care.`);
+  }
+  if (ctx.runwayDays !== null) {
+    facts.push(
+      `At their current spending pace, that's about ${ctx.runwayDays} day${ctx.runwayDays === 1 ? "" : "s"} of money left.`,
+    );
+  }
+  return facts.join(" ");
+}
+
+/**
  * Apply a single tool call to the ledger. Pure — returns a new ledger and
  * a factual summary the model uses to write its confirmation.
  */
@@ -191,21 +221,29 @@ export function applyAction(
         return { ledger, summary: "Invalid expense amount; nothing logged." };
       const label = String(args.label ?? "expense");
       const category = (args.category as ExpenseCategory) ?? "other";
-      const next = addTransaction(ledger, { type: "expense", amount, label, category });
-      return {
-        ledger: next,
-        summary: `Logged expense ${formatMoney(amount, cur)} (${label}). New balance is exactly ${formatMoney(balance(next), cur)} — state this number verbatim; do not add or recalculate.`,
-      };
+      const parsed = { type: "expense" as const, amount, label, category };
+      if (isDuplicateTransaction(ledger, parsed)) {
+        return {
+          ledger,
+          summary: `DUPLICATE: an identical expense (${formatMoney(amount, cur)}, ${label}) was just logged — NOT logged again. Tell the user it's already recorded; do not re-log.`,
+        };
+      }
+      const next = addTransaction(ledger, parsed);
+      return { ledger: next, summary: factSummary("expense", amount, label, next, cur) };
     }
     case "log_income": {
       if (!isFinite(amount) || amount <= 0)
         return { ledger, summary: "Invalid income amount; nothing logged." };
       const label = String(args.label ?? "income");
-      const next = addTransaction(ledger, { type: "income", amount, label, tag: "Other" });
-      return {
-        ledger: next,
-        summary: `Logged income ${formatMoney(amount, cur)} (${label}). New balance is exactly ${formatMoney(balance(next), cur)} — state this number verbatim; do not add or recalculate.`,
-      };
+      const parsed = { type: "income" as const, amount, label, tag: "Other" as const };
+      if (isDuplicateTransaction(ledger, parsed)) {
+        return {
+          ledger,
+          summary: `DUPLICATE: identical income (${formatMoney(amount, cur)}, ${label}) was just logged — NOT logged again. Tell the user it's already recorded; do not re-log.`,
+        };
+      }
+      const next = addTransaction(ledger, parsed);
+      return { ledger: next, summary: factSummary("income", amount, label, next, cur) };
     }
     case "set_monthly_budget": {
       if (!isFinite(amount) || amount <= 0)
