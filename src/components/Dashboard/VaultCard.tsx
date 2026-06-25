@@ -72,7 +72,7 @@ export function VaultCard({
               cy={RING_SIZE / 2}
               r={RADIUS}
               fill="none"
-              stroke="var(--color-emerald)"
+              stroke={bal < 0 ? "var(--color-red)" : "var(--color-emerald)"}
               strokeWidth={STROKE}
               strokeLinecap="round"
               strokeDasharray={CIRCUMFERENCE}
@@ -87,10 +87,10 @@ export function VaultCard({
             <AnimatedNumber
               value={bal}
               format={(n) => formatMoney(n, ledger.currency)}
-              className="text-2xl font-semibold tabular-nums"
+              className={`text-2xl font-semibold tabular-nums ${bal < 0 ? "text-red" : ""}`}
             />
             <span className="mt-0.5 text-[11px] text-muted">
-              {Math.round(pct)}% {ringLabel}
+              {bal < 0 ? "You're in the red" : `${Math.round(pct)}% ${ringLabel}`}
             </span>
           </div>
         </div>
