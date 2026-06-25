@@ -118,17 +118,20 @@ Your job:
 - Suggest realistic income opportunities that fit their skills.
 - Flag financial risks before they become problems.
 
-Acting on money (IMPORTANT):
-- When ${name} reports money going OUT (spent, paid, bought), you MUST call log_expense.
-- When money comes IN (got paid, a gift, allowance, disbursement), you MUST call log_income.
+Acting on money (CRITICAL — follow exactly):
+- When ${name} reports money going OUT (spent, paid, bought), call log_expense ONCE.
+- When money comes IN (got paid, a gift, allowance, disbursement), call log_income ONCE.
 - To set a budget cap, call set_monthly_budget. To undo a mistaken entry, call delete_last_transaction.
-- Do these by CALLING THE TOOL — never just describe the change in words.
-- NEVER do arithmetic on balances. The tool result tells you the exact new balance — quote THAT number verbatim. Do not add the amount to anything; the balance already includes it. (If the tool says new balance is ₦500, say ₦500, never ₦1000.)
+- Use the real tool-call mechanism. NEVER write tool/function syntax as text — never output things like "<function=...>" or JSON tool calls in your reply. If you catch yourself about to, just call the tool instead.
+- Call a tool ONLY to record a real action the user is telling you about. A QUESTION ("how much have I spent?", "what hustles do I have?", "what's left?") is NOT an action — answer it from the snapshot, do not call any tool.
+- NEVER do arithmetic on balances. The balance comes ONLY from the snapshot and tool results — quote it verbatim. The amount is already included; do not add it again. Budget *allocations* (e.g. "10% for tithe") are fine to compute as advice, but the BALANCE itself is never your own math.
+- Log each amount once. Do not re-log something you already logged earlier in the same reply.
 
 Managing scholarships & hustles:
-- When ${name} mentions a scholarship or application they're tracking, use add_scholarship with the name and deadline (resolve relative dates using today, ${new Date().toISOString().slice(0, 10)}).
-- When they mention a side income stream (gig, job, side project), use add_income_stream with the name and, if known, the amount and whether it's recurring.
+- When ${name} says they HAVE a scholarship/application they're tracking, use add_scholarship (name + deadline; resolve relative dates using today, ${new Date().toISOString().slice(0, 10)}).
+- When they say they HAVE a side income stream (gig, job, side project), use add_income_stream (name; amount + recurring if known).
 - To stop tracking something, use remove_scholarship or remove_income_stream by (partial) name.
+- Again: a question about existing scholarships/streams is NOT a request to add one — just answer from the snapshot.
 
 Money is in ${cur.name} (${cur.symbol}). Keep replies concise — a few short sentences unless they ask for depth.`;
 }
@@ -202,6 +205,35 @@ interface ToolCall {
   function: { name: string; arguments: string };
 }
 
+/**
+ * Fallback: some models (incl. llama-3.3 via Groq) occasionally emit a tool
+ * call as PLAIN TEXT in the content instead of the structured tool_calls
+ * field, e.g. `<function=log_expense>{"amount":16000,"label":"earbuds"}</function>`.
+ * If we don't catch these, the ledger never mutates but the model narrates a
+ * new balance — the exact "UI didn't update" bug. Parse them out of content.
+ */
+function extractTextToolCalls(content: string | null): {
+  calls: { name: string; args: Record<string, unknown> }[];
+  cleaned: string;
+} {
+  if (!content) return { calls: [], cleaned: "" };
+  const calls: { name: string; args: Record<string, unknown> }[] = [];
+  let cleaned = content;
+
+  // <function=NAME>{json}</function>  or  <function=NAME>{json}
+  const re = /<function=([a-z_]+)>\s*(\{[\s\S]*?\})\s*(?:<\/function>)?/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    try {
+      calls.push({ name: m[1], args: JSON.parse(m[2]) });
+    } catch {
+      /* ignore unparseable */
+    }
+  }
+  if (calls.length) cleaned = content.replace(re, "").trim();
+  return { calls, cleaned };
+}
+
 export interface AgentTurn {
   reply: string;
   ledger: Ledger;
@@ -265,6 +297,27 @@ export async function runAgentTurn(
     const final = await chatCompletion(messages);
     return {
       reply: (final.content ?? "").trim() || "Done.",
+      ledger: working,
+      mutated: working !== ledger,
+    };
+  }
+
+  // No structured tool_calls — but the model may have written tool syntax as
+  // text. Apply those so the ledger actually mutates, then finalize cleanly.
+  const { calls, cleaned } = extractTextToolCalls(msg.content);
+  if (calls.length > 0) {
+    for (const c of calls) {
+      working = applyAction(working, c.name, c.args).ledger;
+    }
+    messages[0] = { role: "system", content: buildSystemPrompt(working) };
+    messages.push({
+      role: "user",
+      content:
+        "Confirm what changed in one short, warm sentence. State the new balance from the snapshot. Do NOT output any function/tool syntax.",
+    });
+    const final = await chatCompletion(messages);
+    return {
+      reply: (final.content ?? cleaned).trim() || "Done.",
       ledger: working,
       mutated: working !== ledger,
     };

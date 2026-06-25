@@ -39,7 +39,7 @@ export const AGENT_TOOLS = [
       parameters: {
         type: "object",
         properties: {
-          amount: { type: "number", description: "Amount spent, in the user's currency" },
+          amount: { type: ["number", "string"], description: "Amount spent, in the user's currency" },
           label: { type: "string", description: "Short description, e.g. 'new laptop'" },
           category: { type: "string", enum: EXPENSE_CATEGORIES },
         },
@@ -56,7 +56,7 @@ export const AGENT_TOOLS = [
       parameters: {
         type: "object",
         properties: {
-          amount: { type: "number", description: "Amount received, in the user's currency" },
+          amount: { type: ["number", "string"], description: "Amount received, in the user's currency" },
           label: { type: "string", description: "Source, e.g. 'gift from Dad', 'client payment'" },
         },
         required: ["amount", "label"],
@@ -71,7 +71,7 @@ export const AGENT_TOOLS = [
       parameters: {
         type: "object",
         properties: {
-          amount: { type: "number", description: "Monthly budget cap in the user's currency" },
+          amount: { type: ["number", "string"], description: "Monthly budget cap in the user's currency" },
         },
         required: ["amount"],
       },
@@ -123,14 +123,17 @@ export const AGENT_TOOLS = [
     function: {
       name: "add_income_stream",
       description:
-        "Add an income stream / hustle (e.g. a freelance gig, a job, a side project). Use when they mention a source of income they have.",
+        "Add an income stream / hustle (e.g. a freelance gig, a job, a side project). Use ONLY when the user states they HAVE a source of income — never to answer a question about existing streams.",
       parameters: {
         type: "object",
         properties: {
           name: { type: "string", description: "Name of the gig/stream" },
-          amount: { type: "number", description: "Amount it pays, if known" },
+          amount: {
+            type: ["number", "string"],
+            description: "Amount it pays, if known",
+          },
           recurring: {
-            type: "boolean",
+            type: ["boolean", "string"],
             description: "True if it pays regularly each month (e.g. a monthly job)",
           },
         },
@@ -171,7 +174,16 @@ export function applyAction(
   args: Record<string, unknown>,
 ): ActionResult {
   const cur = ledger.currency;
-  const amount = Number(args.amount);
+  // Models sometimes send amounts as strings ("60000", "₦60,000"); coerce.
+  const amount =
+    typeof args.amount === "string"
+      ? Number(args.amount.replace(/[^\d.-]/g, ""))
+      : Number(args.amount);
+  // ...and booleans as strings ("true"/"yes").
+  const recurring =
+    typeof args.recurring === "string"
+      ? /^(true|yes|1)$/i.test(args.recurring.trim())
+      : Boolean(args.recurring);
 
   switch (name) {
     case "log_expense": {
@@ -239,8 +251,8 @@ export function applyAction(
       if (!hName) return { ledger, summary: "No income-stream name given." };
       const next = addHustle(ledger, {
         name: hName,
-        amount: args.amount != null ? Number(args.amount) : undefined,
-        recurring: Boolean(args.recurring),
+        amount: isFinite(amount) && amount > 0 ? amount : undefined,
+        recurring,
       });
       return { ledger: next, summary: `Added income stream "${hName}".` };
     }
