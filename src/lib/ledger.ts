@@ -77,6 +77,48 @@ export function outflowPct(ledger: Ledger): number {
   return Math.min(100, Math.max(0, (spent / denom) * 100));
 }
 
+/**
+ * "Decision context" — the facts a wise friend would notice, computed in
+ * code (the accountant) so the agent never has to do arithmetic. Fields are
+ * omitted when not meaningful (e.g. runway with too little history), so we
+ * never hand the model a garbage number it would faithfully repeat.
+ */
+export interface DecisionContext {
+  balance: number;
+  /** Whole days of money left at the current average spend pace, if known. */
+  runwayDays: number | null;
+  /** Whether the balance is now below zero. */
+  inTheRed: boolean;
+  /** Average spend per active day, if there's enough history. */
+  avgDailySpend: number | null;
+}
+
+export function decisionContext(
+  ledger: Ledger,
+  now: Date = new Date(),
+): DecisionContext {
+  const bal = balance(ledger);
+  const expenses = ledger.transactions.filter((t) => t.type === "expense");
+
+  // Average daily spend needs a real span and a couple of data points to
+  // mean anything — otherwise runway is noise (e.g. "0.5 days" on day one).
+  let avgDailySpend: number | null = null;
+  let runwayDays: number | null = null;
+  if (expenses.length >= 3) {
+    const times = expenses.map((t) => new Date(t.createdAt).getTime());
+    const firstTs = Math.min(...times);
+    const spanDays = Math.max(1, (now.getTime() - firstTs) / 86_400_000);
+    if (spanDays >= 1) {
+      avgDailySpend = totalExpenses(ledger) / spanDays;
+      if (avgDailySpend > 0 && bal > 0) {
+        runwayDays = Math.floor(bal / avgDailySpend);
+      }
+    }
+  }
+
+  return { balance: bal, runwayDays, inTheRed: bal < 0, avgDailySpend };
+}
+
 /** ───────────────── Scholarship urgency ───────────────── */
 
 /** Whole days from `now` until an ISO date (negative = past). */
@@ -123,6 +165,29 @@ export function totalActiveIncome(hustles: Hustle[]): number {
 }
 
 /** ───────────────── Mutations (pure) ───────────────── */
+
+/** Window in which an identical transaction is treated as a duplicate. */
+const DEDUPE_WINDOW_MS = 90_000;
+
+/**
+ * True if an identical transaction (same type + amount + label) was logged
+ * within the dedupe window — the model re-logging the same item, or a
+ * retry after a failed sync. Deterministic; doesn't rely on model discipline.
+ */
+export function isDuplicateTransaction(
+  ledger: Ledger,
+  parsed: ParsedTransaction,
+  now: number = Date.now(),
+): boolean {
+  const label = parsed.label.trim().toLowerCase();
+  return ledger.transactions.some(
+    (t) =>
+      t.type === parsed.type &&
+      t.amount === parsed.amount &&
+      t.label.trim().toLowerCase() === label &&
+      now - new Date(t.createdAt).getTime() < DEDUPE_WINDOW_MS,
+  );
+}
 
 /** Append a transaction. Balance recomputes automatically (it's derived). */
 export function addTransaction(ledger: Ledger, parsed: ParsedTransaction): Ledger {
