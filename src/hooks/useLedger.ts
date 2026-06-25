@@ -3,10 +3,12 @@ import { toast } from "sonner";
 import type { Currency, Ledger, SyncPhase } from "@/types";
 import { EMPTY_LEDGER, migrateLedger } from "@/lib/ledger";
 import {
+  getLocalLedger,
   getStoredRootHash,
   isStorageConfigured,
   loadLedger,
   saveLedger,
+  saveLocalLedger,
 } from "@/lib/ogStorage";
 
 /** Short root-hash badge: "#a7f3c2b1…". */
@@ -16,29 +18,37 @@ function shortRoot(rootHash: string): string {
 }
 
 /**
- * useLedger — owns ledger state, expense logging, and 0G Storage sync.
+ * useLedger — local-first ledger state with 0G as the durable backup.
  *
- * On mount it hydrates from 0G (if a root hash is stored), so the ledger
- * persists across sessions. A ref mirrors state so async sync handlers
- * always read the latest ledger.
+ * Every change writes to localStorage SYNCHRONOUSLY (the working copy,
+ * never lost). 0G sync runs in the background; if it fails, the data is
+ * safe locally and retryable. On boot we read the local copy instantly,
+ * then reconcile with 0G in the background.
  */
 export function useLedger() {
-  const ref = useRef<Ledger>(EMPTY_LEDGER);
-  const [ledger, setLedgerState] = useState<Ledger>(EMPTY_LEDGER);
+  // Seed from the local working copy if present (instant, offline-safe).
+  const initial = getLocalLedger() ?? EMPTY_LEDGER;
+  const ref = useRef<Ledger>(initial);
+  const [ledger, setLedgerState] = useState<Ledger>(initial);
   const [hydrating, setHydrating] = useState<boolean>(
-    isStorageConfigured() && Boolean(getStoredRootHash()),
+    isStorageConfigured() && Boolean(getStoredRootHash()) && !getLocalLedger(),
   );
   const [syncPhase, setSyncPhase] = useState<SyncPhase>("idle");
 
+  /** Single choke-point: update state AND persist the local working copy. */
   const setLedger = (next: Ledger) => {
     ref.current = next;
     setLedgerState(next);
+    saveLocalLedger(next);
   };
 
-  // Restore the ledger from 0G Storage on first load.
+  // Reconcile with 0G in the background. The local copy is already shown;
+  // we only adopt the 0G version if we had no local copy to begin with
+  // (fresh device / cleared cache) so we never clobber unsynced local edits.
   useEffect(() => {
     const root = getStoredRootHash();
-    if (!isStorageConfigured() || !root) {
+    const hadLocal = Boolean(getLocalLedger());
+    if (!isStorageConfigured() || !root || hadLocal) {
       setHydrating(false);
       return;
     }
@@ -85,8 +95,7 @@ export function useLedger() {
 
   /** Replace the ledger wholesale (used when the agent mutates via tools). */
   const applyLedger = useCallback((next: Ledger) => {
-    ref.current = next;
-    setLedgerState(next);
+    setLedger(next);
   }, []);
 
   /** Seed the ledger from onboarding (owner, currency, opening balance). */

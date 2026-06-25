@@ -52,6 +52,34 @@ export function setStoredRootHash(rootHash: string): void {
   localStorage.setItem(LEDGER_ROOT_KEY, rootHash);
 }
 
+/** ───────────────── local-first ledger cache ───────────────── */
+
+/**
+ * The ledger's working copy lives in localStorage and is written on EVERY
+ * change (synchronous, never fails). 0G is the durable, sovereign backup
+ * synced in the background — if a sync fails, nothing is lost; the local
+ * copy is still here and the sync can be retried. This makes the app
+ * offline-capable and trustworthy regardless of testnet flakiness.
+ */
+const LEDGER_CACHE_KEY = "stash_ledger_cache";
+
+export function saveLocalLedger(ledger: Ledger): void {
+  try {
+    localStorage.setItem(LEDGER_CACHE_KEY, JSON.stringify(ledger));
+  } catch {
+    /* quota/serialize errors are non-fatal — 0G remains the backup */
+  }
+}
+
+export function getLocalLedger(): Ledger | null {
+  try {
+    const raw = localStorage.getItem(LEDGER_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as Ledger) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function clearStoredRootHash(): void {
   localStorage.removeItem(LEDGER_ROOT_KEY);
 }
