@@ -1,10 +1,10 @@
 /** The "Sync to 0G" chip is intercepted by App; the rest go to the agent. */
-export const SYNC_CHIP = "🔐 Sync to 0G";
+export const SYNC_CHIP = "Sync to 0G";
 
 export const CHIPS = [
-  "📊 Analyze my spending",
-  "🎓 Scholarship deadlines",
-  "💡 Match me to hustles",
+  "Analyze my spending",
+  "Scholarship deadlines",
+  "Match me to hustles",
   SYNC_CHIP,
 ];
 
