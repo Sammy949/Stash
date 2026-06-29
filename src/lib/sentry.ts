@@ -13,6 +13,15 @@ import * as Sentry from "@sentry/react";
  * (the rendered DOM) off-device to Sentry's servers. Errors + tracing only,
  * and the helpers below scrub financial values out of the context we attach.
  */
+/**
+ * Replace any run of 4+ digits with `[redacted]`. Catches stray amounts /
+ * balances in error text without touching short numbers like HTTP status
+ * codes or schema versions. Intentionally blunt, not a perfect sanitiser.
+ */
+function redactDigits(text: string): string {
+  return text.replace(/\d[\d,.]{3,}/g, "[redacted]");
+}
+
 export function initSentry(): void {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
   if (!dsn) return;
@@ -28,6 +37,22 @@ export function initSentry(): void {
     // serverless sync function. Keeps trace headers off the third-party
     // AI / 0G endpoints, where they'd risk CORS rejections.
     tracePropagationTargets: ["localhost", /^https:\/\/heystash\.app/],
+    // No IP / cookies / headers. Explicit beats relying on the SDK default.
+    sendDefaultPii: false,
+    // Drop console breadcrumbs entirely — a stray `console.log(ledger)`
+    // anywhere would otherwise ride along on the next captured error. Keep
+    // every other breadcrumb type (fetch/navigation/UI) for debugging.
+    beforeBreadcrumb: (crumb) => (crumb.category === "console" ? null : crumb),
+    // Last line of defense: redact long digit runs from error messages, in
+    // case an amount/balance ever lands in a thrown string. Deliberately
+    // simple — make accidental leaks unlikely and obvious, not impossible.
+    beforeSend: (event) => {
+      if (event.message) event.message = redactDigits(event.message);
+      for (const ex of event.exception?.values ?? []) {
+        if (ex.value) ex.value = redactDigits(ex.value);
+      }
+      return event;
+    },
   });
 }
 
