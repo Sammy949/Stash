@@ -70,6 +70,36 @@ export function normalizeCategory(input: unknown): ExpenseCategory {
   return CATEGORY_SYNONYMS[key] ?? "other";
 }
 
+/**
+ * Coerce a model-supplied amount into a number, EXPANDING k/m/thousand/million
+ * shorthand before stripping non-numeric characters.
+ *
+ * Nigerian users say "5k / 50k / 2m" constantly. The old logic stripped all
+ * non-digits first, so "50k" collapsed to 50 — and every downstream figure
+ * (balance, runway, % spent) came out 1000× too small. We detect the
+ * multiplier first, then parse the numeric core, then multiply:
+ *   "50k" → 50000 · "2m" → 2000000 · "2.5k" → 2500 · "5 thousand" → 5000
+ * Plain amounts ("₦50,000", 50000) pass straight through (multiplier 1).
+ */
+export function coerceAmount(input: unknown): number {
+  if (typeof input === "number") return input;
+  if (typeof input !== "string") return Number(input);
+  const s = input.trim().toLowerCase();
+  if (!s) return NaN;
+
+  let multiplier = 1;
+  if (/\bmillion\b/.test(s) || /\d\s*m\b/.test(s)) {
+    multiplier = 1_000_000;
+  } else if (/\bthousand\b/.test(s) || /\d\s*k\b/.test(s)) {
+    multiplier = 1_000;
+  }
+
+  // Keep only the numeric core (digits, decimal point, sign).
+  const num = Number(s.replace(/[^\d.-]/g, ""));
+  if (!Number.isFinite(num)) return NaN;
+  return num * multiplier;
+}
+
 export const AGENT_TOOLS = [
   {
     type: "function",
@@ -258,11 +288,9 @@ export function applyAction(
   args: Record<string, unknown>,
 ): ActionResult {
   const cur = ledger.currency;
-  // Models sometimes send amounts as strings ("60000", "₦60,000"); coerce.
-  const amount =
-    typeof args.amount === "string"
-      ? Number(args.amount.replace(/[^\d.-]/g, ""))
-      : Number(args.amount);
+  // Models sometimes send amounts as strings ("60000", "₦60,000", "50k");
+  // coerce + expand shorthand (50k → 50000) before any math touches it.
+  const amount = coerceAmount(args.amount);
   // ...and booleans as strings ("true"/"yes").
   const recurring =
     typeof args.recurring === "string"
