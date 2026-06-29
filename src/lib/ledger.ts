@@ -93,26 +93,39 @@ export interface DecisionContext {
   avgDailySpend: number | null;
 }
 
+/**
+ * How far back the spend-pace window looks. Anything older is ignored, so
+ * stale or migration-injected expenses (e.g. the v1→v2 legacy "Previous
+ * spending" dated 2026-01-01) can't stretch the span and produce an absurd
+ * runway like "900 days left". A rolling window also keeps the pace honest:
+ * it reflects how the user spends *now*, not months ago.
+ */
+const RUNWAY_WINDOW_DAYS = 30;
+
 export function decisionContext(
   ledger: Ledger,
   now: Date = new Date(),
 ): DecisionContext {
   const bal = balance(ledger);
-  const expenses = ledger.transactions.filter((t) => t.type === "expense");
+  const windowStart = now.getTime() - RUNWAY_WINDOW_DAYS * 86_400_000;
+  // Only recent expenses set the pace; older/legacy entries are excluded so
+  // they can't poison the span (and therefore the runway) below.
+  const recent = ledger.transactions.filter(
+    (t) => t.type === "expense" && new Date(t.createdAt).getTime() >= windowStart,
+  );
 
   // Average daily spend needs a real span and a couple of data points to
   // mean anything — otherwise runway is noise (e.g. "0.5 days" on day one).
   let avgDailySpend: number | null = null;
   let runwayDays: number | null = null;
-  if (expenses.length >= 3) {
-    const times = expenses.map((t) => new Date(t.createdAt).getTime());
+  if (recent.length >= 3) {
+    const times = recent.map((t) => new Date(t.createdAt).getTime());
     const firstTs = Math.min(...times);
     const spanDays = Math.max(1, (now.getTime() - firstTs) / 86_400_000);
-    if (spanDays >= 1) {
-      avgDailySpend = totalExpenses(ledger) / spanDays;
-      if (avgDailySpend > 0 && bal > 0) {
-        runwayDays = Math.floor(bal / avgDailySpend);
-      }
+    const recentSpend = recent.reduce((sum, t) => sum + t.amount, 0);
+    avgDailySpend = recentSpend / spanDays;
+    if (avgDailySpend > 0 && bal > 0) {
+      runwayDays = Math.floor(bal / avgDailySpend);
     }
   }
 
