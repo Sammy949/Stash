@@ -25,7 +25,7 @@ export function CommandBar({
             <InputBar onSend={onSend} onStop={onStop} disabled={isThinking} />
           </div>
         </div>
-        <p className="mt-2 text-center text-[11px] text-muted">
+        <p className="label-caps mt-2 text-center text-[10px] text-muted">
           Powered by 0G Compute
         </p>
       </div>

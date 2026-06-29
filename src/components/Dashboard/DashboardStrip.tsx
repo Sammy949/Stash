@@ -28,9 +28,9 @@ export function DashboardStrip({
       className="flex w-full items-center gap-4 border-b border-line bg-card/60 px-5 py-3 text-left transition-colors hover:bg-card"
     >
       <div className="min-w-0">
-        <span className="block text-[11px] text-muted">Balance</span>
+        <span className="label-caps block text-[10px] text-muted">Balance</span>
         <span
-          className={`block text-base font-semibold tabular-nums ${bal < 0 ? "text-red" : ""}`}
+          className={`font-data block text-base font-semibold ${bal < 0 ? "text-red" : ""}`}
         >
           {formatMoney(bal, ledger.currency)}
         </span>
@@ -41,13 +41,15 @@ export function DashboardStrip({
           <span className="block truncate text-[11px] text-muted">
             {next.name}
           </span>
-          <span className="block text-sm font-medium text-emerald tabular-nums">
+          <span className="font-data block text-sm font-medium text-emerald">
             {radarBadge(next)}
           </span>
         </div>
       )}
 
-      <span className="ml-auto shrink-0 text-xs text-muted">Dashboard ▴</span>
+      <span className="label-caps ml-auto shrink-0 text-[10px] text-muted">
+        Dashboard ▴
+      </span>
     </button>
   );
 }

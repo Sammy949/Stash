@@ -31,10 +31,10 @@ export function AgentPanel({
         <h2 className="text-sm font-semibold">Stash AI</h2>
         <span className="flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald" />
-          <span className="text-[11px] text-muted">Active</span>
+          <span className="label-caps text-[10px] text-muted">Active</span>
         </span>
-        <span className="ml-auto rounded-full border border-line px-2 py-1 text-[10px] font-medium text-muted">
-          ⚡ 0G powered
+        <span className="label-caps ml-auto rounded-full border border-line px-2 py-1 text-[10px] text-muted">
+          0G Powered
         </span>
       </div>
 
