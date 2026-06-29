@@ -38,9 +38,9 @@ export function TransactionList({
 
   return (
     <section className="rounded-2xl border border-line bg-card p-5">
-      <div className="flex items-center gap-2">
-        <h2 className="text-base font-semibold">Recent Activity</h2>
-        <ReceiptIcon className="h-4 w-4 text-muted" />
+      <div className="flex items-center gap-2 text-muted">
+        <ReceiptIcon className="h-3.5 w-3.5" />
+        <h2 className="label-caps text-[11px]">Recent Activity</h2>
       </div>
 
       {ordered.length === 0 && (
@@ -64,13 +64,13 @@ export function TransactionList({
                   <span className="rounded-md border border-line px-1.5 py-0.5 text-[10px] capitalize text-muted">
                     {chip}
                   </span>
-                  <span className="text-xs text-muted tabular-nums">
+                  <span className="font-data text-xs text-muted">
                     {shortDate(t.createdAt)}
                   </span>
                 </div>
               </div>
               <span
-                className={`shrink-0 text-sm font-semibold tabular-nums ${
+                className={`font-data shrink-0 text-sm font-semibold ${
                   income ? "text-emerald" : "text-ink"
                 }`}
               >

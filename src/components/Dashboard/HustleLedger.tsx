@@ -29,9 +29,9 @@ export function HustleLedger({
 
   return (
     <section className="rounded-2xl border border-line bg-card p-5">
-      <div className="flex items-center gap-2">
-        <h2 className="text-base font-semibold">Hustle Ledger</h2>
-        <BoltIcon className="h-4 w-4 text-amber" />
+      <div className="flex items-center gap-2 text-muted">
+        <BoltIcon className="h-3.5 w-3.5" />
+        <h2 className="label-caps text-[11px]">Hustle Ledger</h2>
       </div>
 
       {hustles.length === 0 && (
@@ -52,7 +52,7 @@ export function HustleLedger({
                 <span className="rounded-md border border-line px-1.5 py-0.5 text-[10px] text-muted">
                   {h.tag}
                 </span>
-                <span className="text-xs text-muted tabular-nums">
+                <span className="font-data text-xs text-muted">
                   {h.amountLabel}
                 </span>
               </div>
@@ -68,8 +68,8 @@ export function HustleLedger({
 
       {hustles.length > 0 && (
         <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
-          <span className="text-xs text-muted">Active income</span>
-          <span className="text-sm font-semibold text-emerald tabular-nums">
+          <span className="label-caps text-[11px] text-muted">Active income</span>
+          <span className="font-data text-sm font-semibold text-emerald">
             {formatMoney(activeIncome, currency)}/mo
           </span>
         </div>

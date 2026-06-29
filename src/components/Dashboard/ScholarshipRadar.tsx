@@ -24,9 +24,9 @@ export function ScholarshipRadar({
 }) {
   return (
     <section className="rounded-2xl border border-line bg-card p-5">
-      <div className="flex items-center gap-2">
-        <h2 className="text-base font-semibold">Scholarship Radar</h2>
-        <RadarIcon className="h-4 w-4 text-muted" />
+      <div className="flex items-center gap-2 text-muted">
+        <RadarIcon className="h-3.5 w-3.5" />
+        <h2 className="label-caps text-[11px]">Scholarship Radar</h2>
       </div>
 
       {scholarships.length === 0 && (
@@ -51,7 +51,7 @@ export function ScholarshipRadar({
                 <p className="truncate text-xs text-muted">{s.statusLabel}</p>
               </div>
               <span
-                className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium tabular-nums ${BADGE[urgency]}`}
+                className={`font-data shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${BADGE[urgency]}`}
               >
                 {radarBadge(s)}
               </span>
