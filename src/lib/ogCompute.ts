@@ -10,6 +10,7 @@ import {
 import type { MemoryKind } from "@/types";
 import { CURRENCIES, formatMoney } from "@/lib/currency";
 import { AGENT_TOOLS, applyAction } from "@/lib/agentTools";
+import { extractTextToolCalls, sanitizeToolCall } from "@/lib/toolCalls";
 
 /**
  * 0G Compute integration — the Stash AI agent.
@@ -209,7 +210,7 @@ function toRouterMessages(history: ChatMessage[]): RouterMessage[] {
 async function chatCompletion(
   messages: RouterMessage[],
   tools?: unknown,
-  toolChoice: "auto" | "required" = "auto",
+  toolChoice: "auto" | "required" | "none" = "auto",
   signal?: AbortSignal,
 ): Promise<{ content: string | null; tool_calls?: ToolCall[] }> {
   let res: Response;
@@ -307,35 +308,6 @@ function looksLikePreSpendIntent(text: string): boolean {
   return INTENT.some((re) => re.test(t));
 }
 
-/**
- * Fallback: some models (incl. llama-3.3 via Groq) occasionally emit a tool
- * call as PLAIN TEXT in the content instead of the structured tool_calls
- * field, e.g. `<function=log_expense>{"amount":16000,"label":"earbuds"}</function>`.
- * If we don't catch these, the ledger never mutates but the model narrates a
- * new balance — the exact "UI didn't update" bug. Parse them out of content.
- */
-function extractTextToolCalls(content: string | null): {
-  calls: { name: string; args: Record<string, unknown> }[];
-  cleaned: string;
-} {
-  if (!content) return { calls: [], cleaned: "" };
-  const calls: { name: string; args: Record<string, unknown> }[] = [];
-  let cleaned = content;
-
-  // <function=NAME>{json}</function>  or  <function=NAME>{json}
-  const re = /<function=([a-z_]+)>\s*(\{[\s\S]*?\})\s*(?:<\/function>)?/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(content)) !== null) {
-    try {
-      calls.push({ name: m[1], args: JSON.parse(m[2]) });
-    } catch {
-      /* ignore unparseable */
-    }
-  }
-  if (calls.length) cleaned = content.replace(re, "").trim();
-  return { calls, cleaned };
-}
-
 export interface AgentTurn {
   reply: string;
   ledger: Ledger;
@@ -393,38 +365,56 @@ async function runAgentTurnInner(
     AGENT_TOOLS,
     forceTool ? "required" : "auto",
     signal,
-  );
+  ).catch((e) => {
+    // Some models occasionally emit a malformed tool call the provider rejects
+    // outright ("tool call validation failed… not in request.tools"). It's
+    // non-deterministic — one clean retry on "auto" usually recovers.
+    const validationGlitch =
+      e instanceof StashComputeError &&
+      /tool[\s_]*call|request\.tools|tool[\s_]*choice/i.test(e.message);
+    if (validationGlitch && !signal?.aborted) {
+      return chatCompletion(messages, AGENT_TOOLS, "auto", signal);
+    }
+    throw e;
+  });
 
-  // The model may emit one or more tool calls in a SINGLE response
-  // (parallel tool-calling handles multi-action turns, e.g. "spent 2k and
-  // got 5k"). We execute that one round, then finalize WITHOUT tools so the
-  // model can't re-call and double-log — it must write a grounded reply.
-  if (msg.tool_calls && msg.tool_calls.length > 0) {
+  // The model may emit one or more tool calls in a SINGLE response (parallel
+  // tool-calling handles multi-action turns, e.g. "spent 2k and got 5k"). Every
+  // call is sanitized first — names/args come back in unpredictable shapes — so
+  // a malformed call is recovered, not crashed or silently dropped.
+  const cleanCalls = (msg.tool_calls ?? []).map((c, i) => ({
+    id: c.id || `call_${i}`,
+    ...sanitizeToolCall(c.function?.name ?? "", c.function?.arguments ?? ""),
+  }));
+  const usable = cleanCalls.filter((c) => c.known);
+
+  if (usable.length > 0) {
+    // Echo back ONLY the cleaned, known calls. Echoing a malformed name (or one
+    // with args fused in) makes the provider reject the finalize request — and
+    // means the action silently never ran. Reconstructing them keeps the loop
+    // valid and the ledger actually mutated.
     messages.push({
       role: "assistant",
       content: msg.content ?? "",
-      tool_calls: msg.tool_calls,
+      tool_calls: usable.map((c) => ({
+        id: c.id,
+        type: "function",
+        function: { name: c.name, arguments: JSON.stringify(c.args) },
+      })),
     });
 
-    for (const call of msg.tool_calls) {
-      let args: Record<string, unknown> = {};
-      try {
-        args = JSON.parse(call.function.arguments || "{}");
-      } catch {
-        /* leave args empty on malformed JSON */
-      }
-      const result = applyAction(working, call.function.name, args);
+    for (const c of usable) {
+      const result = applyAction(working, c.name, c.args);
       working = result.ledger;
-      messages.push({
-        role: "tool",
-        tool_call_id: call.id,
-        content: result.summary,
-      });
+      messages.push({ role: "tool", tool_call_id: c.id, content: result.summary });
     }
 
-    // Refresh the snapshot so the reply sees the new balance; no tools now.
+    // Refresh the snapshot so the reply sees the new balance. Keep the tools in
+    // the request (so the echoed calls validate) but forbid NEW ones with
+    // tool_choice "none" — the model must now write a grounded reply, not
+    // re-call and double-log.
     messages[0] = { role: "system", content: buildSystemPrompt(working) };
-    const final = await chatCompletion(messages, undefined, "auto", signal);
+    const final = await chatCompletion(messages, AGENT_TOOLS, "none", signal);
     return {
       reply: (final.content ?? "").trim() || "Done.",
       ledger: working,
