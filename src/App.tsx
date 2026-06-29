@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Toaster } from "sonner";
+import { Analytics } from "@vercel/analytics/react";
 import { Dashboard } from "@/components/Dashboard/Dashboard";
 import { DashboardStrip } from "@/components/Dashboard/DashboardStrip";
 import { AgentPanel } from "@/components/Agent/AgentPanel";
@@ -102,6 +103,7 @@ export default function App() {
       </div>
 
       <Toaster theme="dark" position="bottom-right" richColors closeButton />
+      <Analytics />
     </div>
   );
 }
