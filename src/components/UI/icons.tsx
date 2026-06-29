@@ -103,3 +103,12 @@ export function ReceiptIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function MemoryIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M12 5a3 3 0 0 0-3 3 3 3 0 0 0-1 5.8V16a2 2 0 0 0 4 0" />
+      <path d="M12 5a3 3 0 0 1 3 3 3 3 0 0 1 1 5.8V16a2 2 0 0 1-4 0V5Z" />
+    </svg>
+  );
+}

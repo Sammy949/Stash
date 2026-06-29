@@ -8,6 +8,7 @@ import {
   ReceiptIcon,
   TrashIcon,
 } from "@/components/UI/icons";
+import { RowButton } from "@/components/UI/RowButton";
 
 const PAGE = 10;
 
@@ -16,36 +17,6 @@ function shortDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
-}
-
-/** Small ghost icon-button used for the per-row actions. */
-function RowButton({
-  label,
-  onClick,
-  tone = "muted",
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  tone?: "muted" | "emerald" | "red";
-  children: React.ReactNode;
-}) {
-  const color =
-    tone === "emerald"
-      ? "text-emerald hover:bg-emerald/10"
-      : tone === "red"
-        ? "text-red hover:bg-red/10"
-        : "text-muted hover:bg-bg hover:text-ink";
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      onClick={onClick}
-      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${color}`}
-    >
-      {children}
-    </button>
-  );
 }
 
 /**
