@@ -360,34 +360,41 @@ async function runAgentTurnInner(
     ...toRouterMessages(history),
   ];
 
-  const msg = await chatCompletion(
-    messages,
-    AGENT_TOOLS,
-    forceTool ? "required" : "auto",
-    signal,
-  ).catch((e) => {
-    // Some models occasionally emit a malformed tool call the provider rejects
-    // outright ("tool call validation failed… not in request.tools"). It's
-    // non-deterministic — one clean retry on "auto" usually recovers.
-    const validationGlitch =
-      e instanceof StashComputeError &&
-      /tool[\s_]*call|request\.tools|tool[\s_]*choice/i.test(e.message);
-    if (validationGlitch && !signal?.aborted) {
-      return chatCompletion(messages, AGENT_TOOLS, "auto", signal);
-    }
-    throw e;
-  });
+  // One model call → sanitized, validated tool calls. Retries once on a
+  // provider tool-validation glitch ("tool call validation failed… not in
+  // request.tools") — it's non-deterministic. Crucially the retry keeps the
+  // SAME tool_choice: downgrading a forced money event to "auto" would let the
+  // model narrate a phantom balance instead of acting.
+  async function attempt(choice: "auto" | "required" | "none") {
+    const m = await chatCompletion(messages, AGENT_TOOLS, choice, signal).catch(
+      (e) => {
+        const glitch =
+          e instanceof StashComputeError &&
+          /tool[\s_]*call|request\.tools|tool[\s_]*choice/i.test(e.message);
+        if (glitch && !signal?.aborted) {
+          return chatCompletion(messages, AGENT_TOOLS, choice, signal);
+        }
+        throw e;
+      },
+    );
+    // Every call is sanitized — names/args come back in unpredictable shapes,
+    // so a malformed call is recovered, not crashed or silently dropped.
+    const clean = (m.tool_calls ?? []).map((c, i) => ({
+      id: c.id || `call_${i}`,
+      ...sanitizeToolCall(c.function?.name ?? "", c.function?.arguments ?? ""),
+    }));
+    return { msg: m, usable: clean.filter((c) => c.known) };
+  }
 
-  // The model may emit one or more tool calls in a SINGLE response (parallel
-  // tool-calling handles multi-action turns, e.g. "spent 2k and got 5k"). Every
-  // call is sanitized first — names/args come back in unpredictable shapes — so
-  // a malformed call is recovered, not crashed or silently dropped.
-  const cleanCalls = (msg.tool_calls ?? []).map((c, i) => ({
-    id: c.id || `call_${i}`,
-    ...sanitizeToolCall(c.function?.name ?? "", c.function?.arguments ?? ""),
-  }));
-  const usable = cleanCalls.filter((c) => c.known);
+  // First pass. If a money event was FORCED but the model narrated instead of
+  // calling a tool, give it one more forced attempt before we refuse to guess.
+  let { msg, usable } = await attempt(forceTool ? "required" : "auto");
+  if (forceTool && usable.length === 0) {
+    ({ msg, usable } = await attempt("required"));
+  }
 
+  // The model may emit one or more tool calls in a SINGLE response — parallel
+  // tool-calling handles multi-action turns (e.g. "spent 2k and got 5k").
   if (usable.length > 0) {
     // Echo back ONLY the cleaned, known calls. Echoing a malformed name (or one
     // with args fused in) makes the provider reject the finalize request — and
@@ -440,6 +447,19 @@ async function runAgentTurnInner(
       reply: (final.content ?? cleaned).trim() || "Done.",
       ledger: working,
       mutated: working !== ledger,
+    };
+  }
+
+  // Reached only when NO tool ran. If we FORCED a money event and still landed
+  // here, the model narrated instead of acting — and its reply may state a
+  // phantom balance, which we must NEVER show (code owns the numbers). Refuse
+  // to surface an invented figure; ask the user to restate the amount instead.
+  if (forceTool) {
+    return {
+      reply:
+        "I want to record that exactly right but didn't catch a clear amount. Mind saying it again — like “I earned ₦100,000” or “I spent ₦3,000 on lunch”?",
+      ledger: working,
+      mutated: false,
     };
   }
 
