@@ -184,8 +184,10 @@ const DEDUPE_WINDOW_MS = 90_000;
 
 /**
  * True if an identical transaction (same type + amount + label) was logged
- * within the dedupe window — the model re-logging the same item, or a
- * retry after a failed sync. Deterministic; doesn't rely on model discipline.
+ * within the dedupe window. This flags a *candidate* duplicate — the caller
+ * doesn't drop it silently (a genuine repeat purchase, e.g. two ₦100 bus
+ * trips, is real); instead it asks the user to confirm a second log. Match
+ * stays EXACT on purpose: fuzzier matching would swallow real repeats.
  */
 export function isDuplicateTransaction(
   ledger: Ledger,

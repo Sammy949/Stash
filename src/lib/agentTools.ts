@@ -87,6 +87,11 @@ export const AGENT_TOOLS = [
             description:
               "Optional spending category. Prefer one of: transport, data, food, printing, airtime, rent, other. Anything else is fine too — it's bucketed in code.",
           },
+          force: {
+            type: ["boolean", "string"],
+            description:
+              "Leave unset normally. Set true ONLY when a previous attempt returned DUPLICATE_CONFIRM and the user has now explicitly confirmed they want to log this near-identical expense AGAIN (a genuine second purchase).",
+          },
         },
         required: ["amount", "label"],
       },
@@ -103,6 +108,11 @@ export const AGENT_TOOLS = [
         properties: {
           amount: { type: ["number", "string"], description: "Amount received, in the user's currency" },
           label: { type: "string", description: "Source, e.g. 'gift from Dad', 'client payment'" },
+          force: {
+            type: ["boolean", "string"],
+            description:
+              "Leave unset normally. Set true ONLY when a previous attempt returned DUPLICATE_CONFIRM and the user has now explicitly confirmed they want to log this near-identical income AGAIN.",
+          },
         },
         required: ["amount", "label"],
       },
@@ -258,6 +268,11 @@ export function applyAction(
     typeof args.recurring === "string"
       ? /^(true|yes|1)$/i.test(args.recurring.trim())
       : Boolean(args.recurring);
+  // `force` lets a confirmed re-log bypass the duplicate guard.
+  const force =
+    typeof args.force === "string"
+      ? /^(true|yes|1)$/i.test(args.force.trim())
+      : Boolean(args.force);
 
   switch (name) {
     case "log_expense": {
@@ -266,10 +281,10 @@ export function applyAction(
       const label = String(args.label ?? "expense");
       const category = normalizeCategory(args.category);
       const parsed = { type: "expense" as const, amount, label, category };
-      if (isDuplicateTransaction(ledger, parsed)) {
+      if (!force && isDuplicateTransaction(ledger, parsed)) {
         return {
           ledger,
-          summary: `DUPLICATE: an identical expense (${formatMoney(amount, cur)}, ${label}) was just logged — NOT logged again. Tell the user it's already recorded; do not re-log.`,
+          summary: `DUPLICATE_CONFIRM: a matching expense (${formatMoney(amount, cur)}, ${label}) was logged moments ago — NOT logged again yet. Ask the user if they really mean to log it a SECOND time (a genuine repeat purchase). Only if they confirm, call log_expense again with force=true. Do NOT log it otherwise.`,
         };
       }
       const next = addTransaction(ledger, parsed);
@@ -280,10 +295,10 @@ export function applyAction(
         return { ledger, summary: "Invalid income amount; nothing logged." };
       const label = String(args.label ?? "income");
       const parsed = { type: "income" as const, amount, label, tag: "Other" as const };
-      if (isDuplicateTransaction(ledger, parsed)) {
+      if (!force && isDuplicateTransaction(ledger, parsed)) {
         return {
           ledger,
-          summary: `DUPLICATE: identical income (${formatMoney(amount, cur)}, ${label}) was just logged — NOT logged again. Tell the user it's already recorded; do not re-log.`,
+          summary: `DUPLICATE_CONFIRM: matching income (${formatMoney(amount, cur)}, ${label}) was logged moments ago — NOT logged again yet. Ask the user if they really mean to log it a SECOND time. Only if they confirm, call log_income again with force=true. Do NOT log it otherwise.`,
         };
       }
       const next = addTransaction(ledger, parsed);
