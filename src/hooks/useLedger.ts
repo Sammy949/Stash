@@ -76,7 +76,7 @@ export function useLedger() {
       const result = await saveLedger(current, () => setSyncPhase("uploading"));
       setLedger({ ...ref.current, lastSyncedAt: result.syncedAt });
       setSyncPhase("confirmed");
-      toast.success("Ledger synced to 0G Storage", {
+      toast.success("Saved locally and backed up to 0G", {
         description: `Encrypted · Root: ${shortRoot(result.rootHash)}`,
       });
       window.setTimeout(() => setSyncPhase("idle"), 1800);
