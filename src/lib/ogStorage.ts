@@ -185,33 +185,66 @@ export async function saveLedger(
 ): Promise<SyncResult> {
   if (useProxy()) {
     onProgress?.("Uploading to 0G…");
-    const result = await saveLedgerViaProxy(ledger);
+    const result = await saveLedgerViaProxy(ledger, onProgress);
     setStoredRootHash(result.rootHash);
     return result;
   }
   return saveLedgerDirect(ledger, onProgress);
 }
 
-/** Upload via the same-origin serverless proxy (production path). */
-async function saveLedgerViaProxy(ledger: Ledger): Promise<SyncResult> {
-  let res: Response;
-  try {
-    res = await fetch(PROXY_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ledger }),
-    });
-  } catch (e) {
-    throw new Error(
-      "Couldn't reach the 0G sync service. Check your connection and try again.",
-      { cause: e },
-    );
+/** Exponential backoff between proxy attempts: 1s → 2s → 4s. */
+const PROXY_BACKOFF_MS = [1000, 2000, 4000];
+
+/**
+ * Upload via the same-origin serverless proxy (production path).
+ *
+ * Retries with exponential backoff, mirroring saveLedgerDirect: the testnet
+ * storage nodes the proxy talks to are intermittently busy, and a single
+ * attempt fails too often. Up to 4 attempts (initial + 3 backoff retries of
+ * 1s/2s/4s). Only the proxy's 502 (upstream 0G node busy/unreachable) and
+ * outright network failures are retried — 4xx/500 are request/config errors
+ * that won't self-heal, and known-fatal chain errors (no gas, bad key) are
+ * surfaced immediately.
+ */
+async function saveLedgerViaProxy(
+  ledger: Ledger,
+  onProgress?: SyncProgress,
+): Promise<SyncResult> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= PROXY_BACKOFF_MS.length; attempt++) {
+    let fatal: Error | null = null;
+    try {
+      const res = await fetch(PROXY_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ledger }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.rootHash) {
+        return { rootHash: data.rootHash, syncedAt: data.syncedAt };
+      }
+      const message = data?.error ?? `0G sync failed (${res.status}).`;
+      if (res.status === 502 && !isFatalUploadError(message)) {
+        lastError = new Error(message); // transient — retry
+      } else {
+        fatal = new Error(message); // request/config/fatal — don't retry
+      }
+    } catch (e) {
+      lastError = e; // fetch rejected (network/transport) — retry
+    }
+    if (fatal) throw fatal;
+    if (attempt < PROXY_BACKOFF_MS.length) {
+      onProgress?.(
+        `Storage nodes busy — retrying (${attempt + 1}/${PROXY_BACKOFF_MS.length})…`,
+      );
+      await delayMs(PROXY_BACKOFF_MS[attempt]);
+    }
   }
-  const data = await res.json().catch(() => null);
-  if (!res.ok || !data?.rootHash) {
-    throw new Error(data?.error ?? `0G sync failed (${res.status}).`);
-  }
-  return { rootHash: data.rootHash, syncedAt: data.syncedAt };
+  throw new Error(
+    lastError instanceof Error && /couldn't reach|failed to fetch|networkerror/i.test(lastError.message)
+      ? "Couldn't reach the 0G sync service. Your latest changes are saved locally — syncing will retry."
+      : "0G's storage nodes are busy right now. Your latest changes are saved locally — syncing to 0G will retry.",
+  );
 }
 
 /** Upload by running the SDK directly in the browser (localhost dev path). */

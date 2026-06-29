@@ -8,6 +8,7 @@ const PHASE: Record<
   uploading: { label: "Uploading to 0G…", color: "text-amber" },
   confirmed: { label: "Synced to 0G ✓", color: "text-emerald" },
   error: { label: "Sync failed", color: "text-red" },
+  pending: { label: "Saved locally · syncing to 0G when ready", color: "text-amber" },
 };
 
 /** Live sync status pill; renders nothing when idle. */

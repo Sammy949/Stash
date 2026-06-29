@@ -122,7 +122,10 @@ export type SyncPhase =
   | "encrypting"
   | "uploading"
   | "confirmed"
-  | "error";
+  | "error"
+  /** Sync didn't go through; data is safe locally and will retry. Persists
+   *  (no auto-clear) until a sync succeeds. */
+  | "pending";
 
 /** ───────────────── Agent / Chat ───────────────── */
 

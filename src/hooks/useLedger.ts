@@ -83,12 +83,13 @@ export function useLedger() {
       return true;
     } catch (e) {
       console.error("0G Storage sync failed:", e);
-      setSyncPhase("error");
-      toast.warning("Couldn't reach 0G just now", {
+      // Persistent "pending" — the local copy is safe; this stays visible
+      // until a later sync succeeds, rather than flashing an error away.
+      setSyncPhase("pending");
+      toast.warning("Saved locally — couldn't reach 0G just now", {
         description:
-          e instanceof Error ? e.message : "Tap Sync to 0G again in a moment.",
+          e instanceof Error ? e.message : "It'll keep retrying; tap Sync to 0G to try now.",
       });
-      window.setTimeout(() => setSyncPhase("idle"), 2800);
       return false;
     }
   }, []);
