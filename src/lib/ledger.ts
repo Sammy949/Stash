@@ -226,6 +226,36 @@ export function removeTransaction(ledger: Ledger, id: string): Ledger {
   };
 }
 
+/**
+ * Edit a transaction's amount and/or label by id (manual corrections from the
+ * dashboard list). Invalid patches are ignored field-by-field, so a blank
+ * label or non-positive amount leaves the original value untouched — balance
+ * recomputes automatically since it's derived.
+ */
+export function editTransaction(
+  ledger: Ledger,
+  id: string,
+  patch: { amount?: number; label?: string },
+): Ledger {
+  return {
+    ...ledger,
+    transactions: ledger.transactions.map((t) => {
+      if (t.id !== id) return t;
+      const amount =
+        patch.amount !== undefined &&
+        Number.isFinite(patch.amount) &&
+        patch.amount > 0
+          ? Math.round(patch.amount)
+          : t.amount;
+      const label =
+        patch.label !== undefined && patch.label.trim()
+          ? patch.label.trim()
+          : t.label;
+      return { ...t, amount, label };
+    }),
+  };
+}
+
 /** Remove the most recently logged transaction (agent "undo that"). */
 export function removeLastTransaction(ledger: Ledger): Ledger {
   if (ledger.transactions.length === 0) return ledger;

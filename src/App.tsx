@@ -10,6 +10,7 @@ import type { OnboardingProfile } from "@/components/Onboarding/Onboarding";
 import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
 import { ensureStorageSchema, getStoredRootHash } from "@/lib/ogStorage";
+import { editTransaction, removeTransaction } from "@/lib/ledger";
 
 // One-time forced reset onto the new local-first schema (runs once at load,
 // before any hook reads localStorage).
@@ -68,6 +69,24 @@ export default function App() {
     });
   }
 
+  // Manual corrections from the dashboard list. Same persist-then-sync path
+  // the agent uses: apply the pure reducer, then back up to 0G in the
+  // background. Balance is derived, so it recomputes on its own.
+  function handleEditTransaction(
+    id: string,
+    patch: { amount?: number; label?: string },
+  ) {
+    const updated = editTransaction(ledger, id, patch);
+    applyLedger(updated);
+    void sync(updated);
+  }
+
+  function handleDeleteTransaction(id: string) {
+    const updated = removeTransaction(ledger, id);
+    applyLedger(updated);
+    void sync(updated);
+  }
+
   return (
     <div className="h-screen bg-bg text-ink">
       {/* Centered platform column — doesn't stretch on wide screens. */}
@@ -91,7 +110,13 @@ export default function App() {
           </div>
         ) : (
           <main className="flex-1 overflow-y-auto px-4 py-6">
-            <Dashboard ledger={ledger} syncPhase={syncPhase} hydrating={hydrating} />
+            <Dashboard
+              ledger={ledger}
+              syncPhase={syncPhase}
+              hydrating={hydrating}
+              onEditTransaction={handleEditTransaction}
+              onDeleteTransaction={handleDeleteTransaction}
+            />
           </main>
         )}
 
