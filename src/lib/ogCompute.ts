@@ -240,6 +240,29 @@ function looksLikeMoneyEvent(text: string): boolean {
 }
 
 /**
+ * Pre-spend INTENT: the user is *contemplating* a purchase, not reporting
+ * one that happened ("thinking of buying a 50k laptop", "should I get…",
+ * "can I afford…"). These share a verb+amount with a real money event, so
+ * looksLikeMoneyEvent would force a log — turning a hypothetical into a
+ * phantom expense. When intent is present we suppress the force and let the
+ * model reason and advise instead. This IS the pre-spend moment.
+ */
+function looksLikePreSpendIntent(text: string): boolean {
+  const t = text.toLowerCase();
+  const INTENT = [
+    /\bthink(ing)? (of|about) (buying|getting|spending)\b/,
+    /\bshould i (buy|get|spend|cop|grab)\b/,
+    /\bcan i afford\b/,
+    /\bwhat if i (buy|bought|get|got|spend|spent)\b/,
+    /\bplanning to (buy|get|spend)\b/,
+    /\bconsidering (buying|getting|a |an |the |\d)/,
+    /\bwant to (buy|get|cop|grab)\b/,
+    /\b(is it|would it be|it'?s) worth (buying|getting|it)\b/,
+  ];
+  return INTENT.some((re) => re.test(t));
+}
+
+/**
  * Fallback: some models (incl. llama-3.3 via Groq) occasionally emit a tool
  * call as PLAIN TEXT in the content instead of the structured tool_calls
  * field, e.g. `<function=log_expense>{"amount":16000,"label":"earbuds"}</function>`.
@@ -298,11 +321,17 @@ export async function runAgentTurn(
   ];
 
   // If the latest user message describes money moving, force a tool call so
-  // the model can't narrate a fake mutation. Otherwise leave it on auto.
+  // the model can't narrate a fake mutation. But a PRE-SPEND intent ("should
+  // I buy…", "thinking of getting…") shares the same shape while nothing has
+  // actually moved — forcing a log there fabricates an expense, so we leave
+  // those on auto and let the agent advise. Otherwise leave it on auto.
   const lastUser = [...history]
     .reverse()
     .find((m) => !m.pending && m.role === "user");
-  const forceTool = lastUser ? looksLikeMoneyEvent(lastUser.content) : false;
+  const forceTool = lastUser
+    ? looksLikeMoneyEvent(lastUser.content) &&
+      !looksLikePreSpendIntent(lastUser.content)
+    : false;
 
   const msg = await chatCompletion(
     messages,
