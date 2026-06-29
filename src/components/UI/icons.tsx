@@ -104,6 +104,24 @@ export function ReceiptIcon({ className }: IconProps) {
   );
 }
 
+export function ArrowDownLeftIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M17 7 7 17" />
+      <path d="M16 17H7V8" />
+    </svg>
+  );
+}
+
+export function ArrowUpRightIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M7 17 17 7" />
+      <path d="M8 7h9v9" />
+    </svg>
+  );
+}
+
 export function MemoryIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>
