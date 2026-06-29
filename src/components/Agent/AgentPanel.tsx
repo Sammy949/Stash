@@ -32,6 +32,14 @@ export function AgentPanel({ messages }: { messages: ChatMessage[] }) {
 
       {/* Transcript */}
       <div className="mx-auto w-full max-w-2xl flex-1 space-y-4 overflow-y-auto px-5 py-4">
+        {messages.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-line/80 bg-bg/60 p-4 text-sm text-muted">
+            <p className="font-medium text-ink">Start the story</p>
+            <p className="mt-1">
+              Try a real money event like “I got paid ₦20,000” or “I spent ₦3,000 on lunch” and Stash will ground it in your ledger.
+            </p>
+          </div>
+        ) : null}
         {messages.map((m) => (
           <MessageBubble key={m.id} message={m} />
         ))}

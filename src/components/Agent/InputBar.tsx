@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SendIcon } from "@/components/UI/icons";
 
 export function InputBar({
@@ -10,6 +10,12 @@ export function InputBar({
 }) {
   const [text, setText] = useState("");
   const taRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!disabled) {
+      taRef.current?.focus();
+    }
+  }, [disabled]);
 
   function grow() {
     const ta = taRef.current;
@@ -48,7 +54,7 @@ export function InputBar({
           grow();
         }}
         onKeyDown={onKeyDown}
-        placeholder="Ask Stash anything…"
+        placeholder="Try: “I got paid ₦20,000” or “I spent ₦3,000 on lunch”"
         className="max-h-40 flex-1 resize-none rounded-xl border border-line bg-bg px-3.5 py-2.5 text-sm leading-relaxed outline-none transition-colors placeholder:text-muted focus:border-emerald/50 disabled:opacity-50"
       />
       <button
