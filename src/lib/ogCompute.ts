@@ -2,10 +2,12 @@ import type { ChatMessage, Ledger } from "@/types";
 import {
   balance,
   daysUntil,
+  getMemories,
   totalActiveIncome,
   totalExpenses,
   totalIncome,
 } from "@/lib/ledger";
+import type { MemoryKind } from "@/types";
 import { CURRENCIES, formatMoney } from "@/lib/currency";
 import { AGENT_TOOLS, applyAction } from "@/lib/agentTools";
 
@@ -54,6 +56,35 @@ export function isComputeConfigured(): boolean {
 export class StashComputeError extends Error {}
 
 /** ───────────────── system prompt ───────────────── */
+
+/** Memory kinds in prompt order, with human group headings. */
+const MEMORY_GROUPS: { kind: MemoryKind; heading: string }[] = [
+  { kind: "identity", heading: "Who they are" },
+  { kind: "goal", heading: "Goals" },
+  { kind: "habit", heading: "Habits" },
+  { kind: "preference", heading: "Preferences" },
+  { kind: "opportunity", heading: "Opportunities" },
+];
+
+/**
+ * Render soft memory ("what Stash remembers") grouped by kind. This is the
+ * recall half of the memory loop — every reply sees who the user is, not just
+ * their numbers. Stated explicitly when empty so the model doesn't invent.
+ */
+function renderMemories(ledger: Ledger, name: string): string {
+  const memories = getMemories(ledger);
+  if (memories.length === 0) {
+    return `\nWhat you remember about ${name}: NOTHING lasting yet (no goals, habits, or preferences learned).`;
+  }
+  const lines = [`\nWhat you remember about ${name}:`];
+  for (const { kind, heading } of MEMORY_GROUPS) {
+    const items = memories.filter((m) => m.kind === kind);
+    if (items.length === 0) continue;
+    lines.push(`${heading}:`);
+    for (const m of items) lines.push(`- ${m.content}`);
+  }
+  return lines.join("\n");
+}
 
 /** Render the ledger into a compact, readable snapshot for the prompt. */
 function renderLedgerSnapshot(ledger: Ledger): string {
@@ -118,6 +149,7 @@ export function buildSystemPrompt(ledger: Ledger): string {
 
 ${name}'s current financial snapshot:
 ${renderLedgerSnapshot(ledger)}
+${renderMemories(ledger, name)}
 
 Who you are:
 - ${name}'s financially wise friend — the one who actually knows their money and tells them the truth. Not a receipt printer, not a yes-man.
@@ -144,6 +176,12 @@ Managing scholarships & hustles:
 - When they say they HAVE a side income stream (gig, job, side project), use add_income_stream (name; amount + recurring if known).
 - To stop tracking something, use remove_scholarship or remove_income_stream by (partial) name.
 - Again: a question about existing scholarships/streams is NOT a request to add one — just answer from the snapshot.
+
+Memory — remembering who ${name} is (this is what makes you THEIR companion, not a calculator):
+- Beyond money, ${name} reveals lasting things about themselves: goals ("saving for a laptop"), habits ("I overspend after payday"), preferences ("I'd rather cook than eat out"), identity ("final-year student in Lagos"), or an opportunity not already tracked. When something has LONG-TERM value for future advice, call remember(kind, content).
+- Capture the durable, ignore the disposable. "I'm trying to stop impulse buying" → remember. "lol I'm broke", "thanks", "what's my balance?" → nothing to remember.
+- Phrase it about ${name} in a short line ("Saving for a MacBook", not "I want one"). If they revise it ("tuition now, not the laptop") use update_memory; if it stops being true use forget_memory. NEVER re-save something already under "What you remember".
+- Memory NEVER changes the numbers — it shapes your judgement, not the balance. When your advice touches a goal or habit they told you, reference it like a friend who actually remembers: "you said you're saving for the laptop — this sets that back a little."
 
 Money is in ${cur.name} (${cur.symbol}). Keep replies concise — a few short sentences unless they ask for depth.`;
 }

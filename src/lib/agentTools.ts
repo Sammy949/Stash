@@ -1,14 +1,18 @@
-import type { ExpenseCategory, Ledger } from "@/types";
+import type { ExpenseCategory, Ledger, MemoryKind } from "@/types";
 import {
   addHustle,
+  addMemory,
   addScholarship,
   addTransaction,
   decisionContext,
+  isDuplicateMemory,
   isDuplicateTransaction,
   removeHustleByName,
   removeLastTransaction,
+  removeMemoryByContent,
   removeScholarshipByName,
   setMonthlyBudget,
+  updateMemoryByContent,
 } from "@/lib/ledger";
 import { formatMoney } from "@/lib/currency";
 
@@ -68,6 +72,49 @@ export function normalizeCategory(input: unknown): ExpenseCategory {
     return key as ExpenseCategory;
   }
   return CATEGORY_SYNONYMS[key] ?? "other";
+}
+
+/** The known memory kinds + a few synonyms the model might reach for. */
+const MEMORY_KINDS: MemoryKind[] = [
+  "goal",
+  "habit",
+  "preference",
+  "opportunity",
+  "identity",
+];
+const MEMORY_KIND_SYNONYMS: Record<string, MemoryKind> = {
+  goals: "goal",
+  saving: "goal",
+  target: "goal",
+  aspiration: "goal",
+  habits: "habit",
+  behaviour: "habit",
+  behavior: "habit",
+  pattern: "habit",
+  tendency: "habit",
+  preferences: "preference",
+  like: "preference",
+  dislike: "preference",
+  value: "preference",
+  gig: "opportunity",
+  application: "opportunity",
+  fact: "identity",
+  about: "identity",
+  background: "identity",
+  profile: "identity",
+};
+
+/**
+ * Bucket a free-form memory kind onto our known set. Like normalizeCategory,
+ * the schema does NOT enforce an enum (a strict enum makes the provider reject
+ * the whole tool call on any off-list value); we accept any string and map it.
+ * Unknown kinds fall to "identity" — the most general "fact about the user".
+ */
+export function normalizeMemoryKind(input: unknown): MemoryKind {
+  if (typeof input !== "string") return "identity";
+  const key = input.trim().toLowerCase();
+  if ((MEMORY_KINDS as string[]).includes(key)) return key as MemoryKind;
+  return MEMORY_KIND_SYNONYMS[key] ?? "identity";
 }
 
 /**
@@ -238,6 +285,71 @@ export const AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "remember",
+      description:
+        "Save a lasting fact about WHO the user is — a goal, habit, preference, opportunity, or identity detail — that should shape future advice. Use for non-money statements with long-term value ('I'm saving for a laptop', 'I overspend after payday', 'I prefer cooking', 'I'm a final-year student'). Do NOT use for money events (use log_expense/log_income), questions, or throwaway chit-chat.",
+      parameters: {
+        type: "object",
+        properties: {
+          kind: {
+            type: "string",
+            description:
+              "One of: goal, habit, preference, opportunity, identity. Anything else is bucketed in code.",
+          },
+          content: {
+            type: "string",
+            description:
+              "The memory in a short third-person-about-the-user phrase, e.g. 'Saving for a MacBook', 'Overspends after getting paid'.",
+          },
+        },
+        required: ["kind", "content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_memory",
+      description:
+        "Revise an existing memory when the user changes or corrects it (e.g. 'actually I'm saving for tuition now, not a laptop'). Matches the existing memory by a snippet of its current content.",
+      parameters: {
+        type: "object",
+        properties: {
+          match: {
+            type: "string",
+            description:
+              "A snippet of the EXISTING memory to revise, e.g. 'laptop'.",
+          },
+          content: {
+            type: "string",
+            description: "The new memory content, e.g. 'Saving for tuition'.",
+          },
+        },
+        required: ["match", "content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "forget_memory",
+      description:
+        "Drop a memory that no longer holds (e.g. 'I'm not saving for the laptop anymore'). Matches by a snippet of the memory's content.",
+      parameters: {
+        type: "object",
+        properties: {
+          match: {
+            type: "string",
+            description: "A snippet of the memory to remove, e.g. 'laptop'.",
+          },
+        },
+        required: ["match"],
+      },
+    },
+  },
 ] as const;
 
 export type ToolName = (typeof AGENT_TOOLS)[number]["function"]["name"];
@@ -389,6 +501,48 @@ export function applyAction(
           next === ledger
             ? "No matching income stream found."
             : `Removed income stream matching "${args.name}".`,
+      };
+    }
+    case "remember": {
+      const content = String(args.content ?? "").trim();
+      if (!content) return { ledger, summary: "No memory content given." };
+      const kind = normalizeMemoryKind(args.kind);
+      if (isDuplicateMemory(ledger, kind, content)) {
+        return {
+          ledger,
+          summary: `Already remembered (${kind}: ${content}) — no need to save it again.`,
+        };
+      }
+      const next = addMemory(ledger, { kind, content });
+      return {
+        ledger: next,
+        summary: `Remembered (${kind}): ${content}. Acknowledge naturally — don't read it back like a robot.`,
+      };
+    }
+    case "update_memory": {
+      const match = String(args.match ?? "").trim();
+      const content = String(args.content ?? "").trim();
+      if (!match || !content)
+        return { ledger, summary: "Need both the memory to match and the new content." };
+      const next = updateMemoryByContent(ledger, match, content);
+      return {
+        ledger: next,
+        summary:
+          next === ledger
+            ? `No memory matching "${match}" to update.`
+            : `Updated memory to: ${content}.`,
+      };
+    }
+    case "forget_memory": {
+      const match = String(args.match ?? "").trim();
+      if (!match) return { ledger, summary: "No memory specified to forget." };
+      const next = removeMemoryByContent(ledger, match);
+      return {
+        ledger: next,
+        summary:
+          next === ledger
+            ? `No memory matching "${match}" to forget.`
+            : `Forgot the memory matching "${match}".`,
       };
     }
     default:

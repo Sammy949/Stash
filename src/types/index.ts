@@ -83,6 +83,30 @@ export interface Hustle {
   tag: IncomeTag;
 }
 
+/** ───────────────── Memory ───────────────── */
+
+/**
+ * Soft memory — what Stash KNOWS about the user, beyond the money math.
+ * The conversation creates these; they're model-written and fuzzy, and they
+ * NEVER feed balance math (that stays deterministic + code-owned). The ledger
+ * is a special, stricter kind of memory; this is everything else.
+ */
+export type MemoryKind =
+  | "goal" // "Saving for a MacBook"
+  | "habit" // "Overspends after payday"
+  | "preference" // "Prefers cooking", "Avoids debt"
+  | "opportunity" // a gig/application not already in scholarships/hustles
+  | "identity"; // "Final-year student in Lagos"
+
+export interface Memory {
+  id: string;
+  kind: MemoryKind;
+  /** Free-text, first-person-about-the-user, e.g. "Saving for a MacBook". */
+  content: string;
+  /** ISO 8601 timestamp. */
+  createdAt: string;
+}
+
 /** ───────────────── The persisted ledger ───────────────── */
 
 /**
@@ -106,6 +130,8 @@ export interface Ledger {
   transactions: Transaction[];
   scholarships: Scholarship[];
   hustles: Hustle[];
+  /** Soft memory — goals, habits, preferences. Grows from conversation. */
+  memories: Memory[];
   /** ISO timestamp of the last successful 0G Storage sync. */
   lastSyncedAt: string | null;
 }

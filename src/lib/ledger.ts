@@ -1,6 +1,8 @@
 import type {
   Hustle,
   Ledger,
+  Memory,
+  MemoryKind,
   ParsedTransaction,
   Scholarship,
   Transaction,
@@ -21,7 +23,7 @@ import { formatMoney } from "@/lib/currency";
  * user's own entries. No hardcoded demo data anywhere.
  */
 export const EMPTY_LEDGER: Ledger = {
-  version: 2,
+  version: 3,
   owner: "",
   currency: "NGN",
   openingBalance: 0,
@@ -29,6 +31,7 @@ export const EMPTY_LEDGER: Ledger = {
   transactions: [],
   scholarships: [],
   hustles: [],
+  memories: [],
   lastSyncedAt: null,
 };
 
@@ -335,23 +338,127 @@ export function removeHustleByName(ledger: Ledger, name: string): Ledger {
   return { ...ledger, hustles: ledger.hustles.filter((_, i) => i !== idx) };
 }
 
+/** ───────────────── Memory (pure) ───────────────── */
+
+/** Defensive accessor — older cached ledgers (pre-v3) have no `memories`. */
+export function getMemories(ledger: Ledger): Memory[] {
+  return ledger.memories ?? [];
+}
+
+/** Comparable form of a memory's content (trim, collapse spaces, lowercase). */
+function normalizeMemory(content: string): string {
+  return content.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/**
+ * True if a memory of the same kind with effectively the same content already
+ * exists. Idempotency guard so restating "I'm saving for a laptop" twice
+ * doesn't stack duplicate goals. Kept simple (normalized equality) — fuzzy/
+ * semantic matching is out of scope; the agent uses update_memory to refine.
+ */
+export function isDuplicateMemory(
+  ledger: Ledger,
+  kind: MemoryKind,
+  content: string,
+): boolean {
+  const norm = normalizeMemory(content);
+  return getMemories(ledger).some(
+    (m) => m.kind === kind && normalizeMemory(m.content) === norm,
+  );
+}
+
+/** Append a memory. Caller should guard with isDuplicateMemory first. */
+export function addMemory(
+  ledger: Ledger,
+  input: { kind: MemoryKind; content: string },
+): Ledger {
+  const m: Memory = {
+    id: crypto.randomUUID(),
+    kind: input.kind,
+    content: input.content.trim(),
+    createdAt: new Date().toISOString(),
+  };
+  return { ...ledger, memories: [...getMemories(ledger), m] };
+}
+
+/** Update a memory's content by id (manual edits from the memory list). */
+export function updateMemory(
+  ledger: Ledger,
+  id: string,
+  content: string,
+): Ledger {
+  if (!content.trim()) return ledger;
+  return {
+    ...ledger,
+    memories: getMemories(ledger).map((m) =>
+      m.id === id ? { ...m, content: content.trim() } : m,
+    ),
+  };
+}
+
+/** Remove a memory by id (manual delete from the memory list). */
+export function removeMemory(ledger: Ledger, id: string): Ledger {
+  return { ...ledger, memories: getMemories(ledger).filter((m) => m.id !== id) };
+}
+
+/**
+ * Update the first memory whose content matches (partial, case-insensitive) —
+ * the agent's handle on memory, since it refers to memories by description,
+ * not id (mirrors removeScholarshipByName/removeHustleByName).
+ */
+export function updateMemoryByContent(
+  ledger: Ledger,
+  match: string,
+  content: string,
+): Ledger {
+  const q = normalizeMemory(match);
+  if (!q || !content.trim()) return ledger;
+  const idx = getMemories(ledger).findIndex((m) =>
+    normalizeMemory(m.content).includes(q),
+  );
+  if (idx < 0) return ledger;
+  return {
+    ...ledger,
+    memories: getMemories(ledger).map((m, i) =>
+      i === idx ? { ...m, content: content.trim() } : m,
+    ),
+  };
+}
+
+/** Remove the first memory whose content matches (partial, case-insensitive). */
+export function removeMemoryByContent(ledger: Ledger, match: string): Ledger {
+  const q = normalizeMemory(match);
+  if (!q) return ledger;
+  const idx = getMemories(ledger).findIndex((m) =>
+    normalizeMemory(m.content).includes(q),
+  );
+  if (idx < 0) return ledger;
+  return {
+    ...ledger,
+    memories: getMemories(ledger).filter((_, i) => i !== idx),
+  };
+}
+
 /** ───────────────── Migration ───────────────── */
 
 /**
- * Normalize a ledger loaded from 0G/localStorage into the current (v2)
+ * Normalize a ledger loaded from 0G/localStorage into the current (v3)
  * shape. Guards against NaN when an older v1 ledger (budget: {total,spent})
  * is restored: maps budget.total → monthlyBudget, synthesizes a single
- * expense for the old `spent` so the balance stays consistent.
+ * expense for the old `spent` so the balance stays consistent. v2 ledgers
+ * (no `memories`) get an empty memory list.
  */
 export function migrateLedger(raw: unknown): Ledger {
   if (!raw || typeof raw !== "object") return EMPTY_LEDGER;
   const r = raw as Record<string, unknown>;
 
-  // Already v2.
+  // Already v2/v3 shape (transactions-based). Backfill memories for v2.
   if (typeof r.openingBalance === "number" && Array.isArray(r.transactions)) {
     return {
       ...(r as unknown as Ledger),
+      version: 3,
       monthlyBudget: (r.monthlyBudget as number | null) ?? null,
+      memories: (r.memories as Memory[]) ?? [],
     };
   }
 
@@ -371,7 +478,7 @@ export function migrateLedger(raw: unknown): Ledger {
     });
   }
   return {
-    version: 2,
+    version: 3,
     owner: (r.owner as string) ?? "",
     currency: "NGN",
     openingBalance: 0,
@@ -379,6 +486,7 @@ export function migrateLedger(raw: unknown): Ledger {
     transactions,
     scholarships: (r.scholarships as Ledger["scholarships"]) ?? [],
     hustles: (r.hustles as Ledger["hustles"]) ?? [],
+    memories: (r.memories as Memory[]) ?? [],
     lastSyncedAt: (r.lastSyncedAt as string | null) ?? null,
   };
 }
