@@ -250,6 +250,13 @@ async function chatCompletion(
         "Stash's 0G Compute balance is empty. Top it up at pc.0g.ai to keep chatting.",
       );
     }
+    // Rate / daily-token limit — surface something calm and on-brand instead of
+    // the provider's raw billing error (org id, upgrade URL, etc.).
+    if (res.status === 429 || code === "rate_limit_exceeded") {
+      throw new StashComputeError(
+        "I've hit my AI usage limit for the moment. Give me a few minutes and try again — your data's safe and saved.",
+      );
+    }
     throw new StashComputeError(
       detail?.error?.message ?? `AI provider error (${res.status}).`,
     );
