@@ -18,6 +18,11 @@ interface ImportMetaEnv {
   readonly VITE_OG_RPC_URL: string;
   /** 0G Storage turbo indexer gateway. */
   readonly VITE_OG_INDEXER_URL: string;
+
+  /** PostHog project API key (phc_…). Unset → analytics is a no-op. */
+  readonly VITE_POSTHOG_KEY?: string;
+  /** PostHog ingestion host. Defaults to https://eu.i.posthog.com. */
+  readonly VITE_POSTHOG_HOST?: string;
 }
 
 interface ImportMeta {

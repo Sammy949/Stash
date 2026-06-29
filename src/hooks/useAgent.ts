@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { ChatMessage, Ledger } from "@/types";
 import { runAgentTurn, StashComputeError } from "@/lib/ogCompute";
+import { track } from "@/lib/analytics";
 
 const OPENING_MESSAGE = `Hey. I'm Stash — your personal finance agent.
 I know your balance, your deadlines, and your income streams. Your financial memory is saved here and backed up to 0G. Pick up right where you left off.
@@ -61,6 +62,7 @@ export function useAgent() {
 
     try {
       const turn = await runAgentTurn(history, ledger);
+      track("agent_message_sent", { mutated: turn.mutated });
       if (turn.mutated) onLedgerUpdate?.(turn.ledger);
       commit(
         ref.current.map((m) =>
