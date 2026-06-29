@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { SendIcon } from "@/components/UI/icons";
+import { SendIcon, StopIcon } from "@/components/UI/icons";
 
 export function InputBar({
   onSend,
+  onStop,
   disabled = false,
 }: {
   onSend: (text: string) => void;
+  /** Cancel the in-flight turn. When `disabled` (a turn is running) and this
+   *  is provided, the send button becomes a Stop button. */
+  onStop?: () => void;
   disabled?: boolean;
 }) {
   const [text, setText] = useState("");
@@ -57,15 +61,26 @@ export function InputBar({
         placeholder="Try: “I got paid ₦20,000” or “I spent ₦3,000 on lunch”"
         className="max-h-40 flex-1 resize-none rounded-xl border border-line bg-bg px-3.5 py-2.5 text-sm leading-relaxed outline-none transition-colors placeholder:text-muted focus:border-emerald/50 disabled:opacity-50"
       />
-      <button
-        type="button"
-        onClick={send}
-        disabled={disabled || !text.trim()}
-        aria-label="Send"
-        className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl bg-emerald text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        <SendIcon className="h-4 w-4" />
-      </button>
+      {disabled && onStop ? (
+        <button
+          type="button"
+          onClick={onStop}
+          aria-label="Stop"
+          className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-line bg-card text-ink transition-opacity hover:opacity-90"
+        >
+          <StopIcon className="h-4 w-4" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={send}
+          disabled={disabled || !text.trim()}
+          aria-label="Send"
+          className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl bg-emerald text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <SendIcon className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 }

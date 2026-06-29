@@ -8,9 +8,11 @@ import { InputBar } from "./InputBar";
  */
 export function CommandBar({
   onSend,
+  onStop,
   isThinking,
 }: {
   onSend: (text: string) => void;
+  onStop?: () => void;
   isThinking: boolean;
 }) {
   return (
@@ -20,7 +22,7 @@ export function CommandBar({
         <div className="rounded-2xl border border-line bg-card/90 p-3 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.75)] backdrop-blur">
           <QuickChips onPick={onSend} disabled={isThinking} />
           <div className="mt-2.5">
-            <InputBar onSend={onSend} disabled={isThinking} />
+            <InputBar onSend={onSend} onStop={onStop} disabled={isThinking} />
           </div>
         </div>
         <p className="mt-2 text-center text-[11px] text-muted">

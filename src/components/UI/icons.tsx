@@ -50,3 +50,11 @@ export function SendIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function StopIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}

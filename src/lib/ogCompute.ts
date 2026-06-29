@@ -172,6 +172,7 @@ async function chatCompletion(
   messages: RouterMessage[],
   tools?: unknown,
   toolChoice: "auto" | "required" = "auto",
+  signal?: AbortSignal,
 ): Promise<{ content: string | null; tool_calls?: ToolCall[] }> {
   let res: Response;
   try {
@@ -188,8 +189,13 @@ async function chatCompletion(
         max_tokens: 700,
         ...(tools ? { tools, tool_choice: toolChoice } : {}),
       }),
+      signal,
     });
   } catch (e) {
+    // A user-initiated stop surfaces as an AbortError — let it propagate
+    // untouched so the caller can settle the turn as "Stopped." rather than
+    // showing a network-failure message.
+    if (e instanceof DOMException && e.name === "AbortError") throw e;
     throw new StashComputeError(
       "Couldn't reach the AI provider. Check your connection and try again.",
       { cause: e },
@@ -308,6 +314,7 @@ export interface AgentTurn {
 export async function runAgentTurn(
   history: ChatMessage[],
   ledger: Ledger,
+  signal?: AbortSignal,
 ): Promise<AgentTurn> {
   // If the latest user message describes money moving, force a tool call so
   // the model can't narrate a fake mutation. But a PRE-SPEND intent ("should
@@ -322,17 +329,14 @@ export async function runAgentTurn(
       !looksLikePreSpendIntent(lastUser.content)
     : false;
 
-  try {
-    return await runAgentTurnInner(history, ledger, forceTool);
-  } catch (e) {
-    throw e;
-  }
+  return runAgentTurnInner(history, ledger, forceTool, signal);
 }
 
 async function runAgentTurnInner(
   history: ChatMessage[],
   ledger: Ledger,
   forceTool: boolean,
+  signal?: AbortSignal,
 ): Promise<AgentTurn> {
   if (!isComputeConfigured()) {
     throw new StashComputeError(
@@ -350,6 +354,7 @@ async function runAgentTurnInner(
     messages,
     AGENT_TOOLS,
     forceTool ? "required" : "auto",
+    signal,
   );
 
   // The model may emit one or more tool calls in a SINGLE response
@@ -381,7 +386,7 @@ async function runAgentTurnInner(
 
     // Refresh the snapshot so the reply sees the new balance; no tools now.
     messages[0] = { role: "system", content: buildSystemPrompt(working) };
-    const final = await chatCompletion(messages);
+    const final = await chatCompletion(messages, undefined, "auto", signal);
     return {
       reply: (final.content ?? "").trim() || "Done.",
       ledger: working,
@@ -402,7 +407,7 @@ async function runAgentTurnInner(
       content:
         "Confirm what changed in one short, warm sentence. State the new balance from the snapshot. Do NOT output any function/tool syntax.",
     });
-    const final = await chatCompletion(messages);
+    const final = await chatCompletion(messages, undefined, "auto", signal);
     return {
       reply: (final.content ?? cleaned).trim() || "Done.",
       ledger: working,

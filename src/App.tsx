@@ -23,7 +23,7 @@ const SYNC_CONFIRMATION =
 export default function App() {
   const { ledger, hydrating, syncPhase, sync, applyLedger, initProfile } =
     useLedger();
-  const { messages, isThinking, send, pushAssistant } = useAgent();
+  const { messages, isThinking, send, stop, pushAssistant } = useAgent();
 
   // Returning users (a synced ledger exists) skip onboarding.
   const [onboarded, setOnboarded] = useState(
@@ -97,7 +97,7 @@ export default function App() {
 
         {/* Command bar — always present */}
         <div className="shrink-0">
-          <CommandBar onSend={handleSend} isThinking={isThinking} />
+          <CommandBar onSend={handleSend} onStop={stop} isThinking={isThinking} />
         </div>
       </div>
 

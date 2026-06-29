@@ -31,11 +31,20 @@ export function useAgent() {
   const ref = useRef<ChatMessage[]>([makeMessage("assistant", OPENING_MESSAGE)]);
   const [messages, setMessages] = useState<ChatMessage[]>(ref.current);
   const [isThinking, setIsThinking] = useState(false);
+  // Lets the user cancel an in-flight turn (slow node, wrong message). The
+  // signal is threaded down to the chat-completion fetch; aborting it rejects
+  // the turn with an AbortError, which `send` settles as "Stopped.".
+  const abortRef = useRef<AbortController | null>(null);
 
   const commit = (next: ChatMessage[]) => {
     ref.current = next;
     setMessages(next);
   };
+
+  /** Cancel the current turn. Input re-enables immediately. */
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
 
   /** Append a free-form assistant message (used by step-5 actions). */
   const pushAssistant = useCallback((content: string) => {
@@ -59,8 +68,11 @@ export function useAgent() {
     commit([...history, pending]);
     setIsThinking(true);
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
-      const turn = await runAgentTurn(history, ledger);
+      const turn = await runAgentTurn(history, ledger, controller.signal);
       if (turn.mutated) onLedgerUpdate?.(turn.ledger);
       commit(
         ref.current.map((m) =>
@@ -70,8 +82,11 @@ export function useAgent() {
         ),
       );
     } catch (e) {
-      const msg =
-        e instanceof StashComputeError
+      // User-initiated stop → settle the bubble calmly, not as an error.
+      const aborted = e instanceof DOMException && e.name === "AbortError";
+      const msg = aborted
+        ? "Stopped."
+        : e instanceof StashComputeError
           ? e.message
           : "Something went wrong reaching 0G Compute. Try again in a moment.";
       commit(
@@ -80,9 +95,10 @@ export function useAgent() {
         ),
       );
     } finally {
+      abortRef.current = null;
       setIsThinking(false);
     }
   }, []);
 
-  return { messages, isThinking, send, pushAssistant };
+  return { messages, isThinking, send, stop, pushAssistant };
 }
