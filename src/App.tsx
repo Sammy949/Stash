@@ -16,6 +16,7 @@ import {
   removeMemory,
   updateMemory,
 } from "@/lib/ledger";
+import { deriveObservation } from "@/lib/observations";
 
 // One-time forced reset onto the new local-first schema (runs once at load,
 // before any hook reads localStorage).
@@ -68,9 +69,15 @@ export default function App() {
 
     // 2. Everything else → the agent. It may call tools that mutate the
     //    ledger; when it does, persist the new ledger and sync to 0G.
+    const before = ledger;
     void send(text, ledger, (updated) => {
       applyLedger(updated);
       void sync(updated);
+      // Proactive observation — code (not the model) notices when a money
+      // event collides with something Stash remembers, and adds one nudge
+      // after the agent's reply. Stays silent when there's nothing to say.
+      const observation = deriveObservation(before, updated);
+      if (observation) pushAssistant(observation);
     });
   }
 
