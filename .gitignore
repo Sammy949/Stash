@@ -144,3 +144,6 @@ vite.config.ts.timestamp-*
 
 # Personal
 notes/
+
+# Stray local Solana test-validator scratch (not part of Stash)
+test-ledger/
