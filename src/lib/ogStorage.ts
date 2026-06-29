@@ -1,4 +1,5 @@
 import type { Ledger, SyncResult } from "@/types";
+import { reportStorageError } from "@/lib/sentry";
 
 /**
  * 0G Storage integration — encrypted persistent financial memory.
@@ -183,13 +184,21 @@ export async function saveLedger(
   ledger: Ledger,
   onProgress?: SyncProgress,
 ): Promise<SyncResult> {
-  if (useProxy()) {
-    onProgress?.("Uploading to 0G…");
-    const result = await saveLedgerViaProxy(ledger, onProgress);
-    setStoredRootHash(result.rootHash);
-    return result;
+  const route = useProxy() ? "proxy" : "direct";
+  try {
+    if (route === "proxy") {
+      onProgress?.("Uploading to 0G…");
+      const result = await saveLedgerViaProxy(ledger, onProgress);
+      setStoredRootHash(result.rootHash);
+      return result;
+    }
+    return await saveLedgerDirect(ledger, onProgress);
+  } catch (e) {
+    // Report the final failure (after internal retries) — never the ledger
+    // itself. Fatal chain errors are real bugs; busy-node timeouts are not.
+    reportStorageError(e, { phase: "save", route, fatal: isFatalUploadError(e) });
+    throw e;
   }
-  return saveLedgerDirect(ledger, onProgress);
 }
 
 /** Exponential backoff between proxy attempts: 1s → 2s → 4s. */
@@ -304,30 +313,38 @@ async function saveLedgerDirect(
  * Proxy in production; direct SDK on localhost.
  */
 export async function loadLedger(rootHash: string): Promise<Ledger> {
-  if (useProxy()) {
-    const res = await fetch(`${PROXY_URL}?root=${encodeURIComponent(rootHash)}`);
-    const data = await res.json().catch(() => null);
-    if (!res.ok || !data?.ledger) {
-      throw new Error(data?.error ?? `0G restore failed (${res.status}).`);
+  const route = useProxy() ? "proxy" : "direct";
+  try {
+    if (route === "proxy") {
+      const res = await fetch(`${PROXY_URL}?root=${encodeURIComponent(rootHash)}`);
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ledger) {
+        throw new Error(data?.error ?? `0G restore failed (${res.status}).`);
+      }
+      return data.ledger as Ledger;
     }
-    return data.ledger as Ledger;
+
+    const { indexerUrl, privateKey } = requireConfig();
+    const [{ ethers }, { Indexer }] = await Promise.all([
+      import("ethers"),
+      import("@0gfoundation/0g-storage-ts-sdk"),
+    ]);
+
+    const indexer = new Indexer(indexerUrl);
+    const key = deriveAesKey(ethers, privateKey);
+
+    const [blob, err] = await indexer.downloadToBlob(rootHash, {
+      decryption: { symmetricKey: key },
+    });
+    if (err) throw err;
+    if (!blob) throw new Error("0G download returned no data");
+
+    const text = new TextDecoder().decode(await blob.arrayBuffer());
+    return JSON.parse(text) as Ledger;
+  } catch (e) {
+    // A restore failure is more serious than a save hiccup — it can block
+    // hydration — so report at error level. Still no ledger data attached.
+    reportStorageError(e, { phase: "load", route, fatal: true });
+    throw e;
   }
-
-  const { indexerUrl, privateKey } = requireConfig();
-  const [{ ethers }, { Indexer }] = await Promise.all([
-    import("ethers"),
-    import("@0gfoundation/0g-storage-ts-sdk"),
-  ]);
-
-  const indexer = new Indexer(indexerUrl);
-  const key = deriveAesKey(ethers, privateKey);
-
-  const [blob, err] = await indexer.downloadToBlob(rootHash, {
-    decryption: { symmetricKey: key },
-  });
-  if (err) throw err;
-  if (!blob) throw new Error("0G download returned no data");
-
-  const text = new TextDecoder().decode(await blob.arrayBuffer());
-  return JSON.parse(text) as Ledger;
 }

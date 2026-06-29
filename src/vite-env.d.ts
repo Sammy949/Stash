@@ -23,6 +23,9 @@ interface ImportMetaEnv {
   readonly VITE_POSTHOG_KEY?: string;
   /** PostHog ingestion host. Defaults to https://eu.i.posthog.com. */
   readonly VITE_POSTHOG_HOST?: string;
+
+  /** Sentry DSN. Unset → error monitoring is a no-op. */
+  readonly VITE_SENTRY_DSN?: string;
 }
 
 interface ImportMeta {

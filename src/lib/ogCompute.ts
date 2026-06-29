@@ -8,6 +8,7 @@ import {
 } from "@/lib/ledger";
 import { CURRENCIES, formatMoney } from "@/lib/currency";
 import { AGENT_TOOLS, applyAction } from "@/lib/agentTools";
+import { reportAgentError } from "@/lib/sentry";
 
 /**
  * 0G Compute integration — the Stash AI agent.
@@ -308,18 +309,6 @@ export async function runAgentTurn(
   history: ChatMessage[],
   ledger: Ledger,
 ): Promise<AgentTurn> {
-  if (!isComputeConfigured()) {
-    throw new StashComputeError(
-      "0G Compute is not configured — set VITE_AI_API_KEY (dev) or AI_API_KEY (prod).",
-    );
-  }
-
-  let working = ledger;
-  const messages: RouterMessage[] = [
-    { role: "system", content: buildSystemPrompt(ledger), tool_calls: undefined },
-    ...toRouterMessages(history),
-  ];
-
   // If the latest user message describes money moving, force a tool call so
   // the model can't narrate a fake mutation. But a PRE-SPEND intent ("should
   // I buy…", "thinking of getting…") shares the same shape while nothing has
@@ -332,6 +321,39 @@ export async function runAgentTurn(
     ? looksLikeMoneyEvent(lastUser.content) &&
       !looksLikePreSpendIntent(lastUser.content)
     : false;
+
+  try {
+    return await runAgentTurnInner(history, ledger, forceTool);
+  } catch (e) {
+    // Report with the SHAPE of the turn only — never the message text, which
+    // routinely contains amounts/descriptions the privacy bar keeps local.
+    reportAgentError(e, {
+      provider: usingRouter ? "0g-router" : "fallback",
+      model: STASH_MODEL,
+      forceTool,
+      messageLength: lastUser?.content.length ?? 0,
+      expected: e instanceof StashComputeError,
+    });
+    throw e;
+  }
+}
+
+async function runAgentTurnInner(
+  history: ChatMessage[],
+  ledger: Ledger,
+  forceTool: boolean,
+): Promise<AgentTurn> {
+  if (!isComputeConfigured()) {
+    throw new StashComputeError(
+      "0G Compute is not configured — set VITE_AI_API_KEY (dev) or AI_API_KEY (prod).",
+    );
+  }
+
+  let working = ledger;
+  const messages: RouterMessage[] = [
+    { role: "system", content: buildSystemPrompt(ledger), tool_calls: undefined },
+    ...toRouterMessages(history),
+  ];
 
   const msg = await chatCompletion(
     messages,
