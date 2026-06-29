@@ -35,6 +35,12 @@ export function useAgent() {
   // signal is threaded down to the chat-completion fetch; aborting it rejects
   // the turn with an AbortError, which `send` settles as "Stopped.".
   const abortRef = useRef<AbortController | null>(null);
+  // Single-flight lock. Set SYNCHRONOUSLY (a ref, not state — `isThinking`
+  // only flips on the next render) so two near-simultaneous calls can't both
+  // pass the guard. Any send/editMessage that arrives while a turn is in
+  // flight is dropped, so a second Save (e.g. from another open editor) can
+  // never spawn a concurrent loop that races on the shared transcript.
+  const inFlightRef = useRef(false);
 
   const commit = (next: ChatMessage[]) => {
     ref.current = next;
@@ -62,6 +68,9 @@ export function useAgent() {
       ledger: Ledger,
       onLedgerUpdate?: (next: Ledger) => void,
     ): Promise<boolean> => {
+    // Single-flight: ignore a turn that starts while another is in flight.
+    if (inFlightRef.current) return false;
+    inFlightRef.current = true;
     // Snapshot the state Stash holds going INTO this turn, attached to the
     // user message. Editing the message later restores exactly this.
     const userMsg = makeMessage("user", text, { memorySnapshot: ledger });
@@ -100,6 +109,7 @@ export function useAgent() {
       return false;
     } finally {
       abortRef.current = null;
+      inFlightRef.current = false;
       setIsThinking(false);
     }
   }, []);
@@ -128,6 +138,10 @@ export function useAgent() {
       onRestore: (snapshot: Ledger) => void,
       onLedgerUpdate?: (next: Ledger) => void,
     ): Promise<boolean> => {
+      // Single-flight: never rewind/truncate while a turn is already running.
+      // `send` sets the lock synchronously, so a second edit (or a normal turn)
+      // landing mid-flight is dropped here before it can touch the transcript.
+      if (inFlightRef.current) return false;
       const idx = ref.current.findIndex((m) => m.id === messageId);
       if (idx < 0) return false;
       const target = ref.current[idx];
