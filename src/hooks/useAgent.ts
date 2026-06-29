@@ -61,7 +61,7 @@ export function useAgent() {
       text: string,
       ledger: Ledger,
       onLedgerUpdate?: (next: Ledger) => void,
-    ) => {
+    ): Promise<boolean> => {
     // Snapshot the state Stash holds going INTO this turn, attached to the
     // user message. Editing the message later restores exactly this.
     const userMsg = makeMessage("user", text, { memorySnapshot: ledger });
@@ -83,6 +83,7 @@ export function useAgent() {
             : m,
         ),
       );
+      return true;
     } catch (e) {
       // User-initiated stop → settle the bubble calmly, not as an error.
       const aborted = e instanceof DOMException && e.name === "AbortError";
@@ -96,6 +97,7 @@ export function useAgent() {
           m.id === pending.id ? { ...m, content: msg, pending: false } : m,
         ),
       );
+      return false;
     } finally {
       abortRef.current = null;
       setIsThinking(false);
@@ -110,6 +112,12 @@ export function useAgent() {
    * reconstructed by replaying the model. Money is exact; only fuzzy memory may
    * shift when the edited turn re-runs.
    *
+   * Transactional: the edit truncates the transcript and rewinds the ledger
+   * BEFORE the re-run, but if that re-run fails or is stopped, the prior
+   * conversation must not be lost. We capture the full pre-edit transcript and
+   * restore it on failure; the caller rolls the ledger back and skips the sync.
+   * Returns true only when the re-run completed successfully.
+   *
    * @param onRestore  applies the restored snapshot to the live ledger (App).
    * @param onLedgerUpdate  same callback `send` uses when the re-run mutates.
    */
@@ -119,19 +127,27 @@ export function useAgent() {
       newText: string,
       onRestore: (snapshot: Ledger) => void,
       onLedgerUpdate?: (next: Ledger) => void,
-    ) => {
+    ): Promise<boolean> => {
       const idx = ref.current.findIndex((m) => m.id === messageId);
-      if (idx < 0) return;
+      if (idx < 0) return false;
       const target = ref.current[idx];
       // Only user messages carry a snapshot; without one we can't safely rewind.
-      if (target.role !== "user" || !target.memorySnapshot) return;
+      if (target.role !== "user" || !target.memorySnapshot) return false;
       const snapshot = target.memorySnapshot;
+
+      // Capture the full pre-edit transcript so a failed/aborted re-run can be
+      // rolled back wholesale — nothing is destroyed until the re-run lands.
+      const prevTranscript = ref.current;
 
       // Drop the edited message and everything after it, then restore the
       // pre-turn state and re-run with the new text from that exact point.
       commit(ref.current.slice(0, idx));
       onRestore(snapshot);
-      await send(newText, snapshot, onLedgerUpdate);
+      const ok = await send(newText, snapshot, onLedgerUpdate);
+      // Re-run failed or was stopped → put the original conversation back; the
+      // caller restores the ledger. The edit becomes a no-op, never a data loss.
+      if (!ok) commit(prevTranscript);
+      return ok;
     },
     [send],
   );

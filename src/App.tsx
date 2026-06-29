@@ -78,13 +78,17 @@ export default function App() {
 
   // Edit a past message and re-run from there. The ledger is RESTORED from the
   // message's snapshot (never replayed), the transcript is rewound, and the
-  // edited turn runs from that exact state. We persist locally throughout and
-  // back up to 0G once at the end, so corrections stay durable.
+  // edited turn runs from that exact state. The edit is TRANSACTIONAL: if the
+  // re-run fails or is stopped, we roll the ledger back to its pre-edit state
+  // (which also re-persists localStorage) and skip the sync, so a failed edit
+  // can never destroy the prior conversation. Only a successful re-run is
+  // persisted locally and backed up to 0G once at the end.
   function handleEditMessage(id: string, newText: string) {
     setAgentActive(true);
+    const prevLedger = ledger;
     let before = ledger;
     void (async () => {
-      await editMessage(
+      const ok = await editMessage(
         id,
         newText,
         (snapshot) => {
@@ -97,7 +101,14 @@ export default function App() {
           if (observation) pushAssistant(observation);
         },
       );
-      void sync();
+      if (ok) {
+        void sync();
+      } else {
+        // Re-run failed or was stopped — restore the pre-edit ledger (the
+        // transcript was already rolled back inside editMessage) and do NOT
+        // sync a rewind that never took effect.
+        applyLedger(prevLedger);
+      }
     })();
   }
 
