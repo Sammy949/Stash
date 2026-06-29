@@ -10,12 +10,7 @@ import type { OnboardingProfile } from "@/components/Onboarding/Onboarding";
 import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
 import { ensureStorageSchema, getStoredRootHash } from "@/lib/ogStorage";
-import {
-  editTransaction,
-  removeTransaction,
-  removeMemory,
-  updateMemory,
-} from "@/lib/ledger";
+import { editTransaction, removeTransaction } from "@/lib/ledger";
 import { deriveObservation } from "@/lib/observations";
 
 // One-time forced reset onto the new local-first schema (runs once at load,
@@ -99,20 +94,6 @@ export default function App() {
     void sync(updated);
   }
 
-  // Manual edits to what Stash remembers. Memory is soft (never touches the
-  // balance), but it's still durable — persist + back up to 0G like everything.
-  function handleEditMemory(id: string, content: string) {
-    const updated = updateMemory(ledger, id, content);
-    applyLedger(updated);
-    void sync(updated);
-  }
-
-  function handleDeleteMemory(id: string) {
-    const updated = removeMemory(ledger, id);
-    applyLedger(updated);
-    void sync(updated);
-  }
-
   return (
     <div className="h-screen bg-bg text-ink">
       {/* Centered platform column — doesn't stretch on wide screens. */}
@@ -142,8 +123,6 @@ export default function App() {
               hydrating={hydrating}
               onEditTransaction={handleEditTransaction}
               onDeleteTransaction={handleDeleteTransaction}
-              onEditMemory={handleEditMemory}
-              onDeleteMemory={handleDeleteMemory}
             />
           </main>
         )}
