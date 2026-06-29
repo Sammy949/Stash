@@ -54,6 +54,7 @@ export function AgentPanel({
             message={m}
             onEdit={onEditMessage}
             editable={!isThinking}
+            isThinking={isThinking}
           />
         ))}
         <div ref={endRef} />

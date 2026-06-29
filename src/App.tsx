@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 import { Dashboard } from "@/components/Dashboard/Dashboard";
 import { DashboardStrip } from "@/components/Dashboard/DashboardStrip";
 import { AgentPanel } from "@/components/Agent/AgentPanel";
@@ -106,8 +106,10 @@ export default function App() {
       } else {
         // Re-run failed or was stopped — restore the pre-edit ledger (the
         // transcript was already rolled back inside editMessage) and do NOT
-        // sync a rewind that never took effect.
+        // sync a rewind that never took effect. Tell the user so the silent
+        // revert doesn't read as "nothing happened".
         applyLedger(prevLedger);
+        toast("Edit rolled back — your conversation is unchanged.");
       }
     })();
   }

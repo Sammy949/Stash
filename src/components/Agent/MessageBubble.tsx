@@ -39,16 +39,26 @@ export function MessageBubble({
   message,
   onEdit,
   editable,
+  isThinking,
 }: {
   message: ChatMessage;
   /** Edit + re-run this user message (replaces everything below it). */
   onEdit?: (id: string, text: string) => void;
   /** False while a turn is in flight — hides the edit affordance. */
   editable?: boolean;
+  /** True while a turn is in flight. */
+  isThinking?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
   const taRef = useRef<HTMLTextAreaElement>(null);
+
+  // Close the editor if a turn starts mid-edit. The single-flight lock already
+  // makes Save a no-op during a turn, but a stale open textarea looks broken —
+  // snap it back to the normal bubble.
+  useEffect(() => {
+    if (isThinking) setEditing(false);
+  }, [isThinking]);
 
   // Auto-size the textarea to its content while editing.
   useEffect(() => {
