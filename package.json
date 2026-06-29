@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@0gfoundation/0g-storage-ts-sdk": "^1.2.10",
-    "@sentry/react": "^10.62.0",
     "ethers": "6.13.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

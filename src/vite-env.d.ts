@@ -18,9 +18,6 @@ interface ImportMetaEnv {
   readonly VITE_OG_RPC_URL: string;
   /** 0G Storage turbo indexer gateway. */
   readonly VITE_OG_INDEXER_URL: string;
-
-  /** Sentry DSN. Unset → error monitoring is a no-op. */
-  readonly VITE_SENTRY_DSN?: string;
 }
 
 interface ImportMeta {

@@ -1,5 +1,4 @@
 import type { Ledger, SyncResult } from "@/types";
-import { reportStorageError } from "@/lib/sentry";
 
 /**
  * 0G Storage integration — encrypted persistent financial memory.
@@ -194,9 +193,6 @@ export async function saveLedger(
     }
     return await saveLedgerDirect(ledger, onProgress);
   } catch (e) {
-    // Report the final failure (after internal retries) — never the ledger
-    // itself. Fatal chain errors are real bugs; busy-node timeouts are not.
-    reportStorageError(e, { phase: "save", route, fatal: isFatalUploadError(e) });
     throw e;
   }
 }
@@ -342,9 +338,6 @@ export async function loadLedger(rootHash: string): Promise<Ledger> {
     const text = new TextDecoder().decode(await blob.arrayBuffer());
     return JSON.parse(text) as Ledger;
   } catch (e) {
-    // A restore failure is more serious than a save hiccup — it can block
-    // hydration — so report at error level. Still no ledger data attached.
-    reportStorageError(e, { phase: "load", route, fatal: true });
     throw e;
   }
 }

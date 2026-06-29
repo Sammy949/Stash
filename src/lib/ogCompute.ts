@@ -8,7 +8,6 @@ import {
 } from "@/lib/ledger";
 import { CURRENCIES, formatMoney } from "@/lib/currency";
 import { AGENT_TOOLS, applyAction } from "@/lib/agentTools";
-import { reportAgentError } from "@/lib/sentry";
 
 /**
  * 0G Compute integration — the Stash AI agent.
@@ -325,15 +324,6 @@ export async function runAgentTurn(
   try {
     return await runAgentTurnInner(history, ledger, forceTool);
   } catch (e) {
-    // Report with the SHAPE of the turn only — never the message text, which
-    // routinely contains amounts/descriptions the privacy bar keeps local.
-    reportAgentError(e, {
-      provider: usingRouter ? "0g-router" : "fallback",
-      model: STASH_MODEL,
-      forceTool,
-      messageLength: lastUser?.content.length ?? 0,
-      expected: e instanceof StashComputeError,
-    });
     throw e;
   }
 }
