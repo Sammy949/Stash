@@ -164,6 +164,14 @@ export interface ChatMessage {
   createdAt: string;
   /** Transient flag for the typing indicator placeholder. */
   pending?: boolean;
+  /**
+   * The full state Stash held just BEFORE this (user) turn ran — money AND
+   * memory. Editing a message restores exactly this, so the ledger is never
+   * reconstructed by replaying the model; the snapshot is the source of truth
+   * for the numbers. Named "memory", not "ledger", because it captures
+   * everything Stash knew, not just transactions.
+   */
+  memorySnapshot?: Ledger;
 }
 
 /** A transaction parsed from natural language (expense or income). */

@@ -62,7 +62,9 @@ export function useAgent() {
       ledger: Ledger,
       onLedgerUpdate?: (next: Ledger) => void,
     ) => {
-    const userMsg = makeMessage("user", text);
+    // Snapshot the state Stash holds going INTO this turn, attached to the
+    // user message. Editing the message later restores exactly this.
+    const userMsg = makeMessage("user", text, { memorySnapshot: ledger });
     const history = [...ref.current, userMsg];
     const pending = makeMessage("assistant", "", { pending: true });
     commit([...history, pending]);
@@ -100,5 +102,39 @@ export function useAgent() {
     }
   }, []);
 
-  return { messages, isThinking, send, stop, pushAssistant };
+  /**
+   * Edit a past user message and re-run from there (ChatGPT-style). The old
+   * exchange — and everything after it — is replaced.
+   *
+   * Determinism rule: the ledger is RESTORED from the message's snapshot, never
+   * reconstructed by replaying the model. Money is exact; only fuzzy memory may
+   * shift when the edited turn re-runs.
+   *
+   * @param onRestore  applies the restored snapshot to the live ledger (App).
+   * @param onLedgerUpdate  same callback `send` uses when the re-run mutates.
+   */
+  const editMessage = useCallback(
+    async (
+      messageId: string,
+      newText: string,
+      onRestore: (snapshot: Ledger) => void,
+      onLedgerUpdate?: (next: Ledger) => void,
+    ) => {
+      const idx = ref.current.findIndex((m) => m.id === messageId);
+      if (idx < 0) return;
+      const target = ref.current[idx];
+      // Only user messages carry a snapshot; without one we can't safely rewind.
+      if (target.role !== "user" || !target.memorySnapshot) return;
+      const snapshot = target.memorySnapshot;
+
+      // Drop the edited message and everything after it, then restore the
+      // pre-turn state and re-run with the new text from that exact point.
+      commit(ref.current.slice(0, idx));
+      onRestore(snapshot);
+      await send(newText, snapshot, onLedgerUpdate);
+    },
+    [send],
+  );
+
+  return { messages, isThinking, send, stop, pushAssistant, editMessage };
 }

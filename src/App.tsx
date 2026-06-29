@@ -25,7 +25,8 @@ const SYNC_CONFIRMATION =
 export default function App() {
   const { ledger, hydrating, syncPhase, sync, applyLedger, initProfile } =
     useLedger();
-  const { messages, isThinking, send, stop, pushAssistant } = useAgent();
+  const { messages, isThinking, send, stop, pushAssistant, editMessage } =
+    useAgent();
 
   // Returning users (a synced ledger exists) skip onboarding.
   const [onboarded, setOnboarded] = useState(
@@ -76,6 +77,31 @@ export default function App() {
     });
   }
 
+  // Edit a past message and re-run from there. The ledger is RESTORED from the
+  // message's snapshot (never replayed), the transcript is rewound, and the
+  // edited turn runs from that exact state. We persist locally throughout and
+  // back up to 0G once at the end, so corrections stay durable.
+  function handleEditMessage(id: string, newText: string) {
+    setAgentActive(true);
+    let before = ledger;
+    void (async () => {
+      await editMessage(
+        id,
+        newText,
+        (snapshot) => {
+          before = snapshot;
+          applyLedger(snapshot);
+        },
+        (updated) => {
+          applyLedger(updated);
+          const observation = deriveObservation(before, updated);
+          if (observation) pushAssistant(observation);
+        },
+      );
+      void sync();
+    })();
+  }
+
   // Manual corrections from the dashboard list. Same persist-then-sync path
   // the agent uses: apply the pure reducer, then back up to 0G in the
   // background. Balance is derived, so it recomputes on its own.
@@ -113,7 +139,11 @@ export default function App() {
         {agentActive ? (
           <div className="flex min-h-0 flex-1 animate-slide-up flex-col">
             <DashboardStrip ledger={ledger} onExpand={() => setAgentActive(false)} />
-            <AgentPanel messages={messages} />
+            <AgentPanel
+              messages={messages}
+              onEditMessage={handleEditMessage}
+              isThinking={isThinking}
+            />
           </div>
         ) : (
           <main className="flex-1 overflow-y-auto px-4 py-6">

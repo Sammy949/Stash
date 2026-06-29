@@ -1,4 +1,7 @@
+import { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "@/types";
+import { CloseIcon, PencilIcon, SendIcon } from "@/components/UI/icons";
+import { RowButton } from "@/components/UI/RowButton";
 
 /** Stash avatar — small emerald vault glyph. */
 function StashAvatar() {
@@ -32,12 +35,92 @@ function TypingDots() {
   );
 }
 
-export function MessageBubble({ message }: { message: ChatMessage }) {
+export function MessageBubble({
+  message,
+  onEdit,
+  editable,
+}: {
+  message: ChatMessage;
+  /** Edit + re-run this user message (replaces everything below it). */
+  onEdit?: (id: string, text: string) => void;
+  /** False while a turn is in flight — hides the edit affordance. */
+  editable?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(message.content);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-size the textarea to its content while editing.
+  useEffect(() => {
+    const el = taRef.current;
+    if (editing && el) {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  }, [editing, draft]);
+
   const mine = message.role === "user";
 
+  function startEdit() {
+    setDraft(message.content);
+    setEditing(true);
+  }
+
+  function save() {
+    const text = draft.trim();
+    if (text) onEdit?.(message.id, text);
+    setEditing(false);
+  }
+
+  // ── User message, editing ──────────────────────────────────────────
+  if (mine && editing) {
+    return (
+      <div className="animate-slide-up">
+        <div className="ml-auto max-w-[85%]">
+          <textarea
+            ref={taRef}
+            value={draft}
+            autoFocus
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                save();
+              }
+              if (e.key === "Escape") setEditing(false);
+            }}
+            className="w-full resize-none overflow-hidden rounded-2xl rounded-br-sm bg-slate px-3.5 py-2.5 text-sm leading-relaxed text-ink outline-none ring-1 ring-emerald/50 focus:ring-emerald"
+          />
+          <div className="mt-1 flex items-center justify-end gap-1">
+            <RowButton label="Cancel edit" onClick={() => setEditing(false)}>
+              <CloseIcon className="h-4 w-4" />
+            </RowButton>
+            <RowButton label="Save and resend" tone="emerald" onClick={save}>
+              <SendIcon className="h-4 w-4" />
+            </RowButton>
+          </div>
+          <p className="mt-0.5 text-right text-[10px] text-muted">
+            Saving replaces everything below.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── User message, default ──────────────────────────────────────────
   if (mine) {
     return (
-      <div className="flex justify-end animate-slide-up">
+      <div className="group flex items-start justify-end gap-1.5 animate-slide-up">
+        {editable && onEdit && (
+          <button
+            type="button"
+            aria-label="Edit message"
+            onClick={startEdit}
+            className="mt-1.5 flex h-7 w-7 items-center justify-center rounded-lg text-muted opacity-100 transition-colors hover:bg-bg hover:text-ink md:opacity-0 md:group-hover:opacity-100"
+          >
+            <PencilIcon className="h-3.5 w-3.5" />
+          </button>
+        )}
         <p className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-slate px-3.5 py-2.5 text-sm leading-relaxed text-ink">
           {message.content}
         </p>
@@ -45,6 +128,7 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
     );
   }
 
+  // ── Assistant message ──────────────────────────────────────────────
   return (
     <div className="flex items-start gap-2.5 animate-slide-up">
       <StashAvatar />

@@ -3,7 +3,15 @@ import type { ChatMessage } from "@/types";
 import { MessageBubble } from "./MessageBubble";
 
 /** The conversation transcript — fills the space under the strip when active. */
-export function AgentPanel({ messages }: { messages: ChatMessage[] }) {
+export function AgentPanel({
+  messages,
+  onEditMessage,
+  isThinking,
+}: {
+  messages: ChatMessage[];
+  onEditMessage: (id: string, text: string) => void;
+  isThinking: boolean;
+}) {
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,7 +49,12 @@ export function AgentPanel({ messages }: { messages: ChatMessage[] }) {
           </div>
         ) : null}
         {messages.map((m) => (
-          <MessageBubble key={m.id} message={m} />
+          <MessageBubble
+            key={m.id}
+            message={m}
+            onEdit={onEditMessage}
+            editable={!isThinking}
+          />
         ))}
         <div ref={endRef} />
       </div>
