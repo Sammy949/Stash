@@ -6,7 +6,7 @@
 
 **The personal finance agent that knows your financial life — and helps you stay ahead of it.**
 
-### 🔗 [Live demo → heystash.vercel.app](https://heystash.vercel.app)
+### 🔗 [Live demo → heystash.app](https://heystash.app)
 
 Built for [Zero Cup 2026](https://0g.ai) · 0G Labs
 by [Samuel Yahaya](https://twitter.com/I_am_SamY01) · [@Sammy949](https://github.com/Sammy949)
@@ -33,7 +33,7 @@ It tracks where your money actually goes, keeps you ahead of scholarship deadlin
 
 ### 🔐 0G Storage — the core differentiator
 
-Your financial ledger is stored as an **encrypted JSON file on the 0G decentralized storage network** — not a database we own, not browser localStorage.
+Your financial ledger is stored as an **encrypted JSON file on the 0G decentralized storage network** as its durable backup — not a database we own. The app is local-first (`localStorage` is the working copy), and 0G is where your state is encrypted, finalized, and made sovereign.
 
 - Ledger serialized and encrypted with the SDK's **native AES-256** encryption.
 - The AES key is **derived deterministically from your wallet** — `sha256("stash-ledger-v1:" + privateKey)` → 32 bytes. The same wallet always, and only, decrypts its own ledger. The key is never stored or transmitted.
@@ -56,14 +56,14 @@ The Stash AI agent is built for the **0G Compute Router** (`router-api.0g.ai`, m
 
 ## Core features
 
-### 💸 Budget tracking
-Natural-language expense logging. Type *"Spent ₦2,000 on transport"* → Stash parses the amount and category → the Vault card's progress ring and numbers **animate live** → the ledger syncs to 0G Storage with a real root-hash toast.
+### 💸 Expense & income tracking
+Just talk to it. Type *"Spent ₦2,000 on transport"* or *"Got ₦12k from a client"* → the agent emits a **structured tool call** (`log_expense` / `log_income`), the ledger reducer applies it, the Vault card's progress ring and numbers **animate live**, and the state syncs to 0G Storage with a real root-hash toast. No brittle regex — all natural language goes through the agent, and the **code owns the math** so the dashboard and the agent's words never disagree.
 
 ### 🎓 Scholarship Radar
-A **dynamic urgency system** — red / amber / green are derived from the actual deadline dates, not hardcoded. Under 7 days is critical, under 30 is approaching. Preloaded with MEXT, Mastercard Foundation, ALU Rwanda, Türkiye Burslari, and KGSP.
+A **dynamic urgency system** — red / amber / green are derived from the actual deadline dates, not hardcoded. Under 7 days is critical, under 30 is approaching. You add and manage scholarships through the agent (`add_scholarship` / `remove_scholarship`).
 
 ### ⚡ Hustle Ledger
-Income streams with status tracking — *received, active, pending, building* — and a live-calculated total of active monthly income.
+Income streams with status tracking — *received, active, pending, building* — and a live-calculated total of active monthly income. Managed conversationally (`add_income_stream` / `remove_income_stream`).
 
 ### 🧠 Stash AI agent
 A conversational agent with full ledger context. It knows your balance, deadlines, and income streams, and responds specifically. Direct, warm, and built for the Nigerian student hustle — short sentences, no fluff, real talk.
@@ -153,11 +153,11 @@ Click **"🎓 Scholarship deadlines"**. The agent responds with *your* specific 
 ### Data flow
 A single `Ledger` object flows through everything:
 
-1. **Seeded** with realistic student data on first load.
-2. **Hydrated** from 0G Storage on boot if a root hash exists in `localStorage`.
-3. **Updated** on every expense log (instant, local — the UI never waits on the network).
-4. **Re-encrypted and uploaded** to 0G on sync; the new root hash is persisted.
-5. **Injected** into the agent's system prompt on every call.
+1. **Empty on first load** — no seed data; your ledger grows from your own entries (onboarding sets name, currency, and opening balance).
+2. **Local-first** — `localStorage` is the canonical working copy, written synchronously on every change so the UI never waits on the network.
+3. **Updated** on every agent tool call via a pure reducer (the code computes the new balance; the model never invents math).
+4. **Re-encrypted and backed up** to 0G Storage on sync — through a Vercel serverless proxy — and the new root hash is persisted.
+5. **Hydrated** from 0G on boot if a root hash exists, and **injected** into the agent's system prompt on every call.
 
 ### Why 0G Storage over a database
 A central database is owned by the platform. 0G Storage is owned by the user. A student's financial life is deeply personal data — Stash puts it where it belongs: with the student, encrypted and sovereign.
@@ -172,7 +172,7 @@ Uploads run with finality required — each sync blocks until 0G confirms the da
 
 ## Project
 
-- **~30 atomic commits**, conventional-commits style (`type(scope): description`).
+- **60+ atomic commits**, conventional-commits style (`type(scope): description`).
 - Full history: [github.com/Sammy949/Stash/commits/main](https://github.com/Sammy949/Stash/commits/main)
 
 ---
