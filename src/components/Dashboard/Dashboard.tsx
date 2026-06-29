@@ -9,17 +9,10 @@ export function Dashboard({
   ledger,
   syncPhase,
   hydrating,
-  onEditTransaction,
-  onDeleteTransaction,
 }: {
   ledger: Ledger;
   syncPhase: SyncPhase;
   hydrating: boolean;
-  onEditTransaction: (
-    id: string,
-    patch: { amount?: number; label?: string },
-  ) => void;
-  onDeleteTransaction: (id: string) => void;
 }) {
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5">
@@ -29,8 +22,6 @@ export function Dashboard({
       <TransactionList
         transactions={ledger.transactions}
         currency={ledger.currency}
-        onEdit={onEditTransaction}
-        onDelete={onDeleteTransaction}
       />
     </div>
   );
