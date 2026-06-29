@@ -10,7 +10,6 @@ import {
   saveLedger,
   saveLocalLedger,
 } from "@/lib/ogStorage";
-import { track } from "@/lib/analytics";
 
 /** Short root-hash badge: "#a7f3c2b1…". */
 function shortRoot(rootHash: string): string {
@@ -77,7 +76,6 @@ export function useLedger() {
       const result = await saveLedger(current, () => setSyncPhase("uploading"));
       setLedger({ ...ref.current, lastSyncedAt: result.syncedAt });
       setSyncPhase("confirmed");
-      track("og_sync", { success: true });
       toast.success("Saved locally and backed up to 0G", {
         description: `Encrypted · Root: ${shortRoot(result.rootHash)}`,
       });
@@ -88,7 +86,6 @@ export function useLedger() {
       // Persistent "pending" — the local copy is safe; this stays visible
       // until a later sync succeeds, rather than flashing an error away.
       setSyncPhase("pending");
-      track("og_sync", { success: false });
       toast.warning("Saved locally — couldn't reach 0G just now", {
         description:
           e instanceof Error ? e.message : "It'll keep retrying; tap Sync to 0G to try now.",
@@ -116,7 +113,6 @@ export function useLedger() {
         openingBalance: profile.openingBalance,
       };
       setLedger(next);
-      track("onboarding_completed", { currency: profile.currency });
       return next;
     },
     [],
