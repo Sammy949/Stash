@@ -158,6 +158,14 @@ export function ArrowUpRightIcon({ className }: IconProps) {
   );
 }
 
+export function ChatIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 16H9l-4 3.5V6.5A1.5 1.5 0 0 1 5 5Z" />
+    </svg>
+  );
+}
+
 export function MemoryIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>

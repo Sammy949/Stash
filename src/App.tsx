@@ -282,9 +282,17 @@ export default function App() {
           </main>
         )}
 
-        {/* Command bar — always present */}
+        {/* Command bar — always present. While the panel is closed and a
+            conversation already exists, it offers a quiet way to reopen the
+            transcript (review only — no message sent, no agent turn). */}
         <div className="shrink-0">
-          <CommandBar onSend={handleSend} onStop={stop} isThinking={isThinking} />
+          <CommandBar
+            onSend={handleSend}
+            onStop={stop}
+            isThinking={isThinking}
+            onOpenPanel={() => setAgentActive(true)}
+            canOpenPanel={!agentActive && messages.length > 0}
+          />
         </div>
       </div>
 
