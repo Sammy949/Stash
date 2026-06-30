@@ -188,6 +188,22 @@
     animation: stash-float 5s ease-in-out infinite;
   }
 
+  /* "Just updated" section emphasis — a one-shot accent ring that fades. */
+  @keyframes stash-highlight {
+    0% {
+      box-shadow: 0 0 0 0 rgb(59 130 246 / 0);
+    }
+    12% {
+      box-shadow: 0 0 0 2px rgb(59 130 246 / 0.55);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgb(59 130 246 / 0);
+    }
+  }
+  .animate-highlight {
+    animation: stash-highlight 2.2s ease-out;
+  }
+
   /* Respect reduced-motion: hold everything still. */
   @media (prefers-reduced-motion: reduce) {
     .animate-spin-slow,
@@ -195,7 +211,8 @@
     .animate-spin-rev,
     .animate-float,
     .animate-rise,
-    .animate-blink {
+    .animate-blink,
+    .animate-highlight {
       animation: none;
     }
   }

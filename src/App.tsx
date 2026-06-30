@@ -15,6 +15,7 @@ import { deriveObservation } from "@/lib/observations";
 import { deriveWelcomeBack } from "@/lib/welcomeBack";
 import type { WelcomeBack as WelcomeBackData } from "@/lib/welcomeBack";
 import { analyzeSpending, isSpendingQuery } from "@/lib/analysis";
+import type { Ledger } from "@/types";
 
 // One-time forced reset onto the new local-first schema (runs once at load,
 // before any hook reads localStorage).
@@ -22,6 +23,17 @@ ensureStorageSchema();
 
 const ONBOARDED_KEY = "stash_onboarded";
 const LAST_VISIT_KEY = "stash_last_visit";
+
+type SectionKey = "activity" | "scholarships" | "hustles";
+
+/** Which dashboard section a turn touched. Pure reducers swap only the changed
+ *  array, so reference inequality pinpoints it exactly. */
+function changedSection(before: Ledger, after: Ledger): SectionKey | null {
+  if (before.transactions !== after.transactions) return "activity";
+  if (before.scholarships !== after.scholarships) return "scholarships";
+  if (before.hustles !== after.hustles) return "hustles";
+  return null;
+}
 
 const SYNC_CONFIRMATION =
   "Your financial data is encrypted and stored on 0G's decentralized network. Nobody else can access it. It'll be here next time you open Stash.";
@@ -42,6 +54,11 @@ export default function App() {
   // Split-Shift: dashboard is full by default; asking anything opens the
   // agent panel (dashboard condenses to a strip). Tap the strip to return.
   const [agentActive, setAgentActive] = useState(false);
+
+  // "Just updated" emphasis — the section a turn changed. Persists (no timer)
+  // until the dashboard is next viewed and consumes it, since after an action
+  // the user is in the agent panel, not looking at the dashboard.
+  const [highlight, setHighlight] = useState<SectionKey | null>(null);
 
   // Welcome-back greeting — "Since you were last here…". Computed ONCE per load,
   // after the ledger has hydrated, from the deterministic delta vs the last
@@ -90,6 +107,8 @@ export default function App() {
       latest = updated;
       applyLedger(updated);
       void sync(updated);
+      const changed = changedSection(before, updated);
+      if (changed) setHighlight(changed);
       // Proactive observation — code (not the model) notices when a money
       // event collides with something Stash remembers, and adds one nudge
       // after the agent's reply. Stays silent when there's nothing to say.
@@ -125,6 +144,8 @@ export default function App() {
         },
         (updated) => {
           applyLedger(updated);
+          const changed = changedSection(before, updated);
+          if (changed) setHighlight(changed);
           const observation = deriveObservation(before, updated);
           if (observation) pushAssistant(observation);
         },
@@ -180,6 +201,8 @@ export default function App() {
               syncPhase={syncPhase}
               hydrating={hydrating}
               onPrompt={handleSend}
+              highlight={highlight}
+              onHighlightConsumed={() => setHighlight(null)}
             />
           </main>
         )}
