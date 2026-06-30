@@ -186,6 +186,8 @@ The division of labour (CRITICAL):
 
 Acting on money:
 - Money OUT (spent, paid, bought) → call log_expense ONCE. Money IN (paid, gift, allowance, disbursement) → call log_income ONCE.
+- Distinguish money that MOVED from money that's OWED. "I spent / I bought / I got / I got paid" = it happened, log it. "I have to pay / need to fix / I owe / it's due / supposed to pay" = an UPCOMING cost, not a transaction — do NOT log it as an expense. It hasn't left the account. Instead acknowledge it, weigh it against their balance, flag if it's a stretch — and OFFER to track it as a savings goal so they can work toward it ("want me to set that £400 as a goal?"). Don't create the goal unprompted; wait for a yes. Only log a real expense later, when they say they actually paid.
+- A single message can MIX both — "I just got shoes for £100, and I have to pay £1000 for a program and fix my phone for £400." Log ONLY what moved (the £100 shoes). Treat the £1000 and £400 as upcoming costs: react to them and offer to set them as goals. Never log the same money twice.
 - Budget cap → set_monthly_budget. Undo a mistaken entry → delete_last_transaction.
 - Always expand shorthand amounts to full numbers before passing to tools. 50k = 50000, 2m = 2000000.
 - Use the real tool mechanism. NEVER write tool/function syntax as text (no "<function=...>", no JSON tool calls in your reply).
@@ -282,8 +284,14 @@ async function chatCompletion(
         "I've hit my AI usage limit for the moment. Give me a few minutes and try again — your data's safe and saved.",
       );
     }
+    // Unknown provider failure. NEVER surface the raw provider message into the
+    // chat — those strings are billing/validation internals ("Tool choice is
+    // none, but model called a tool", org ids, upgrade URLs) and reading like a
+    // Stash reply is both confusing and off-brand. Log the detail for debugging
+    // and show something calm and on-brand instead.
+    console.error("AI provider error", res.status, detail);
     throw new StashComputeError(
-      detail?.error?.message ?? `AI provider error (${res.status}).`,
+      "I hit a snag reaching 0G Compute. Give it another go in a moment — your data's safe and saved.",
     );
   }
 
@@ -325,6 +333,9 @@ function looksLikeMoneyEvent(text: string): boolean {
  * looksLikeMoneyEvent would force a log — turning a hypothetical into a
  * phantom expense. When intent is present we suppress the force and let the
  * model reason and advise instead. This IS the pre-spend moment.
+ *
+ * Obligations/future bills ("I have to pay…", "I owe rent") are a sibling
+ * case handled by looksLikeObligation — both feed the same force-suppression.
  */
 function looksLikePreSpendIntent(text: string): boolean {
   const t = text.toLowerCase();
@@ -339,6 +350,29 @@ function looksLikePreSpendIntent(text: string): boolean {
     /\b(is it|would it be|it'?s) worth (buying|getting|it)\b/,
   ];
   return INTENT.some((re) => re.test(t));
+}
+
+/**
+ * OBLIGATION / future-cost intent: the user is naming money they OWE or will
+ * have to spend, not money that has moved ("I have to pay £1000 for the
+ * scholarship", "need to fix my phone, it's £400", "I owe rent"). Like a
+ * pre-spend intent these carry amount + a money verb, so looksLikeMoneyEvent
+ * would force a log — booking a phantom expense for money still in the account.
+ * When obligation phrasing is present we drop the force and let the model
+ * advise (or capture it as something to track) instead of logging a spend.
+ */
+function looksLikeObligation(text: string): boolean {
+  const t = text.toLowerCase();
+  const OBLIGATION = [
+    /\b(have|need|got|going|has) to (pay|fix|cover|settle|sort|spend|buy|get)\b/,
+    /\bhave to pay for\b/,
+    /\b(owe|owing|owed)\b/,
+    /\b(due|payable|outstanding)\b/,
+    /\b(supposed|meant|expected) to pay\b/,
+    /\b(will|gonna|gotta|must) (have to )?(pay|cover|fix|settle)\b/,
+    /\bbill(s)? (due|coming|to pay)\b/,
+  ];
+  return OBLIGATION.some((re) => re.test(t));
 }
 
 export interface AgentTurn {
@@ -361,15 +395,17 @@ export async function runAgentTurn(
 ): Promise<AgentTurn> {
   // If the latest user message describes money moving, force a tool call so
   // the model can't narrate a fake mutation. But a PRE-SPEND intent ("should
-  // I buy…", "thinking of getting…") shares the same shape while nothing has
-  // actually moved — forcing a log there fabricates an expense, so we leave
-  // those on auto and let the agent advise. Otherwise leave it on auto.
+  // I buy…", "thinking of getting…") or an OBLIGATION ("I have to pay £1000",
+  // "need to fix my phone, £400") shares the same amount+verb shape while
+  // nothing has actually moved — forcing a log there fabricates an expense, so
+  // we leave those on auto and let the agent advise. Otherwise leave on auto.
   const lastUser = [...history]
     .reverse()
     .find((m) => !m.pending && m.role === "user");
   const forceTool = lastUser
     ? looksLikeMoneyEvent(lastUser.content) &&
-      !looksLikePreSpendIntent(lastUser.content)
+      !looksLikePreSpendIntent(lastUser.content) &&
+      !looksLikeObligation(lastUser.content)
     : false;
 
   return runAgentTurnInner(history, ledger, forceTool, signal);
@@ -429,37 +465,51 @@ async function runAgentTurnInner(
   // The model may emit one or more tool calls in a SINGLE response — parallel
   // tool-calling handles multi-action turns (e.g. "spent 2k and got 5k").
   if (usable.length > 0) {
-    // Echo back ONLY the cleaned, known calls. Echoing a malformed name (or one
-    // with args fused in) makes the provider reject the finalize request — and
-    // means the action silently never ran. Reconstructing them keeps the loop
-    // valid and the ledger actually mutated.
-    messages.push({
-      role: "assistant",
-      content: msg.content ?? "",
-      tool_calls: usable.map((c) => ({
-        id: c.id,
-        type: "function",
-        function: { name: c.name, arguments: JSON.stringify(c.args) },
-      })),
-    });
-
+    // Apply each known call to the working ledger, collecting the factual
+    // summaries — each carries the exact post-action balance, computed in code.
+    const summaries: string[] = [];
     for (const c of usable) {
       const result = applyAction(working, c.name, c.args);
       working = result.ledger;
-      messages.push({ role: "tool", tool_call_id: c.id, content: result.summary });
+      summaries.push(result.summary);
     }
+    const didMutate = working !== ledger;
 
-    // Refresh the snapshot so the reply sees the new balance. Keep the tools in
-    // the request (so the echoed calls validate) but forbid NEW ones with
-    // tool_choice "none" — the model must now write a grounded reply, not
-    // re-call and double-log.
+    // Finalize WITHOUT tools. The old loop echoed the assistant tool_calls +
+    // tool-role replies and re-sent AGENT_TOOLS with tool_choice "none" — and
+    // that exact combination trips Groq's llama-3.3: with the schemas still
+    // visible and (on a multi-event turn) money still unresolved, the model
+    // tries to call again, the provider 400s ("tool_choice is none, but model
+    // called a tool"), and the whole turn dies — taking the already-applied
+    // mutation down with it. Sending NO tools makes that validation impossible
+    // to fire; we hand the model the results as a plain note instead.
     messages[0] = { role: "system", content: buildSystemPrompt(working) };
-    const final = await chatCompletion(messages, AGENT_TOOLS, "none", signal);
-    return {
-      reply: (final.content ?? "").trim() || "Done.",
-      ledger: working,
-      mutated: working !== ledger,
-    };
+    messages.push({
+      role: "user",
+      content:
+        `Recorded:\n${summaries.join("\n")}\n\nNow reply to me as Stash — grounded in these exact facts and the snapshot. Use the new balance verbatim, do NOT recompute it, and do NOT output any tool or function syntax.`,
+    });
+
+    // The finalize is ONLY narration — the ledger is already mutated. If it
+    // fails (provider quirk, rate limit, network blip), we must not lose the
+    // action: fall back to a deterministic reply built from code-owned numbers
+    // and return the mutated ledger regardless. A user-initiated abort still
+    // propagates so the turn settles as "Stopped.".
+    let replyText = "";
+    try {
+      const final = await chatCompletion(messages, undefined, "auto", signal);
+      replyText = (final.content ?? "").trim();
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") throw e;
+      // Swallow — fall through to the deterministic reply below.
+    }
+    if (!replyText) {
+      const bal = formatMoney(balance(working), working.currency);
+      replyText = didMutate
+        ? `Done — that's recorded. Your balance is now ${bal}.`
+        : `Your balance is ${bal}.`;
+    }
+    return { reply: replyText, ledger: working, mutated: didMutate };
   }
 
   // No structured tool_calls — but the model may have written tool syntax as
