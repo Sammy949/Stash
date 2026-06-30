@@ -310,6 +310,29 @@ interface ToolCall {
 }
 
 /**
+ * Drop EXACT-duplicate tool calls (same name + same args) from one model
+ * response. GLM-5/llama-3.3 intermittently emit the same call twice in a
+ * single turn ("parallel tool calling" gone wrong). Money events survive this
+ * because isDuplicateTransaction catches the re-log, but contribute_to_goal /
+ * add_scholarship / remember have no such guard, so a duplicated call applies
+ * twice — e.g. "set aside £200" earmarks £400. No legitimate turn needs the
+ * identical action run twice in one shot, and a genuine repeat purchase routes
+ * through the DUPLICATE_CONFIRM flow, not a same-response duplicate. We keep
+ * order and first occurrence.
+ */
+function dedupeCalls<T extends { name: string; args: Record<string, unknown> }>(
+  calls: T[],
+): T[] {
+  const seen = new Set<string>();
+  return calls.filter((c) => {
+    const sig = `${c.name}:${JSON.stringify(c.args)}`;
+    if (seen.has(sig)) return false;
+    seen.add(sig);
+    return true;
+  });
+}
+
+/**
  * Heuristic: does this user message describe money actually MOVING (in or
  * out), as opposed to a question or general chat?
  *
@@ -488,8 +511,10 @@ async function runAgentTurnInner(
   if (usable.length > 0) {
     // Apply each known call to the working ledger, collecting the factual
     // summaries — each carries the exact post-action balance, computed in code.
+    // Dedupe first: a model that emits the same call twice in one response must
+    // not apply it twice (it would double a goal contribution).
     const summaries: string[] = [];
-    for (const c of usable) {
+    for (const c of dedupeCalls(usable)) {
       const result = applyAction(working, c.name, c.args);
       working = result.ledger;
       summaries.push(result.summary);
@@ -537,7 +562,7 @@ async function runAgentTurnInner(
   // text. Apply those so the ledger actually mutates, then finalize cleanly.
   const { calls, cleaned } = extractTextToolCalls(msg.content);
   if (calls.length > 0) {
-    for (const c of calls) {
+    for (const c of dedupeCalls(calls)) {
       working = applyAction(working, c.name, c.args).ledger;
     }
     messages[0] = { role: "system", content: buildSystemPrompt(working) };
