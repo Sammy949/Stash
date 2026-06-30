@@ -1,5 +1,5 @@
 import type { Ledger } from "@/types";
-import { getMemories } from "@/lib/ledger";
+import { getGoals, getMemories } from "@/lib/ledger";
 import { formatMoney } from "@/lib/currency";
 
 /**
@@ -10,9 +10,12 @@ import { formatMoney } from "@/lib/currency";
  * remembers, and surfaces ONE short line. Deterministic on purpose — the
  * observation references the user's own memory verbatim, no numbers invented.
  *
- * Scope is deliberately narrow for now: income arriving while a savings goal
- * exists. One observation at a time; returns null when nothing is worth
- * saying, so it never interrupts for the sake of it.
+ * Scope is deliberately narrow: income arriving while a savings goal exists,
+ * but ONLY when that goal is a soft MEMORY (no structured Goal). When a
+ * structured Goal exists, the agent's own reply already weaves the "set some
+ * aside?" nudge from code-computed GOAL CONTEXT facts (goalContext.ts) — so
+ * firing this bubble too would double-mention. One observation at a time;
+ * returns null when nothing is worth saying.
  */
 export function deriveObservation(prev: Ledger, next: Ledger): string | null {
   // What changed this turn — only brand-new transactions, matched by id.
@@ -22,7 +25,10 @@ export function deriveObservation(prev: Ledger, next: Ledger): string | null {
   );
   if (!income) return null;
 
-  // ...and only if Stash is holding a savings goal to protect.
+  // Structured goals own the in-reply nudge — don't duplicate it here.
+  if (getGoals(next).length > 0) return null;
+
+  // ...otherwise fall back to a soft memory-goal, if Stash is holding one.
   const goal = getMemories(next).find((m) => m.kind === "goal");
   if (!goal) return null;
 

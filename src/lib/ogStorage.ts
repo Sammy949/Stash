@@ -91,7 +91,7 @@ export function clearStoredRootHash(): void {
  * clean on the new architecture exactly once. Call this BEFORE any hook
  * reads localStorage (i.e. at module load).
  */
-const STORAGE_SCHEMA = 3;
+const STORAGE_SCHEMA = 4;
 const SCHEMA_KEY = "stash_schema";
 const STASH_KEYS = [
   LEDGER_ROOT_KEY,

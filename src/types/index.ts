@@ -83,6 +83,33 @@ export interface Hustle {
   tag: IncomeTag;
 }
 
+/** ───────────────── Goals (savings targets) ───────────────── */
+
+/**
+ * A savings target — money the user is working TOWARD ("save £1000 for the
+ * scholarship", "£8k for a semester abroad"). Distinct from a `goal` MEMORY
+ * (a vague, number-less aspiration): a Goal is structured and trackable.
+ *
+ * Progress is an EARMARK model: `savedAmount` is money the user has mentally
+ * set aside, bumped only by explicit "I set aside £X" actions. It is NOT a
+ * transaction and NEVER changes the spendable balance — balance stays derived
+ * from transactions alone. Actually paying for the thing is a normal expense
+ * that, separately, can close the goal.
+ */
+export interface Goal {
+  id: string;
+  /** What they're saving for, e.g. "Scholarship payment", "Fix phone". */
+  name: string;
+  /** The target amount to reach. */
+  targetAmount: number;
+  /** Money earmarked so far (0..targetAmount-ish). Never touches balance. */
+  savedAmount: number;
+  /** Optional ISO date they want to hit the target by. */
+  targetDate?: string;
+  /** ISO 8601 timestamp. */
+  createdAt: string;
+}
+
 /** ───────────────── Memory ───────────────── */
 
 /**
@@ -130,6 +157,8 @@ export interface Ledger {
   transactions: Transaction[];
   scholarships: Scholarship[];
   hustles: Hustle[];
+  /** Structured savings targets (earmark progress, never balance). */
+  goals: Goal[];
   /** Soft memory — goals, habits, preferences. Grows from conversation. */
   memories: Memory[];
   /** ISO timestamp of the last successful 0G Storage sync. */
@@ -153,6 +182,33 @@ export type SyncPhase =
    *  (no auto-clear) until a sync succeeds. */
   | "pending";
 
+/** ───────────────── Agent cards (structured replies) ───────────────── */
+
+/** One row in a spending breakdown — a category and its share of the total. */
+export interface SpendRow {
+  label: string;
+  amount: number;
+  pct: number;
+}
+
+/**
+ * A deterministic spending breakdown, computed in code (never the model) and
+ * rendered as an inline card in chat. Numbers are code-owned — see
+ * `analyzeSpending` in lib/analysis.ts.
+ */
+export interface SpendingBreakdown {
+  currency: Currency;
+  windowDays: number;
+  total: number;
+  /** Top categories, largest first. */
+  rows: SpendRow[];
+  topLabel: string;
+  topShare: number;
+}
+
+/** Structured payload the agent can attach to a message for rich rendering. */
+export type AgentCard = { type: "spending"; data: SpendingBreakdown };
+
 /** ───────────────── Agent / Chat ───────────────── */
 
 export type ChatRole = "user" | "assistant" | "system";
@@ -164,6 +220,24 @@ export interface ChatMessage {
   createdAt: string;
   /** Transient flag for the typing indicator placeholder. */
   pending?: boolean;
+  /** Optional structured card rendered with this message (e.g. a spending
+   *  breakdown). Code-computed — see lib/analysis.ts. */
+  card?: AgentCard;
+  /**
+   * IDs of goals this assistant turn touched (created/contributed-to) or, for a
+   * "review my goals" turn, the active goals to show. The bubble renders an
+   * inline GoalCard for each still-existing goal — visible proof of goal state,
+   * shown only at the moments it matters, not on every message.
+   */
+  relatedGoalIds?: string[];
+  /**
+   * IDs of scholarships this assistant turn surfaced — created (add_scholarship),
+   * referenced by name, proactively nudged for a near deadline, or the top few
+   * for a "Scholarship deadlines" turn. The bubble renders an inline
+   * ScholarshipCard for each still-tracked one. Selection is code-side and
+   * deterministic — see lib/scholarshipContext.ts.
+   */
+  relatedScholarshipIds?: string[];
   /**
    * The full state Stash held just BEFORE this (user) turn ran — money AND
    * memory. Editing a message restores exactly this, so the ledger is never

@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChatMessage } from "@/types";
+import type { ChatMessage, Currency, Goal, Scholarship } from "@/types";
 import { CloseIcon, PencilIcon, SendIcon } from "@/components/UI/icons";
 import { RowButton } from "@/components/UI/RowButton";
+import { CopyButton } from "@/components/UI/CopyButton";
+import { GoalCard } from "@/components/UI/GoalCard";
+import { ScholarshipCard } from "@/components/UI/ScholarshipCard";
+import { SpendingCard } from "./SpendingCard";
+import { Markdown } from "./Markdown";
 
 /** Stash avatar — small emerald vault glyph. */
 function StashAvatar() {
@@ -39,16 +44,35 @@ export function MessageBubble({
   message,
   onEdit,
   editable,
+  isThinking,
+  goals,
+  scholarships,
+  currency,
 }: {
   message: ChatMessage;
   /** Edit + re-run this user message (replaces everything below it). */
   onEdit?: (id: string, text: string) => void;
   /** False while a turn is in flight — hides the edit affordance. */
   editable?: boolean;
+  /** True while a turn is in flight. */
+  isThinking?: boolean;
+  /** Live goals — used to resolve this message's relatedGoalIds to cards. */
+  goals?: Goal[];
+  /** Live scholarships — resolves this message's relatedScholarshipIds to cards. */
+  scholarships?: Scholarship[];
+  /** Ledger currency for the goal cards. */
+  currency?: Currency;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
   const taRef = useRef<HTMLTextAreaElement>(null);
+
+  // Close the editor if a turn starts mid-edit. The single-flight lock already
+  // makes Save a no-op during a turn, but a stale open textarea looks broken —
+  // snap it back to the normal bubble.
+  useEffect(() => {
+    if (isThinking) setEditing(false);
+  }, [isThinking]);
 
   // Auto-size the textarea to its content while editing.
   useEffect(() => {
@@ -111,17 +135,20 @@ export function MessageBubble({
   if (mine) {
     return (
       <div className="group flex items-start justify-end gap-1.5 animate-slide-up">
-        {editable && onEdit && (
-          <button
-            type="button"
-            aria-label="Edit message"
-            onClick={startEdit}
-            className="mt-1.5 flex h-7 w-7 items-center justify-center rounded-lg text-muted opacity-100 transition-colors hover:bg-bg hover:text-ink md:opacity-0 md:group-hover:opacity-100"
-          >
-            <PencilIcon className="h-3.5 w-3.5" />
-          </button>
-        )}
-        <p className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-slate px-3.5 py-2.5 text-sm leading-relaxed text-ink">
+        <div className="mt-1.5 flex items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+          <CopyButton text={message.content} />
+          {editable && onEdit && (
+            <button
+              type="button"
+              aria-label="Edit message"
+              onClick={startEdit}
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-muted transition-colors hover:bg-bg hover:text-ink"
+            >
+              <PencilIcon className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        <p className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-slate px-3.5 py-2.5 text-sm leading-relaxed text-ink">
           {message.content}
         </p>
       </div>
@@ -130,13 +157,66 @@ export function MessageBubble({
 
   // ── Assistant message ──────────────────────────────────────────────
   return (
-    <div className="flex items-start gap-2.5 animate-slide-up">
+    <div className="group flex items-start gap-2.5 animate-slide-up">
       <StashAvatar />
-      <div className="max-w-[80%] rounded-2xl rounded-tl-sm border border-line bg-bg/60 px-3.5 py-2.5 text-sm leading-relaxed text-ink">
+      <div className="flex max-w-[85%] flex-col items-start gap-1.5">
         {message.pending ? (
-          <TypingDots />
+          <div className="rounded-2xl rounded-tl-sm border border-line bg-bg/60 px-3.5 py-2.5">
+            <TypingDots />
+          </div>
         ) : (
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          <>
+            {message.content && (
+              <div className="break-words rounded-2xl rounded-tl-sm border border-line bg-bg/60 px-3.5 py-2.5 text-sm leading-relaxed text-ink">
+                <Markdown>{message.content}</Markdown>
+              </div>
+            )}
+            {message.card?.type === "spending" && (
+              <SpendingCard data={message.card.data} />
+            )}
+            {/* Inline goal proof — resolve IDs to live goals; skip any that
+                were since removed (the card silently disappears, never errors). */}
+            {message.relatedGoalIds && currency
+              ? message.relatedGoalIds
+                  .map((id) => goals?.find((g) => g.id === id))
+                  .filter((g): g is Goal => Boolean(g))
+                  .map((g) => (
+                    <GoalCard key={g.id} goal={g} currency={currency} />
+                  ))
+              : null}
+            {/* Inline scholarship proof — same pattern as goals; a since-removed
+                one is skipped silently. The "+N more" hint only appears on the
+                capped deadlines stack (3 shown while more are tracked). */}
+            {(() => {
+              if (!message.relatedScholarshipIds) return null;
+              const shown = message.relatedScholarshipIds
+                .map((id) => scholarships?.find((s) => s.id === id))
+                .filter((s): s is Scholarship => Boolean(s));
+              if (!shown.length) return null;
+              const total = scholarships?.length ?? 0;
+              const more =
+                shown.length >= 3 && total > shown.length
+                  ? total - shown.length
+                  : 0;
+              return (
+                <>
+                  {shown.map((s) => (
+                    <ScholarshipCard key={s.id} scholarship={s} />
+                  ))}
+                  {more > 0 && (
+                    <p className="px-1 text-xs text-muted">
+                      +{more} more on your radar
+                    </p>
+                  )}
+                </>
+              );
+            })()}
+            {message.content && (
+              <div className="-ml-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                <CopyButton text={message.content} />
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

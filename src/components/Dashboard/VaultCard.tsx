@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Ledger, SyncPhase } from "@/types";
 import {
   balance,
@@ -9,10 +10,16 @@ import {
 import { formatMoney } from "@/lib/currency";
 import { AnimatedNumber } from "@/components/UI/AnimatedNumber";
 import { SyncIndicator } from "@/components/UI/SyncIndicator";
-import { LockIcon } from "@/components/UI/icons";
+import {
+  ArrowDownLeftIcon,
+  ArrowUpRightIcon,
+  LockIcon,
+} from "@/components/UI/icons";
 
-const RING_SIZE = 168;
-const STROKE = 12;
+// Compact "spent" ring — a secondary indicator in the top-right, not the
+// centerpiece (the balance is). Small + thin to read as a status gauge.
+const RING_SIZE = 78;
+const STROKE = 7;
 const RADIUS = (RING_SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
@@ -29,36 +36,52 @@ export function VaultCard({
   const income = totalIncome(ledger);
   const expenses = totalExpenses(ledger);
   const pct = outflowPct(ledger);
-  const ringLabel = ledger.monthlyBudget ? "of budget spent" : "of income spent";
+  const overdrawn = bal < 0;
   const offset = CIRCUMFERENCE * (1 - pct / 100);
 
   return (
-    <section className="rounded-2xl border border-line bg-card p-5">
-      {/* Header */}
-      <div className="flex items-center gap-2">
-        <h2 className="text-base font-semibold">Stash Vault</h2>
-        <LockIcon className="h-4 w-4 text-emerald" />
-        <span className="ml-auto">
-          {syncPhase === "idle" ? (
-            <span className="text-xs text-muted">Secured on 0G Storage</span>
-          ) : (
-            <SyncIndicator phase={syncPhase} />
-          )}
-        </span>
-      </div>
+    <section className="rounded-2xl border border-line bg-card p-6">
+      {/* Top region: balance dominant on the left, spent ring on the right. */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-muted">
+            <span className="label-caps text-[11px]">Vault Balance</span>
+            <LockIcon className="h-3 w-3" />
+          </div>
 
-      {/* Ring */}
-      <div className="mt-5 flex justify-center">
+          <AnimatedNumber
+            value={bal}
+            format={(n) => formatMoney(n, ledger.currency)}
+            className={`font-data mt-2 block text-[clamp(1.6rem,7vw,2.6rem)] font-semibold leading-[1.1] ${
+              overdrawn ? "text-red" : "text-ink"
+            }`}
+          />
+
+          {/* Sync / persistence status — one quiet line under the balance. */}
+          <div className="mt-3 h-4 text-xs">
+            {hydrating ? (
+              <span className="text-muted">Restoring from 0G Storage…</span>
+            ) : syncPhase === "idle" ? (
+              <span className="flex items-center gap-1.5 text-muted">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald" />
+                {formatSyncedAt(ledger.lastSyncedAt)}
+              </span>
+            ) : (
+              <SyncIndicator phase={syncPhase} />
+            )}
+          </div>
+        </div>
+
+        {/* Spent ring */}
         <div
-          className="relative"
+          className="relative shrink-0"
           style={{ width: RING_SIZE, height: RING_SIZE }}
+          role="img"
+          aria-label={
+            overdrawn ? "Overdrawn" : `${Math.round(pct)} percent spent`
+          }
         >
-          <svg
-            width={RING_SIZE}
-            height={RING_SIZE}
-            className="-rotate-90"
-            aria-hidden
-          >
+          <svg width={RING_SIZE} height={RING_SIZE} className="-rotate-90" aria-hidden>
             <circle
               cx={RING_SIZE / 2}
               cy={RING_SIZE / 2}
@@ -72,44 +95,46 @@ export function VaultCard({
               cy={RING_SIZE / 2}
               r={RADIUS}
               fill="none"
-              stroke={bal < 0 ? "var(--color-red)" : "var(--color-emerald)"}
+              stroke={overdrawn ? "var(--color-red)" : "var(--color-emerald)"}
               strokeWidth={STROKE}
               strokeLinecap="round"
               strokeDasharray={CIRCUMFERENCE}
               strokeDashoffset={offset}
-              style={{
-                transition: "stroke-dashoffset 0.7s cubic-bezier(0.22,1,0.36,1)",
-              }}
+              className="[transition:stroke-dashoffset_0.7s_cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
             />
           </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
-            <span className="text-[11px] text-muted">Balance</span>
-            <AnimatedNumber
-              value={bal}
-              format={(n) => formatMoney(n, ledger.currency)}
-              className={`text-2xl font-semibold tabular-nums ${bal < 0 ? "text-red" : ""}`}
-            />
-            <span className="mt-0.5 text-[11px] text-muted">
-              {bal < 0 ? "You're in the red" : `${Math.round(pct)}% ${ringLabel}`}
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <span className="label-caps text-[8px] text-muted">Spent</span>
+            <span className="font-data text-sm font-semibold leading-tight">
+              {Math.round(pct)}%
             </span>
           </div>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="mt-5 grid grid-cols-2 gap-2 text-center">
-        <Stat label="Income" value={income} accent="emerald" currency={ledger.currency} />
-        <Stat label="Expenses" value={expenses} accent="amber" currency={ledger.currency} />
+      {/* Inflow / outflow tiles */}
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <Stat
+          label="Income"
+          value={income}
+          currency={ledger.currency}
+          icon={<ArrowDownLeftIcon className="h-3.5 w-3.5" />}
+          accent
+        />
+        <Stat
+          label="Expenses"
+          value={expenses}
+          currency={ledger.currency}
+          icon={<ArrowUpRightIcon className="h-3.5 w-3.5" />}
+        />
       </div>
 
-      {/* Footer */}
-      <p className="mt-4 text-center text-[11px] text-muted">
-        {hydrating
-          ? "Restoring from 0G Storage…"
-          : ledger.transactions.length === 0
-            ? "Tell Stash about your money below to get started."
-            : formatSyncedAt(ledger.lastSyncedAt)}
-      </p>
+      {/* Empty-first nudge — only before any money is logged. */}
+      {!hydrating && ledger.transactions.length === 0 && (
+        <p className="mt-4 text-center text-[11px] text-muted">
+          Tell Stash about your money below to get started.
+        </p>
+      )}
     </section>
   );
 }
@@ -117,28 +142,31 @@ export function VaultCard({
 function Stat({
   label,
   value,
-  accent,
   currency,
+  icon,
+  accent = false,
 }: {
   label: string;
   value: number;
-  accent?: "emerald" | "amber";
   currency: Ledger["currency"];
+  icon: ReactNode;
+  /** Income tile gets the blue accent; expenses stay neutral (amber/red are
+   *  reserved strictly for warnings). */
+  accent?: boolean;
 }) {
-  const color =
-    accent === "emerald"
-      ? "text-emerald"
-      : accent === "amber"
-        ? "text-amber"
-        : "text-ink";
   return (
-    <div className="rounded-xl border border-line bg-bg/40 px-2 py-3">
+    <div className="rounded-xl border border-line bg-bg/40 p-3">
+      <div className="flex items-center gap-1.5 text-muted">
+        <span className={accent ? "text-emerald" : ""}>{icon}</span>
+        <span className="label-caps text-[10px]">{label}</span>
+      </div>
       <AnimatedNumber
         value={value}
         format={(n) => formatMoney(n, currency)}
-        className={`block text-sm font-semibold tabular-nums ${color}`}
+        className={`font-data mt-1.5 block text-lg font-semibold ${
+          accent ? "text-emerald" : "text-ink"
+        }`}
       />
-      <span className="mt-1 block text-[11px] text-muted">{label}</span>
     </div>
   );
 }

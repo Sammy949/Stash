@@ -22,8 +22,12 @@
   --color-red: #ef4444;
   --color-slate: #1e293b;
 
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system,
+  /* Geist for everything; Geist Mono is reserved for money/data figures and
+     system-status caps labels. */
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", "Cascadia Code",
+    Menlo, Consolas, monospace;
 }
 
 @layer base {
@@ -31,16 +35,41 @@
     color-scheme: dark;
   }
 
+  /* Visible keyboard-focus ring on every interactive element — touch/mouse
+     users never see it (focus-visible), keyboard users always do. One rule
+     keeps it consistent across the custom-styled buttons, chips, and links. */
+  :focus-visible {
+    outline: 2px solid var(--color-emerald);
+    outline-offset: 2px;
+  }
+
   body {
     margin: 0;
-    min-height: 100vh;
+    min-height: 100dvh;
+    /* Never scroll the document sideways — surfaces clamp their own width, but
+       this is the backstop against any stray wide child. */
+    overflow-x: hidden;
+    /* Landscape notch/rounded-corner inset — keeps full-bleed chrome (header,
+       command bar, strip) out from under the camera housing on its side. */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
     background-color: var(--color-bg);
     color: var(--color-ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    font-feature-settings: "cv11", "ss01";
-    font-variation-settings: "opsz" 32;
+  }
+
+  /* iOS Safari force-zooms the page whenever a focused field is < 16px. Pin
+     every text control to 16px on phones so tapping the chat box (or any
+     onboarding input) never triggers a lurching zoom. Larger viewports keep
+     the design's smaller type via the utility classes. */
+  @media (max-width: 640px) {
+    input,
+    textarea,
+    select {
+      font-size: 16px;
+    }
   }
 
   /* Thin, unobtrusive scrollbars to match the premium dark UI */
@@ -62,6 +91,23 @@
    Micro-animations (smooth, not flashy)
 ─────────────────────────────────────────────── */
 @layer utilities {
+  /* Monetary & data figures — Geist Mono with tabular-nums so columns of
+     numbers align perfectly. The spec's `data-mono` style. Apply to every
+     balance, amount, count, and countdown. */
+  .font-data {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+
+  /* System-status caps label — Geist Mono, uppercase, tracked out. The
+     "INCOME / EXPENSES / VAULT BALANCE" micro-labels. */
+  .label-caps {
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
   /* Blue accent pulse used on 0G sync confirmations */
   @keyframes stash-pulse {
     0% {
@@ -93,6 +139,22 @@
     animation: stash-slide-up 0.25s ease-out;
   }
 
+  /* Dashboard entrance — slower + more travel than slide-up, so it's felt.
+     `both` fill applies the start frame during any delay. */
+  @keyframes stash-enter {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-enter {
+    animation: stash-enter 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
   /* Typing-dots */
   @keyframes stash-blink {
     0%,
@@ -119,5 +181,103 @@
   }
   .animate-flash {
     animation: stash-flash 0.6s ease-out;
+  }
+
+  /* ── Onboarding "Stash Core" scene motion ───────────────────── */
+  @keyframes stash-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  /* Radar sweep / fast orbit */
+  .animate-spin-slow {
+    animation: stash-spin 9s linear infinite;
+  }
+  /* Slow orbit ring */
+  .animate-spin-slower {
+    animation: stash-spin 24s linear infinite;
+  }
+  .animate-spin-rev {
+    animation: stash-spin 18s linear infinite reverse;
+  }
+
+  /* Bars rising into place */
+  @keyframes stash-rise {
+    0% {
+      transform: scaleY(0.16);
+      opacity: 0.4;
+    }
+    100% {
+      transform: scaleY(1);
+      opacity: 1;
+    }
+  }
+  .animate-rise {
+    transform-origin: bottom;
+    animation: stash-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Gentle floating card */
+  @keyframes stash-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+  .animate-float {
+    animation: stash-float 5s ease-in-out infinite;
+  }
+
+  /* Backdrop fade for overlays/sheets. */
+  @keyframes stash-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  .animate-fade {
+    animation: stash-fade 0.2s ease-out;
+  }
+
+  /* "Just updated" section emphasis — a one-shot accent ring that fades. */
+  @keyframes stash-highlight {
+    0% {
+      box-shadow: 0 0 0 0 rgb(59 130 246 / 0);
+    }
+    12% {
+      box-shadow: 0 0 0 2px rgb(59 130 246 / 0.55);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgb(59 130 246 / 0);
+    }
+  }
+  .animate-highlight {
+    animation: stash-highlight 2.2s ease-out;
+  }
+
+  /* Respect reduced-motion: hold everything still. Covers the bespoke
+     keyframes above AND Tailwind's built-in animate-pulse used for status
+     dots, so a reduced-motion user gets no looping/entrance motion anywhere. */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-spin-slow,
+    .animate-spin-slower,
+    .animate-spin-rev,
+    .animate-float,
+    .animate-rise,
+    .animate-blink,
+    .animate-highlight,
+    .animate-enter,
+    .animate-slide-up,
+    .animate-fade,
+    .animate-flash,
+    .animate-stash-pulse,
+    .animate-pulse {
+      animation: none;
+    }
   }
 }
