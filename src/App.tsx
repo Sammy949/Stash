@@ -164,6 +164,7 @@ export default function App() {
             <AgentPanel
               messages={messages}
               onEditMessage={handleEditMessage}
+              onSend={handleSend}
               isThinking={isThinking}
             />
           </div>
