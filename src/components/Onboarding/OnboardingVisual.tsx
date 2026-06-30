@@ -145,36 +145,87 @@ function IdentityScene() {
   );
 }
 
-const ORBIT_CODES: Currency[] = ["USD", "EUR", "GBP", "NGN", "KES", "ZAR"];
+const ORBIT_OUTER: Currency[] = ["USD", "EUR", "GBP", "NGN", "KES", "ZAR"];
+const ORBIT_INNER: Currency[] = ["GHS", "RWF"];
 
-/** Step 2 — the chosen currency at the centre, others orbiting it. */
+/** One orbiting currency "coin". */
+function Coin({
+  code,
+  index,
+  count,
+  radius,
+  small = false,
+}: {
+  code: Currency;
+  index: number;
+  count: number;
+  radius: number;
+  small?: boolean;
+}) {
+  const angle = (index / count) * 2 * Math.PI - Math.PI / 2;
+  const left = 50 + radius * Math.cos(angle);
+  const top = 50 + radius * Math.sin(angle);
+  return (
+    <span
+      className={`font-data absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-line bg-card text-muted ${
+        small ? "h-7 w-7 text-[11px]" : "h-9 w-9 text-sm"
+      }`}
+      style={{ left: `${left}%`, top: `${top}%` }}
+    >
+      {currencySymbol(code)}
+    </span>
+  );
+}
+
+/** Step 2 — the chosen currency glows at the centre; other currencies orbit
+ *  on two counter-rotating rings of coins. */
 function CurrencyScene({ currency }: { currency: Currency }) {
-  const others = ORBIT_CODES.filter((c) => c !== currency).slice(0, 5);
+  const outer = ORBIT_OUTER.filter((c) => c !== currency).slice(0, 5);
+  const inner = ORBIT_INNER.filter((c) => c !== currency);
   return (
     <div className="relative flex h-60 w-60 animate-slide-up items-center justify-center">
-      <div className="absolute inset-3 rounded-full border border-line/70" />
-      <div className="absolute inset-16 rounded-full border border-line/40" />
+      {/* soft accent glow */}
+      <div className="absolute h-28 w-28 animate-pulse rounded-full bg-emerald/20 blur-2xl" />
 
-      {/* rotating orbit carrying the other currency symbols */}
+      {/* guide rings */}
+      <div className="absolute inset-2 rounded-full border border-line/60" />
+      <div className="absolute inset-[3.75rem] rounded-full border border-line/40" />
+
+      {/* rotating dashed accent ring */}
+      <svg viewBox="0 0 200 200" className="absolute inset-0 animate-spin-slower">
+        <circle
+          cx="100"
+          cy="100"
+          r="92"
+          strokeWidth="1"
+          strokeDasharray="3 9"
+          className="fill-none stroke-emerald/30"
+        />
+      </svg>
+
+      {/* outer orbit (slow) */}
       <div className="absolute inset-0 animate-spin-slower">
-        {others.map((code, i) => {
-          const angle = (i / others.length) * 2 * Math.PI - Math.PI / 2;
-          const left = 50 + 44 * Math.cos(angle);
-          const top = 50 + 44 * Math.sin(angle);
-          return (
-            <span
-              key={code}
-              className="font-data absolute -translate-x-1/2 -translate-y-1/2 text-sm text-muted"
-              style={{ left: `${left}%`, top: `${top}%` }}
-            >
-              {currencySymbol(code)}
-            </span>
-          );
-        })}
+        {outer.map((code, i) => (
+          <Coin key={code} code={code} index={i} count={outer.length} radius={44} />
+        ))}
       </div>
 
-      {/* chosen currency */}
-      <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-emerald/40 bg-emerald/10">
+      {/* inner orbit (counter-rotating, faster) */}
+      <div className="absolute inset-0 animate-spin-rev">
+        {inner.map((code, i) => (
+          <Coin
+            key={code}
+            code={code}
+            index={i}
+            count={Math.max(inner.length, 1)}
+            radius={27}
+            small
+          />
+        ))}
+      </div>
+
+      {/* chosen currency — glowing centre coin */}
+      <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-emerald/50 bg-emerald/15 shadow-[0_0_30px_-4px_rgba(59,130,246,0.55)]">
         <span className="font-data text-3xl font-semibold text-emerald">
           {currencySymbol(currency)}
         </span>
