@@ -21,13 +21,27 @@ export function Onboarding({
   onComplete: (profile: OnboardingProfile) => void;
 }) {
   const [step, setStep] = useState(0);
+  // Furthest step the user has reached — they can jump back to any of these
+  // (entries are preserved in state), but not skip ahead past unvisited steps.
+  const [maxStep, setMaxStep] = useState(0);
   const [name, setName] = useState("");
   const [currency, setCurrency] = useState<Currency>("NGN");
   const [openingText, setOpeningText] = useState("");
 
   const total = 4;
 
+  /** Advance forward (from a validated Continue), unlocking the new step. */
+  function go(n: number) {
+    setStep(n);
+    setMaxStep((m) => Math.max(m, n));
+  }
+
   function finish() {
+    // Back-nav could leave the name blank — don't submit an empty owner.
+    if (!name.trim()) {
+      setStep(1);
+      return;
+    }
     const opening = Math.max(
       0,
       Math.round(parseFloat(openingText.replace(/[^\d.]/g, "")) || 0),
@@ -53,16 +67,34 @@ export function Onboarding({
               </span>
             </div>
 
-            {/* Progress segments */}
+            {/* Progress segments — click a reached one to jump back and edit. */}
             <div className="mb-8 flex gap-1.5">
-              {Array.from({ length: total }).map((_, i) => (
-                <span
-                  key={i}
-                  className={`h-1 flex-1 rounded-full transition-colors ${
-                    i <= step ? "bg-emerald" : "bg-line"
-                  }`}
-                />
-              ))}
+              {Array.from({ length: total }).map((_, i) => {
+                const reached = i <= maxStep;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    disabled={!reached}
+                    onClick={() => reached && setStep(i)}
+                    aria-label={`Go to step ${i + 1}`}
+                    aria-current={i === step ? "step" : undefined}
+                    className={`group -my-2 flex-1 py-2 ${
+                      reached ? "cursor-pointer" : "cursor-not-allowed"
+                    }`}
+                  >
+                    <span
+                      className={`block h-1 rounded-full transition-colors ${
+                        i <= step
+                          ? "bg-emerald"
+                          : reached
+                            ? "bg-line group-hover:bg-emerald/50"
+                            : "bg-line"
+                      }`}
+                    />
+                  </button>
+                );
+              })}
             </div>
 
             {step === 0 && (
@@ -78,7 +110,7 @@ export function Onboarding({
                   Your financial memory is encrypted and stored on 0G&apos;s
                   decentralized network — only you can read it.
                 </p>
-                <Primary onClick={() => setStep(1)}>Get started</Primary>
+                <Primary onClick={() => go(1)}>Get started</Primary>
               </div>
             )}
 
@@ -87,7 +119,7 @@ export function Onboarding({
                 className="animate-slide-up"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (name.trim()) setStep(2);
+                  if (name.trim()) go(2);
                 }}
               >
                 <h1 className="text-2xl font-semibold tracking-tight">
@@ -140,7 +172,7 @@ export function Onboarding({
                     </button>
                   ))}
                 </div>
-                <Primary onClick={() => setStep(3)}>Continue</Primary>
+                <Primary onClick={() => go(3)}>Continue</Primary>
               </div>
             )}
 
