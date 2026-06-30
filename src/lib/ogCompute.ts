@@ -49,6 +49,18 @@ const API_KEY =
   import.meta.env.VITE_AI_API_KEY || import.meta.env.VITE_OG_COMPUTE_API_KEY;
 export const STASH_MODEL = import.meta.env.VITE_AI_MODEL || ROUTER_MODEL;
 
+/**
+ * Optional SAME-PROVIDER fallback model. Groq rate-limits PER MODEL, so when
+ * the primary (e.g. gpt-oss-120b, 8k TPM) is exhausted even after backoff,
+ * retrying the identical request on a different model (e.g.
+ * llama-3.3-70b-versatile, a separate 12k-TPM bucket) gets a fresh budget —
+ * same key, same endpoint, no new credentials. Empty = no fallback (we throw
+ * the calm limit message as before). Leave unset on the 0G Router, whose model
+ * catalog differs. The fallback model must be tool-call capable (the agent loop
+ * depends on it) — llama-3.3-70b-versatile, Stash's original demo model, is.
+ */
+export const FALLBACK_MODEL = import.meta.env.VITE_AI_FALLBACK_MODEL || "";
+
 /** Whether the active provider is the 0G Router (vs a fallback). */
 export const usingRouter = BASE_URL === ROUTER_URL;
 
@@ -220,6 +232,27 @@ Memory — remembering who ${name} is (this is what makes you THEIR companion, n
 Money is in ${cur.name} (${cur.symbol}). Keep replies concise — a few short sentences unless they ask for depth.`;
 }
 
+/**
+ * Compact system prompt for the FINALIZE call only — the narration step after a
+ * tool already mutated the ledger. That step writes one grounded sentence and
+ * sends NO tools, so it doesn't need the full ~1,800-token behavioural spec
+ * (tool routing, obligation/goal rules, etc.). Resending all of that on every
+ * money event is the single biggest avoidable token cost per turn against
+ * Groq's TPM cap. This keeps just what narration needs — voice, the fresh
+ * snapshot, and the numbers-discipline rule — so the "wise friend" tone and the
+ * code-owns-the-math invariant both survive at a fraction of the tokens.
+ */
+function buildFinalizePrompt(ledger: Ledger): string {
+  const name = ledger.owner?.trim() || "there";
+  const cur = CURRENCIES[ledger.currency];
+  return `You are Stash AI — ${name}'s financially wise friend. Warm but straight, specific to their real numbers, never generic filler ("okay", "got it", "done").
+
+${name}'s current snapshot (the ONLY truth about what exists):
+${renderLedgerSnapshot(ledger)}
+
+You just applied an action for ${name}. You'll be handed the exact FACTS (new balance, goal progress). Use those numbers and the snapshot VERBATIM — never calculate, recompute, or invent any figure (balance, runway, %, projection). React like a friend in a few short sentences; when useful, ask ONE sharp question. Output NO tool or function syntax. Money is in ${cur.name} (${cur.symbol}).`;
+}
+
 /** ───────────────── inference ───────────────── */
 
 /** Loose message shape — covers system/user/assistant + tool messages. */
@@ -232,49 +265,138 @@ interface RouterMessage {
   tool_call_id?: string;
 }
 
-/** Map the UI transcript to Router messages (drop pending placeholders). */
+/**
+ * How many recent chat turns to send to the model. The system prompt already
+ * carries ALL durable state — the full ledger snapshot, memories, and goals —
+ * so older chat turns hold no money facts and can be dropped safely. Windowing
+ * keeps each request from ballooning as a session grows, which is what tips a
+ * rapid demo over Groq's per-minute token cap.
+ */
+const HISTORY_WINDOW = 8;
+
+/**
+ * Map the UI transcript to Router messages (drop pending placeholders), keeping
+ * only the last HISTORY_WINDOW turns. See HISTORY_WINDOW for why trimming is
+ * safe here: durable state lives in the system prompt, not the transcript.
+ */
 function toRouterMessages(history: ChatMessage[]): RouterMessage[] {
   return history
     .filter((m) => !m.pending && (m.role === "user" || m.role === "assistant"))
+    .slice(-HISTORY_WINDOW)
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 }
 
-/** One OpenAI-compatible chat completion; returns the raw `message` object. */
+/** ───────────────── rate-limit backoff ─────────────────
+ *
+ * Groq's free tier caps tokens-per-minute hard, and a rapid demo blows through
+ * it fast. A 429 there is usually TRANSIENT — the minute window resets in a few
+ * seconds and the provider tells us when via Retry-After. So instead of dumping
+ * the user on the first 429 (as this path used to), we wait that hint out and
+ * retry. Only when waiting genuinely can't help (no retries left, or the hint is
+ * a long daily-reset beyond our cap) do we surface the calm limit message.
+ * Mirrors the storage-side backoff in ogStorage.ts (PROXY_BACKOFF_MS). */
+const RATE_LIMIT_MAX_RETRIES = 2;
+/** Per-wait ceiling. A hint longer than this is a daily-style reset where
+ *  waiting is pointless in a live session — bail to the calm message instead. */
+const RATE_LIMIT_MAX_WAIT_MS = 12_000;
+/** Fallback backoff when the provider sends no Retry-After hint: 2s → 4s. */
+const RATE_LIMIT_BASE_WAIT_MS = 2_000;
+
+/**
+ * Sleep that rejects with an AbortError the instant `signal` aborts, so a user
+ * Stop cancels a backoff wait rather than leaving the turn hanging for seconds.
+ * The AbortError propagates exactly like the fetch one, settling as "Stopped.".
+ */
+function abortableSleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+/**
+ * How long to wait before retrying a 429, in ms, or null if no hint is given.
+ * Prefers the standard Retry-After header (seconds); falls back to parsing
+ * Groq's human "try again in 2.5s" out of the body message.
+ */
+function parseRetryWaitMs(res: Response, detail: unknown): number | null {
+  const header = res.headers.get("retry-after");
+  if (header) {
+    const secs = Number(header);
+    if (Number.isFinite(secs)) return Math.max(0, secs) * 1000;
+  }
+  const msg =
+    (detail as { error?: { message?: string } } | null)?.error?.message ?? "";
+  const m = msg.match(/in\s+([\d.]+)\s*(ms|s)\b/i);
+  if (m) {
+    const n = Number(m[1]);
+    if (Number.isFinite(n)) return m[2].toLowerCase() === "ms" ? n : n * 1000;
+  }
+  return null;
+}
+
+/**
+ * One OpenAI-compatible chat completion; returns the raw `message` object.
+ * Retries transient 429s with a Retry-After-aware backoff (see above).
+ * `maxTokens` caps the output reservation — kept small (replies are a few short
+ * sentences) because the provider charges the reservation against the TPM cap.
+ */
 async function chatCompletion(
   messages: RouterMessage[],
   tools?: unknown,
   toolChoice: "auto" | "required" | "none" = "auto",
   signal?: AbortSignal,
+  maxTokens = 320,
 ): Promise<{ content: string | null; tool_calls?: ToolCall[] }> {
-  let res: Response;
-  try {
-    res = await fetch(`${BASE_URL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: STASH_MODEL,
-        messages,
-        temperature: 0.5,
-        max_tokens: 700,
-        ...(tools ? { tools, tool_choice: toolChoice } : {}),
-      }),
-      signal,
-    });
-  } catch (e) {
-    // A user-initiated stop surfaces as an AbortError — let it propagate
-    // untouched so the caller can settle the turn as "Stopped." rather than
-    // showing a network-failure message.
-    if (e instanceof DOMException && e.name === "AbortError") throw e;
-    throw new StashComputeError(
-      "Couldn't reach the AI provider. Check your connection and try again.",
-      { cause: e },
-    );
-  }
+  // The model can change mid-loop: once the primary's rate-limit budget is
+  // spent, we switch to FALLBACK_MODEL (a separate bucket) and keep going.
+  let model = STASH_MODEL;
+  let usedFallback = false;
+  for (let attempt = 0; ; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(`${BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.5,
+          max_tokens: maxTokens,
+          ...(tools ? { tools, tool_choice: toolChoice } : {}),
+        }),
+        signal,
+      });
+    } catch (e) {
+      // A user-initiated stop surfaces as an AbortError — let it propagate
+      // untouched so the caller can settle the turn as "Stopped." rather than
+      // showing a network-failure message.
+      if (e instanceof DOMException && e.name === "AbortError") throw e;
+      throw new StashComputeError(
+        "Couldn't reach the AI provider. Check your connection and try again.",
+        { cause: e },
+      );
+    }
 
-  if (!res.ok) {
+    if (res.ok) {
+      const data = await res.json();
+      return data?.choices?.[0]?.message ?? { content: null };
+    }
+
     const detail = await res.json().catch(() => null);
     const code = detail?.error?.code;
     if (usingRouter && (res.status === 402 || code === "insufficient_balance")) {
@@ -282,9 +404,27 @@ async function chatCompletion(
         "Stash's 0G Compute balance is empty. Top it up at pc.0g.ai to keep chatting.",
       );
     }
-    // Rate / daily-token limit — surface something calm and on-brand instead of
-    // the provider's raw billing error (org id, upgrade URL, etc.).
+    // Rate / token limit. Usually a transient per-minute reset — wait the
+    // provider's hint out and retry rather than dumping the user. Only give up
+    // (with a calm, on-brand message, never the raw billing error) when we're
+    // out of retries or the hint is a long daily-style reset past our cap.
     if (res.status === 429 || code === "rate_limit_exceeded") {
+      const wait =
+        parseRetryWaitMs(res, detail) ?? RATE_LIMIT_BASE_WAIT_MS * (attempt + 1);
+      if (attempt < RATE_LIMIT_MAX_RETRIES && wait <= RATE_LIMIT_MAX_WAIT_MS) {
+        await abortableSleep(wait, signal); // AbortError → settles as "Stopped."
+        continue;
+      }
+      // Backoff exhausted on this model. Before giving up, fail over to the
+      // fallback model ONCE — it has its own rate-limit bucket, so the same
+      // request often succeeds there. Reset the attempt budget (-1 → 0 after the
+      // loop's ++) so the fallback gets its own backoff allowance.
+      if (FALLBACK_MODEL && !usedFallback && model !== FALLBACK_MODEL) {
+        usedFallback = true;
+        model = FALLBACK_MODEL;
+        attempt = -1;
+        continue;
+      }
       throw new StashComputeError(
         "I've hit my AI usage limit for the moment. Give me a few minutes and try again — your data's safe and saved.",
       );
@@ -299,9 +439,6 @@ async function chatCompletion(
       "I hit a snag reaching 0G Compute. Give it another go in a moment — your data's safe and saved.",
     );
   }
-
-  const data = await res.json();
-  return data?.choices?.[0]?.message ?? { content: null };
 }
 
 interface ToolCall {
@@ -538,7 +675,7 @@ async function runAgentTurnInner(
     // called a tool"), and the whole turn dies — taking the already-applied
     // mutation down with it. Sending NO tools makes that validation impossible
     // to fire; we hand the model the results as a plain note instead.
-    messages[0] = { role: "system", content: buildSystemPrompt(working) };
+    messages[0] = { role: "system", content: buildFinalizePrompt(working) };
     messages.push({
       role: "user",
       content:
@@ -577,7 +714,7 @@ async function runAgentTurnInner(
       working = result.ledger;
       if (result.relatedGoalIds) goalIds.push(...result.relatedGoalIds);
     }
-    messages[0] = { role: "system", content: buildSystemPrompt(working) };
+    messages[0] = { role: "system", content: buildFinalizePrompt(working) };
     messages.push({
       role: "user",
       content:
