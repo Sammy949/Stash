@@ -8,7 +8,7 @@ import { formatMoney } from "@/lib/currency";
  */
 export function SpendingCard({ data }: { data: SpendingBreakdown }) {
   return (
-    <div className="w-64 rounded-xl border border-line bg-card/80 p-3.5">
+    <div className="w-full max-w-[18rem] rounded-2xl border border-line bg-card/80 p-3.5">
       <div className="flex items-baseline justify-between gap-2">
         <span className="label-caps text-[10px] text-muted">
           Spending · last {data.windowDays} days

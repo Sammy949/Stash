@@ -11,12 +11,16 @@ export function CommandBar({
   onSend,
   onStop,
   isThinking,
+  active = false,
   onOpenPanel,
   canOpenPanel = false,
 }: {
   onSend: (text: string) => void;
   onStop?: () => void;
   isThinking: boolean;
+  /** True while the agent panel is open. Gates input autofocus so the keyboard
+   *  never pops over the dashboard on cold load. */
+  active?: boolean;
   /** Reopen the agent panel to review the conversation — no message sent. */
   onOpenPanel?: () => void;
   /** Only offer the reopen affordance when the panel is closed and there's
@@ -24,7 +28,7 @@ export function CommandBar({
   canOpenPanel?: boolean;
 }) {
   return (
-    <div className="px-4 pb-5 pt-3">
+    <div className="px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
       <div className="mx-auto w-full max-w-2xl">
         {/* Chips float above the pill; the pill (InputBar) carries its own
             border + shadow so it reads as a floating command line. */}
@@ -34,7 +38,7 @@ export function CommandBar({
         {/* Quiet ghost affordance + the input pill. The chat button reopens the
             transcript without triggering a turn; it sits out of the way until
             there's a conversation to return to. */}
-        <div className="flex items-end gap-1.5">
+        <div className="flex items-center gap-1.5">
           {canOpenPanel && onOpenPanel && (
             <button
               type="button"
@@ -47,12 +51,14 @@ export function CommandBar({
             </button>
           )}
           <div className="min-w-0 flex-1">
-            <InputBar onSend={onSend} onStop={onStop} disabled={isThinking} />
+            <InputBar
+              onSend={onSend}
+              onStop={onStop}
+              disabled={isThinking}
+              autoFocus={active}
+            />
           </div>
         </div>
-        <p className="label-caps mt-2 text-center text-[10px] text-muted">
-          Powered by 0G Compute
-        </p>
       </div>
     </div>
   );

@@ -142,13 +142,13 @@ export function MessageBubble({
               type="button"
               aria-label="Edit message"
               onClick={startEdit}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-bg hover:text-ink"
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-muted transition-colors hover:bg-bg hover:text-ink"
             >
               <PencilIcon className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
-        <p className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-slate px-3.5 py-2.5 text-sm leading-relaxed text-ink">
+        <p className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-slate px-3.5 py-2.5 text-sm leading-relaxed text-ink">
           {message.content}
         </p>
       </div>
@@ -167,7 +167,7 @@ export function MessageBubble({
         ) : (
           <>
             {message.content && (
-              <div className="rounded-2xl rounded-tl-sm border border-line bg-bg/60 px-3.5 py-2.5 text-sm leading-relaxed text-ink">
+              <div className="break-words rounded-2xl rounded-tl-sm border border-line bg-bg/60 px-3.5 py-2.5 text-sm leading-relaxed text-ink">
                 <Markdown>{message.content}</Markdown>
               </div>
             )}

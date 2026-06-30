@@ -18,7 +18,7 @@ const components: Components = {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="text-emerald underline underline-offset-2 hover:opacity-80"
+      className="break-words text-emerald underline underline-offset-2 hover:opacity-80"
     >
       {children}
     </a>
@@ -50,7 +50,7 @@ const components: Components = {
     </h3>
   ),
   code: ({ children }) => (
-    <code className="font-data rounded bg-bg px-1 py-0.5 text-[0.85em]">
+    <code className="font-data break-all rounded bg-bg px-1 py-0.5 text-[0.85em]">
       {children}
     </code>
   ),
@@ -66,7 +66,9 @@ const components: Components = {
   ),
   hr: () => <hr className="my-3 border-line" />,
   table: ({ children }) => (
-    <table className="my-2 w-full border-collapse text-xs">{children}</table>
+    <div className="my-2 max-w-full overflow-x-auto">
+      <table className="w-full border-collapse text-xs">{children}</table>
+    </div>
   ),
   th: ({ children }) => (
     <th className="border border-line px-2 py-1 text-left font-semibold">

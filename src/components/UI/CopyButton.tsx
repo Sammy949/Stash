@@ -26,7 +26,7 @@ export function CopyButton({
       type="button"
       onClick={copy}
       aria-label={copied ? "Copied" : "Copy"}
-      className={`flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-bg hover:text-ink ${className}`}
+      className={`flex h-11 w-11 items-center justify-center rounded-lg text-muted transition-colors hover:bg-bg hover:text-ink ${className}`}
     >
       {copied ? (
         <CheckIcon className="h-3.5 w-3.5 text-emerald" />

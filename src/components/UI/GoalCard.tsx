@@ -41,7 +41,7 @@ export function GoalCard({ goal, currency }: { goal: Goal; currency: Currency })
   const deadline = deadlineLabel(goal);
 
   return (
-    <div className="w-72 rounded-xl border border-line border-l-2 border-l-emerald bg-card/80 p-3.5">
+    <div className="w-full max-w-[18rem] rounded-2xl border border-line border-l-2 border-l-emerald bg-card/80 p-3.5">
       {/* Name + percentage */}
       <div className="flex items-baseline justify-between gap-2">
         <span className="flex items-center gap-1.5 text-sm font-medium text-ink">

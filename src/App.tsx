@@ -238,19 +238,23 @@ export default function App() {
           : [];
 
   return (
-    <div className="h-screen bg-bg text-ink">
+    <div className="h-dvh bg-bg text-ink">
       {/* Centered platform column — doesn't stretch on wide screens. */}
       <div className="mx-auto flex h-full max-w-2xl flex-col">
-        {/* Top bar */}
-        <header className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-3">
-          <img src="/vault.svg" alt="" className="h-7 w-7" />
-          <div>
-            <h1 className="text-sm font-semibold leading-none">Stash</h1>
-            <p className="mt-1 text-[11px] text-muted">
-              Know where you stand. See what&apos;s coming. Stay ahead.
-            </p>
-          </div>
-        </header>
+        {/* Top bar — only on the dashboard. In chat mode the balance strip +
+            "Stash AI" header are the chrome (matches the Stitch reference), so
+            we drop this third bar to give the transcript back its height. */}
+        {!agentActive && (
+          <header className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+            <img src="/vault.svg" alt="" className="h-7 w-7" />
+            <div>
+              <h1 className="text-sm font-semibold leading-none">Stash</h1>
+              <p className="mt-1 text-[11px] text-muted">
+                Know where you stand. See what&apos;s coming. Stay ahead.
+              </p>
+            </div>
+          </header>
+        )}
 
         {/* Content — Split-Shift */}
         {agentActive ? (
@@ -259,7 +263,6 @@ export default function App() {
             <AgentPanel
               messages={messages}
               onEditMessage={handleEditMessage}
-              onSend={handleSend}
               isThinking={isThinking}
               goals={ledger.goals}
               scholarships={ledger.scholarships}
@@ -293,6 +296,7 @@ export default function App() {
             onSend={handleSend}
             onStop={stop}
             isThinking={isThinking}
+            active={agentActive}
             onOpenPanel={() => setAgentActive(true)}
             canOpenPanel={!agentActive && messages.length > 0}
           />
@@ -322,7 +326,7 @@ export default function App() {
         />
       )}
 
-      <Toaster theme="dark" position="bottom-right" richColors closeButton />
+      <Toaster theme="dark" position="top-center" richColors closeButton />
     </div>
   );
 }

@@ -50,9 +50,12 @@ export function Onboarding({
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg p-4 text-ink md:p-8">
-      {/* Floating card — split on desktop, form-only on mobile. */}
-      <div className="grid w-full max-w-4xl overflow-hidden rounded-3xl border border-line bg-card/20 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.85)] md:grid-cols-2">
+    <div className="flex min-h-dvh overflow-y-auto bg-bg p-4 py-[max(1rem,env(safe-area-inset-top))] text-ink md:p-8">
+      {/* Floating card — split on desktop, form-only on mobile. `m-auto` centers
+          when there's room but lets the card scroll into view (top and bottom)
+          when a small screen + open keyboard make it taller than the viewport,
+          so the primary CTA is never trapped behind the keyboard. */}
+      <div className="m-auto grid w-full max-w-4xl overflow-hidden rounded-3xl border border-line bg-card/20 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.85)] md:grid-cols-2">
         {/* ── Form side ─────────────────────────────────────────── */}
         <div className="flex flex-col justify-center p-6 sm:p-10">
           <div className="mx-auto w-full max-w-sm">
@@ -138,6 +141,7 @@ export function Onboarding({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your name"
+                  aria-label="Your name"
                   className="mt-5 w-full rounded-xl border border-line bg-card px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-muted focus:border-emerald/50"
                 />
                 <Primary type="submit" disabled={!name.trim()}>
@@ -205,6 +209,7 @@ export function Onboarding({
                     value={openingText}
                     onChange={(e) => setOpeningText(e.target.value)}
                     placeholder="0"
+                    aria-label={`Opening balance in ${currency}`}
                     className="font-data w-full bg-transparent py-2.5 text-sm outline-none placeholder:text-muted"
                   />
                 </div>

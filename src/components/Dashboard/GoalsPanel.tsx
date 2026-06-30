@@ -47,7 +47,7 @@ export function GoalsPanel({
 
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-bg/60">
                 <div
-                  className="h-full rounded-full bg-emerald transition-[width] duration-500"
+                  className="h-full rounded-full bg-emerald transition-[width] duration-500 motion-reduce:transition-none"
                   style={{ width: `${pct}%` }}
                 />
               </div>

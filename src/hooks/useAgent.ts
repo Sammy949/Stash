@@ -11,8 +11,9 @@ import {
   SCHOLARSHIP_DEADLINES_CHIP,
 } from "@/components/Agent/QuickChips";
 
-const OPENING_MESSAGE = `Hey. I'm Stash — your personal finance agent.
-I know your balance, your deadlines, and your income streams. Your financial memory is saved here and backed up to 0G. Pick up right where you left off.
+const OPENING_MESSAGE = `Welcome back.
+
+I remember your financial world, so you don't have to.
 
 What do you want to stay ahead of today?`;
 

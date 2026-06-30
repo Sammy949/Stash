@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { ChatMessage, Currency, Goal, Scholarship } from "@/types";
 import { MessageBubble } from "./MessageBubble";
-import { CHIPS, SYNC_CHIP } from "./QuickChips";
 
 /** Stash's vault glyph in its accent ring. */
 function StashGlyph({ size = 7 }: { size?: number }) {
@@ -22,7 +21,6 @@ function StashGlyph({ size = 7 }: { size?: number }) {
 export function AgentPanel({
   messages,
   onEditMessage,
-  onSend,
   isThinking,
   goals,
   scholarships,
@@ -30,7 +28,6 @@ export function AgentPanel({
 }: {
   messages: ChatMessage[];
   onEditMessage: (id: string, text: string) => void;
-  onSend: (text: string) => void;
   isThinking: boolean;
   /** Live goals — passed to bubbles to render inline goal cards. */
   goals: Goal[];
@@ -40,13 +37,28 @@ export function AgentPanel({
   currency: Currency;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Whether the user is parked at (or near) the bottom. Only then do we
+  // auto-follow new messages — so reading older history isn't yanked away
+  // when a reply lands or a proactive observation/card is appended.
+  const pinnedRef = useRef(true);
+
+  function onScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    pinnedRef.current =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  }
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    if (pinnedRef.current) {
+      endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
   }, [messages]);
 
-  // Before the first user turn, show a centered greeting + starter chips
-  // instead of a lone left-aligned bubble.
+  // Before the first user turn, show a centered greeting instead of a lone
+  // left-aligned bubble. The starter chips live on the command bar (above the
+  // input) — no need to repeat them here.
   const greeting =
     messages.length === 1 && messages[0].role === "assistant" && !messages[0].pending
       ? messages[0]
@@ -68,25 +80,17 @@ export function AgentPanel({
       </div>
 
       {/* Transcript */}
-      <div className="mx-auto w-full max-w-2xl flex-1 space-y-4 overflow-y-auto px-5 py-4">
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="mx-auto w-full max-w-2xl flex-1 space-y-4 overflow-y-auto px-5 py-4"
+      >
         {greeting ? (
           <div className="flex h-full flex-col items-center justify-center px-2 text-center">
             <StashGlyph size={12} />
             <p className="mt-4 max-w-sm whitespace-pre-wrap text-sm leading-relaxed text-muted">
               {greeting.content}
             </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-2">
-              {CHIPS.filter((c) => c !== SYNC_CHIP).map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => onSend(c)}
-                  className="rounded-full border border-line bg-bg px-3 py-1.5 text-xs text-muted transition-colors hover:border-emerald/40 hover:text-ink"
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
           </div>
         ) : (
           messages.map((m) => (

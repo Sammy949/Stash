@@ -42,7 +42,7 @@ export function ManageSheet({
         onClick={onClose}
         aria-hidden
       />
-      <div className="relative z-10 flex max-h-[80vh] w-full max-w-2xl animate-slide-up flex-col overflow-hidden rounded-t-3xl border border-line bg-card sm:rounded-3xl">
+      <div className="relative z-10 flex max-h-[85dvh] w-full max-w-2xl animate-slide-up flex-col overflow-hidden rounded-t-3xl border border-line bg-card sm:max-h-[80dvh] sm:rounded-3xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <h2 className="text-sm font-semibold">{title}</h2>
@@ -50,7 +50,7 @@ export function ManageSheet({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-bg hover:text-ink"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted transition-colors hover:bg-bg hover:text-ink"
           >
             <CloseIcon className="h-4 w-4" />
           </button>
@@ -64,7 +64,7 @@ export function ManageSheet({
         </ul>
 
         {/* Add via agent */}
-        <div className="border-t border-line p-4">
+        <div className="border-t border-line p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <button
             type="button"
             onClick={onAdd}
@@ -105,14 +105,14 @@ function ManageRow({
           <button
             type="button"
             onClick={() => setConfirming(false)}
-            className="rounded-lg px-2 py-1 text-xs text-muted transition-colors hover:text-ink"
+            className="rounded-lg px-3 py-2 text-xs text-muted transition-colors hover:text-ink"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={onRemove}
-            className="rounded-lg border border-red/40 bg-red/10 px-2 py-1 text-xs font-medium text-red transition-colors hover:bg-red/20"
+            className="rounded-lg border border-red/40 bg-red/10 px-3 py-2 text-xs font-medium text-red transition-colors hover:bg-red/20"
           >
             Remove
           </button>
@@ -122,7 +122,7 @@ function ManageRow({
           type="button"
           onClick={() => setConfirming(true)}
           aria-label={`Remove ${item.primary}`}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-bg hover:text-red"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-bg hover:text-red"
         >
           <TrashIcon className="h-3.5 w-3.5" />
         </button>

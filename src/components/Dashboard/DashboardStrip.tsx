@@ -25,7 +25,7 @@ export function DashboardStrip({
   return (
     <button
       onClick={onExpand}
-      className="flex w-full items-center gap-4 border-b border-line bg-card/60 px-5 py-3 text-left transition-colors hover:bg-card"
+      className="flex w-full items-center gap-4 border-b border-line bg-card/60 px-5 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-left transition-colors hover:bg-card"
     >
       <div className="min-w-0">
         <span className="label-caps block text-[10px] text-muted">Balance</span>

@@ -24,6 +24,16 @@ export function AnimatedNumber({
     const to = value;
     if (from === to) return;
 
+    // Reduced-motion: skip the count-up tween and snap to the final figure.
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    ) {
+      fromRef.current = to;
+      setDisplay(to);
+      return;
+    }
+
     let raf = 0;
     let start: number | null = null;
 

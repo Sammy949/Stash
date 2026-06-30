@@ -52,7 +52,7 @@ export function VaultCard({
           <AnimatedNumber
             value={bal}
             format={(n) => formatMoney(n, ledger.currency)}
-            className={`font-data mt-2 block text-[2.6rem] font-semibold leading-none ${
+            className={`font-data mt-2 block text-[clamp(1.6rem,7vw,2.6rem)] font-semibold leading-[1.1] ${
               overdrawn ? "text-red" : "text-ink"
             }`}
           />
@@ -100,9 +100,7 @@ export function VaultCard({
               strokeLinecap="round"
               strokeDasharray={CIRCUMFERENCE}
               strokeDashoffset={offset}
-              style={{
-                transition: "stroke-dashoffset 0.7s cubic-bezier(0.22,1,0.36,1)",
-              }}
+              className="[transition:stroke-dashoffset_0.7s_cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
