@@ -14,6 +14,7 @@ import type { MemoryKind } from "@/types";
 import { CURRENCIES, formatMoney } from "@/lib/currency";
 import { AGENT_TOOLS, applyAction } from "@/lib/agentTools";
 import { extractTextToolCalls, sanitizeToolCall } from "@/lib/toolCalls";
+import { extractPrimaryAmount, purchaseImpactFacts } from "@/lib/goalContext";
 
 /**
  * 0G Compute integration — the Stash AI agent.
@@ -204,7 +205,11 @@ Goals — things ${name} is saving TOWARD:
 - A goal is a savings TARGET with an amount (e.g. "save £1000 for the scholarship", "£8k for a semester abroad"). When ${name} names something they need to save up for, use add_goal (name + target_amount + target_date if given). This sets a target — it does NOT move money or change the balance.
 - Earmarking: "I set aside £200 for the phone", "put £50 toward my laptop fund" → contribute_to_goal. This bumps the goal's PROGRESS only — it is NOT spending and the balance does NOT change. Never confuse this with log_expense (that's money actually leaving). If they then actually BUY the thing, that's a separate log_expense.
 - Progress numbers (saved / target / % / remaining) are code-owned — use the FACTS line from the tool result verbatim, never compute them yourself.
-- Use goals in your judgement like a friend who remembers: "that £100 on shoes — you're £400 short on the phone goal, just so you know." A vague aspiration with no number ("I want to save more") is a remember(goal), not an add_goal; only structured targets with an amount become goals.
+- LIVING CONTEXT — connect new events to goals, naturally, in your OWN reply:
+  - When a "GOAL CONTEXT" line appears after income, work it in like a friend: acknowledge the money, then OFFER to set part aside ("nice — you're £120 from tuition, want to put some of this toward it?"). Don't move money unless they say yes.
+  - When a "PURCHASE-IMPACT FACTS" line appears (they're weighing a buy), weave the trade-off honestly. Use the week figure ONLY if that line gives you one — if it says money-terms only (no date), talk money, never invent a timeline.
+  - Use the figures from those lines VERBATIM. If no such line is present, don't fabricate goal numbers.
+- A vague aspiration with no number ("I want to save more") is a remember(goal), not an add_goal; only structured targets with an amount become goals.
 
 Memory — remembering who ${name} is (this is what makes you THEIR companion, not a calculator):
 - Beyond money, ${name} reveals lasting things about themselves: goals ("saving for a laptop"), habits ("I overspend after payday"), preferences ("I'd rather cook than eat out"), identity ("final-year student in Lagos"), or an opportunity not already tracked. When something has LONG-TERM value for future advice, call remember(kind, content).
@@ -408,13 +413,24 @@ export async function runAgentTurn(
       !looksLikeObligation(lastUser.content)
     : false;
 
-  return runAgentTurnInner(history, ledger, forceTool, signal);
+  // Living goal context at the pre-spend moment: when they're WEIGHING a
+  // purchase ("should I buy a 50k jacket?") and an open goal exists, hand the
+  // agent a code-computed impact note (weeks of goal progress, or money terms
+  // when undated) so its advice is grounded, not guessed. Nothing is logged.
+  let purchaseNote: string | null = null;
+  if (lastUser && looksLikePreSpendIntent(lastUser.content)) {
+    const amount = extractPrimaryAmount(lastUser.content);
+    purchaseNote = purchaseImpactFacts(ledger, amount, ledger.currency);
+  }
+
+  return runAgentTurnInner(history, ledger, forceTool, purchaseNote, signal);
 }
 
 async function runAgentTurnInner(
   history: ChatMessage[],
   ledger: Ledger,
   forceTool: boolean,
+  purchaseNote: string | null,
   signal?: AbortSignal,
 ): Promise<AgentTurn> {
   if (!isComputeConfigured()) {
@@ -428,6 +444,11 @@ async function runAgentTurnInner(
     { role: "system", content: buildSystemPrompt(ledger), tool_calls: undefined },
     ...toRouterMessages(history),
   ];
+  // Surface the pre-spend impact as a trailing system instruction so it's the
+  // freshest thing the model sees before it advises (code owns the numbers).
+  if (purchaseNote) {
+    messages.push({ role: "system", content: purchaseNote, tool_calls: undefined });
+  }
 
   // One model call → sanitized, validated tool calls. Retries once on a
   // provider tool-validation glitch ("tool call validation failed… not in

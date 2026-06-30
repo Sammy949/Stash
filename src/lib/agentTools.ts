@@ -22,6 +22,7 @@ import {
   updateMemoryByContent,
 } from "@/lib/ledger";
 import { formatMoney } from "@/lib/currency";
+import { incomeGoalFacts } from "@/lib/goalContext";
 
 /**
  * Agent tools — the structured actions Stash can take on the ledger.
@@ -456,6 +457,12 @@ function factSummary(
       `At their current spending pace, that's about ${ctx.runwayDays} day${ctx.runwayDays === 1 ? "" : "s"} of money left.`,
     );
   }
+  // Living goal context: when fresh income lands and an open goal exists, hand
+  // the agent the "set some aside?" facts so it can offer naturally in-reply.
+  if (type === "income") {
+    const goalFacts = incomeGoalFacts(ledger, cur);
+    if (goalFacts) facts.push(goalFacts);
+  }
   return facts.join(" ");
 }
 
@@ -575,7 +582,11 @@ export function applyAction(
     case "add_goal": {
       const goalName = String(args.name ?? "").trim();
       if (!goalName) return { ledger, summary: "No goal name given." };
-      if (!isFinite(amount) || amount <= 0)
+      // The schema field is `target_amount`; fall back to `amount` in case the
+      // model reaches for the shared name. (The top-level `amount` is derived
+      // from args.amount and is NaN for a correct target_amount-only call.)
+      const goalTarget = coerceAmount(args.target_amount ?? args.amount);
+      if (!isFinite(goalTarget) || goalTarget <= 0)
         return { ledger, summary: "Invalid goal target; nothing added." };
       if (isDuplicateGoal(ledger, goalName)) {
         return {
@@ -585,7 +596,7 @@ export function applyAction(
       }
       const next = addGoal(ledger, {
         name: goalName,
-        targetAmount: amount,
+        targetAmount: goalTarget,
         targetDate: args.target_date ? String(args.target_date) : null,
       });
       const g = getGoals(next)[getGoals(next).length - 1];
