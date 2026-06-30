@@ -139,4 +139,64 @@
   .animate-flash {
     animation: stash-flash 0.6s ease-out;
   }
+
+  /* ── Onboarding "Stash Core" scene motion ───────────────────── */
+  @keyframes stash-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  /* Radar sweep / fast orbit */
+  .animate-spin-slow {
+    animation: stash-spin 9s linear infinite;
+  }
+  /* Slow orbit ring */
+  .animate-spin-slower {
+    animation: stash-spin 24s linear infinite;
+  }
+  .animate-spin-rev {
+    animation: stash-spin 18s linear infinite reverse;
+  }
+
+  /* Bars rising into place */
+  @keyframes stash-rise {
+    0% {
+      transform: scaleY(0.16);
+      opacity: 0.4;
+    }
+    100% {
+      transform: scaleY(1);
+      opacity: 1;
+    }
+  }
+  .animate-rise {
+    transform-origin: bottom;
+    animation: stash-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Gentle floating card */
+  @keyframes stash-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+  .animate-float {
+    animation: stash-float 5s ease-in-out infinite;
+  }
+
+  /* Respect reduced-motion: hold everything still. */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-spin-slow,
+    .animate-spin-slower,
+    .animate-spin-rev,
+    .animate-float,
+    .animate-rise,
+    .animate-blink {
+      animation: none;
+    }
+  }
 }
