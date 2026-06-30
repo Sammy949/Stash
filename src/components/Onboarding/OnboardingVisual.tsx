@@ -11,9 +11,9 @@ import { LockIcon } from "@/components/UI/icons";
 
 const SCENES = [
   {
-    tag: "Secure Foundation",
-    title: "Stash is listening",
-    body: "An agent that watches your whole financial picture — income, deadlines, goals — and acts on it.",
+    tag: "Private by Design",
+    title: "Your Financial Memory",
+    body: "Stash remembers your goals, income and deadlines, then helps you make better financial decisions over time.",
   },
   {
     tag: "Identity",

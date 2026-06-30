@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Currency } from "@/types";
 import { CURRENCY_LIST, currencySymbol } from "@/lib/currency";
+import { LockIcon } from "@/components/UI/icons";
 import { OnboardingVisual } from "./OnboardingVisual";
 
 export interface OnboardingProfile {
@@ -67,32 +68,38 @@ export function Onboarding({
               </span>
             </div>
 
-            {/* Progress segments — click a reached one to jump back and edit. */}
+            {/* Progress segments — click a reached one to jump back and edit.
+                Unreached steps are inert (plain spans): not clickable, and the
+                cursor stays normal — no disabled/blocked-cursor affordance. */}
             <div className="mb-8 flex gap-1.5">
               {Array.from({ length: total }).map((_, i) => {
                 const reached = i <= maxStep;
-                return (
+                const bar = (
+                  <span
+                    className={`block h-1 rounded-full transition-colors ${
+                      i <= step
+                        ? "bg-emerald"
+                        : reached
+                          ? "bg-line group-hover:bg-emerald/50"
+                          : "bg-line"
+                    }`}
+                  />
+                );
+                return reached ? (
                   <button
                     key={i}
                     type="button"
-                    disabled={!reached}
-                    onClick={() => reached && setStep(i)}
+                    onClick={() => setStep(i)}
                     aria-label={`Go to step ${i + 1}`}
                     aria-current={i === step ? "step" : undefined}
-                    className={`group -my-2 flex-1 py-2 ${
-                      reached ? "cursor-pointer" : "cursor-not-allowed"
-                    }`}
+                    className="group -my-2 flex-1 cursor-pointer py-2"
                   >
-                    <span
-                      className={`block h-1 rounded-full transition-colors ${
-                        i <= step
-                          ? "bg-emerald"
-                          : reached
-                            ? "bg-line group-hover:bg-emerald/50"
-                            : "bg-line"
-                      }`}
-                    />
+                    {bar}
                   </button>
+                ) : (
+                  <span key={i} aria-hidden className="-my-2 flex-1 py-2">
+                    {bar}
+                  </span>
                 );
               })}
             </div>
@@ -102,14 +109,19 @@ export function Onboarding({
                 <h1 className="text-2xl font-semibold tracking-tight">
                   Welcome to Stash
                 </h1>
-                <p className="mt-3 text-sm leading-relaxed text-muted">
-                  Your money, understood. Track what comes in and goes out, stay
-                  ahead of deadlines, and ask Stash anything.
+                <p className="mt-3 text-base font-medium text-ink">
+                  Your financial memory.
                 </p>
-                <p className="mt-3 text-sm leading-relaxed text-muted">
-                  Your financial memory is encrypted and stored on 0G&apos;s
-                  decentralized network — only you can read it.
+                <p className="mt-2 text-sm leading-relaxed text-muted">
+                  Track money, remember what matters, and get guidance that grows
+                  with you.
                 </p>
+                <div className="mt-5 flex items-start gap-2 rounded-lg border border-line bg-bg/40 px-3 py-2.5 text-xs text-muted">
+                  <LockIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald" />
+                  <span>
+                    Your data is encrypted and stored on 0G. Only you can read it.
+                  </span>
+                </div>
                 <Primary onClick={() => go(1)}>Get started</Primary>
               </div>
             )}
