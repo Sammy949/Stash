@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Toaster, toast } from "sonner";
 import { Dashboard } from "@/components/Dashboard/Dashboard";
 import { DashboardStrip } from "@/components/Dashboard/DashboardStrip";
+import { WelcomeBack } from "@/components/Dashboard/WelcomeBack";
 import { AgentPanel } from "@/components/Agent/AgentPanel";
 import { CommandBar } from "@/components/Agent/CommandBar";
 import { SYNC_CHIP } from "@/components/Agent/QuickChips";
@@ -11,12 +12,15 @@ import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
 import { ensureStorageSchema, getStoredRootHash } from "@/lib/ogStorage";
 import { deriveObservation } from "@/lib/observations";
+import { deriveWelcomeBack } from "@/lib/welcomeBack";
+import type { WelcomeBack as WelcomeBackData } from "@/lib/welcomeBack";
 
 // One-time forced reset onto the new local-first schema (runs once at load,
 // before any hook reads localStorage).
 ensureStorageSchema();
 
 const ONBOARDED_KEY = "stash_onboarded";
+const LAST_VISIT_KEY = "stash_last_visit";
 
 const SYNC_CONFIRMATION =
   "Your financial data is encrypted and stored on 0G's decentralized network. Nobody else can access it. It'll be here next time you open Stash.";
@@ -38,6 +42,19 @@ export default function App() {
   // agent panel (dashboard condenses to a strip). Tap the strip to return.
   const [agentActive, setAgentActive] = useState(false);
 
+  // Welcome-back greeting — "Since you were last here…". Computed ONCE per load,
+  // after the ledger has hydrated, from the deterministic delta vs the last
+  // visit (code owns every number). Null when there's nothing worth saying.
+  const [welcome, setWelcome] = useState<WelcomeBackData | null>(null);
+  useEffect(() => {
+    if (!onboarded || hydrating) return;
+    const last = localStorage.getItem(LAST_VISIT_KEY);
+    setWelcome(deriveWelcomeBack(ledger, last));
+    localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString());
+    // Intentionally keyed on hydration settling, not on every ledger change —
+    // the greeting is a one-shot snapshot of "since last visit".
+  }, [onboarded, hydrating]);
+
   function completeOnboarding(profile: OnboardingProfile) {
     initProfile(profile);
     localStorage.setItem(ONBOARDED_KEY, "1");
@@ -50,6 +67,7 @@ export default function App() {
 
   async function handleSend(text: string) {
     setAgentActive(true);
+    setWelcome(null); // greeting gives way once the conversation starts
 
     // 1. "Sync to 0G" chip → real storage sync, no Compute needed.
     if (text === SYNC_CHIP) {
@@ -141,6 +159,11 @@ export default function App() {
           </div>
         ) : (
           <main className="flex-1 overflow-y-auto px-4 py-6">
+            {welcome && (
+              <div className="mx-auto mb-5 w-full max-w-2xl">
+                <WelcomeBack data={welcome} onDismiss={() => setWelcome(null)} />
+              </div>
+            )}
             <Dashboard
               ledger={ledger}
               syncPhase={syncPhase}
