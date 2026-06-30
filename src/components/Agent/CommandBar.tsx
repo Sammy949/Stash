@@ -18,13 +18,12 @@ export function CommandBar({
   return (
     <div className="px-4 pb-5 pt-3">
       <div className="mx-auto w-full max-w-2xl">
-        {/* Floating panel — distinct from the page via border + shadow. */}
-        <div className="rounded-2xl border border-line bg-card/90 p-3 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.75)] backdrop-blur">
+        {/* Chips float above the pill; the pill (InputBar) carries its own
+            border + shadow so it reads as a floating command line. */}
+        <div className="mb-2.5">
           <QuickChips onPick={onSend} disabled={isThinking} />
-          <div className="mt-2.5">
-            <InputBar onSend={onSend} onStop={onStop} disabled={isThinking} />
-          </div>
         </div>
+        <InputBar onSend={onSend} onStop={onStop} disabled={isThinking} />
         <p className="label-caps mt-2 text-center text-[10px] text-muted">
           Powered by 0G Compute
         </p>

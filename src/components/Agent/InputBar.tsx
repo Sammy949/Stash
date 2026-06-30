@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { SendIcon, StopIcon } from "@/components/UI/icons";
+import { SendIcon, SparkleIcon, StopIcon } from "@/components/UI/icons";
 
 export function InputBar({
   onSend,
@@ -47,7 +47,11 @@ export function InputBar({
   }
 
   return (
-    <div className="flex items-end gap-2">
+    // Floating command pill — one row: AI glyph · input · circular action.
+    <div className="flex items-end gap-1.5 rounded-3xl border border-line bg-bg px-2 py-1.5 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.7)] transition-colors focus-within:border-emerald/50">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center text-emerald">
+        <SparkleIcon className="h-4 w-4" />
+      </span>
       <textarea
         ref={taRef}
         rows={1}
@@ -59,14 +63,14 @@ export function InputBar({
         }}
         onKeyDown={onKeyDown}
         placeholder="Try: “I got paid ₦20,000” or “I spent ₦3,000 on lunch”"
-        className="max-h-40 flex-1 resize-none rounded-xl border border-line bg-bg px-3.5 py-2.5 text-sm leading-relaxed outline-none transition-colors placeholder:text-muted focus:border-emerald/50 disabled:opacity-50"
+        className="max-h-40 flex-1 resize-none bg-transparent py-2 text-sm leading-relaxed outline-none placeholder:text-muted disabled:opacity-50"
       />
       {disabled && onStop ? (
         <button
           type="button"
           onClick={onStop}
           aria-label="Stop"
-          className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-line bg-card text-ink transition-opacity hover:opacity-90"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-card text-ink transition-opacity hover:opacity-90"
         >
           <StopIcon className="h-4 w-4" />
         </button>
@@ -76,7 +80,7 @@ export function InputBar({
           onClick={send}
           disabled={disabled || !text.trim()}
           aria-label="Send"
-          className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl bg-emerald text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <SendIcon className="h-4 w-4" />
         </button>

@@ -104,6 +104,15 @@ export function ReceiptIcon({ className }: IconProps) {
   );
 }
 
+export function SparkleIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M12 4l1.7 5 5 1.7-5 1.7L12 17.4l-1.7-4.9-5-1.7 5-1.7L12 4Z" />
+      <path d="M18.5 5.5v3M20 7h-3" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
 export function ArrowDownLeftIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>
