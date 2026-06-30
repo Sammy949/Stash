@@ -52,8 +52,15 @@ const SYNC_CONFIRMATION =
 export default function App() {
   const { ledger, hydrating, syncPhase, sync, applyLedger, initProfile } =
     useLedger();
-  const { messages, isThinking, send, stop, pushAssistant, pushCard, editMessage } =
-    useAgent();
+  const {
+    messages,
+    isThinking,
+    send,
+    stop,
+    pushAssistant,
+    pushCard,
+    editMessage,
+  } = useAgent();
 
   // Returning users (a synced ledger exists) skip onboarding.
   const [onboarded, setOnboarded] = useState(
@@ -246,12 +253,9 @@ export default function App() {
             we drop this third bar to give the transcript back its height. */}
         {!agentActive && (
           <header className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-            <img src="/vault.svg" alt="" className="h-7 w-7" />
+            <img src="/logo.svg" alt="Stash" className="h-7 w-7 rounded-lg" />
             <div>
-              <h1 className="text-sm font-semibold leading-none">Stash</h1>
-              <p className="mt-1 text-[11px] text-muted">
-                Know where you stand. See what&apos;s coming. Stay ahead.
-              </p>
+              <h1 className="text-lg font-semibold leading-none">Stash</h1>
             </div>
           </header>
         )}
@@ -259,7 +263,10 @@ export default function App() {
         {/* Content — Split-Shift */}
         {agentActive ? (
           <div className="flex min-h-0 flex-1 animate-slide-up flex-col">
-            <DashboardStrip ledger={ledger} onExpand={() => setAgentActive(false)} />
+            <DashboardStrip
+              ledger={ledger}
+              onExpand={() => setAgentActive(false)}
+            />
             <AgentPanel
               messages={messages}
               onEditMessage={handleEditMessage}
@@ -273,7 +280,10 @@ export default function App() {
           <main className="flex-1 overflow-y-auto px-4 py-6">
             {welcome && (
               <div className="mx-auto mb-5 w-full max-w-2xl">
-                <WelcomeBack data={welcome} onDismiss={() => setWelcome(null)} />
+                <WelcomeBack
+                  data={welcome}
+                  onDismiss={() => setWelcome(null)}
+                />
               </div>
             )}
             <Dashboard
