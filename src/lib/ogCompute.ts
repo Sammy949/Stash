@@ -2,7 +2,10 @@ import type { ChatMessage, Ledger } from "@/types";
 import {
   balance,
   daysUntil,
+  getGoals,
   getMemories,
+  goalProgressPct,
+  goalRemaining,
   totalActiveIncome,
   totalExpenses,
   totalIncome,
@@ -130,6 +133,22 @@ function renderLedgerSnapshot(ledger: Ledger): string {
     lines.push("Income streams: NONE added yet (the list is empty).");
   }
 
+  // Savings goals — stated explicitly when empty, like the other lists, so the
+  // model reports the truth instead of inventing targets. Progress is the
+  // earmark counter (never the balance).
+  const goals = getGoals(ledger);
+  if (goals.length > 0) {
+    lines.push("\nSavings goals (earmarked progress, NOT part of the balance):");
+    for (const g of goals) {
+      const by = g.targetDate ? `, by ${g.targetDate}` : "";
+      lines.push(
+        `- ${g.name} — ${money(g.savedAmount)} of ${money(g.targetAmount)} saved (${Math.round(goalProgressPct(g))}%, ${money(goalRemaining(g))} to go${by})`,
+      );
+    }
+  } else {
+    lines.push("\nSavings goals: NONE set yet (the list is empty).");
+  }
+
   if (ledger.transactions.length > 0) {
     lines.push("\nRecent activity (newest first):");
     for (const t of ledger.transactions.slice(-8).reverse()) {
@@ -178,6 +197,12 @@ Managing scholarships & hustles:
 - When they say they HAVE a side income stream (gig, job, side project), use add_income_stream (name; amount + recurring if known).
 - To stop tracking something, use remove_scholarship or remove_income_stream by (partial) name.
 - Again: a question about existing scholarships/streams is NOT a request to add one — just answer from the snapshot.
+
+Goals — things ${name} is saving TOWARD:
+- A goal is a savings TARGET with an amount (e.g. "save £1000 for the scholarship", "£8k for a semester abroad"). When ${name} names something they need to save up for, use add_goal (name + target_amount + target_date if given). This sets a target — it does NOT move money or change the balance.
+- Earmarking: "I set aside £200 for the phone", "put £50 toward my laptop fund" → contribute_to_goal. This bumps the goal's PROGRESS only — it is NOT spending and the balance does NOT change. Never confuse this with log_expense (that's money actually leaving). If they then actually BUY the thing, that's a separate log_expense.
+- Progress numbers (saved / target / % / remaining) are code-owned — use the FACTS line from the tool result verbatim, never compute them yourself.
+- Use goals in your judgement like a friend who remembers: "that £100 on shoes — you're £400 short on the phone goal, just so you know." A vague aspiration with no number ("I want to save more") is a remember(goal), not an add_goal; only structured targets with an amount become goals.
 
 Memory — remembering who ${name} is (this is what makes you THEIR companion, not a calculator):
 - Beyond money, ${name} reveals lasting things about themselves: goals ("saving for a laptop"), habits ("I overspend after payday"), preferences ("I'd rather cook than eat out"), identity ("final-year student in Lagos"), or an opportunity not already tracked. When something has LONG-TERM value for future advice, call remember(kind, content).

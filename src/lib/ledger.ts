@@ -1,4 +1,5 @@
 import type {
+  Goal,
   Hustle,
   Ledger,
   Memory,
@@ -23,7 +24,7 @@ import { formatMoney } from "@/lib/currency";
  * user's own entries. No hardcoded demo data anywhere.
  */
 export const EMPTY_LEDGER: Ledger = {
-  version: 3,
+  version: 4,
   owner: "",
   currency: "NGN",
   openingBalance: 0,
@@ -31,6 +32,7 @@ export const EMPTY_LEDGER: Ledger = {
   transactions: [],
   scholarships: [],
   hustles: [],
+  goals: [],
   memories: [],
   lastSyncedAt: null,
 };
@@ -351,6 +353,95 @@ export function removeHustle(ledger: Ledger, id: string): Ledger {
   return { ...ledger, hustles: ledger.hustles.filter((h) => h.id !== id) };
 }
 
+/** ───────────────── Goals (savings targets, pure) ───────────────── */
+
+/** Defensive accessor — older cached ledgers (pre-v4) have no `goals`. */
+export function getGoals(ledger: Ledger): Goal[] {
+  return ledger.goals ?? [];
+}
+
+/** Progress toward the target as a 0–100 percentage (clamped). */
+export function goalProgressPct(goal: Goal): number {
+  if (goal.targetAmount <= 0) return 0;
+  return Math.min(100, Math.max(0, (goal.savedAmount / goal.targetAmount) * 100));
+}
+
+/** Amount still needed to hit the target (never negative). */
+export function goalRemaining(goal: Goal): number {
+  return Math.max(0, goal.targetAmount - goal.savedAmount);
+}
+
+/** True once enough has been earmarked to cover the target. */
+export function isGoalComplete(goal: Goal): boolean {
+  return goal.savedAmount >= goal.targetAmount && goal.targetAmount > 0;
+}
+
+/**
+ * True if a goal with effectively the same name already exists — idempotency
+ * guard so "save £1000 for the scholarship" said twice doesn't stack targets.
+ */
+export function isDuplicateGoal(ledger: Ledger, name: string): boolean {
+  const q = name.trim().toLowerCase();
+  return getGoals(ledger).some((g) => g.name.trim().toLowerCase() === q);
+}
+
+/** Add a savings target (agent action). Progress starts at 0 (earmark model). */
+export function addGoal(
+  ledger: Ledger,
+  input: { name: string; targetAmount: number; targetDate?: string | null },
+): Ledger {
+  const target =
+    input.targetAmount > 0 ? Math.round(input.targetAmount) : 0;
+  const g: Goal = {
+    id: crypto.randomUUID(),
+    name: input.name.trim(),
+    targetAmount: target,
+    savedAmount: 0,
+    targetDate: normalizeDate(input.targetDate) ?? undefined,
+    createdAt: new Date().toISOString(),
+  };
+  return { ...ledger, goals: [...getGoals(ledger), g] };
+}
+
+/**
+ * Earmark money toward the first goal whose name matches (partial, case-
+ * insensitive). Bumps `savedAmount` ONLY — never a transaction, never the
+ * balance. A negative delta walks it back (corrections), floored at 0.
+ */
+export function contributeToGoal(
+  ledger: Ledger,
+  match: string,
+  amount: number,
+): Ledger {
+  const q = match.trim().toLowerCase();
+  if (!q || !Number.isFinite(amount) || amount === 0) return ledger;
+  const idx = getGoals(ledger).findIndex((g) =>
+    g.name.toLowerCase().includes(q),
+  );
+  if (idx < 0) return ledger;
+  return {
+    ...ledger,
+    goals: getGoals(ledger).map((g, i) =>
+      i === idx
+        ? { ...g, savedAmount: Math.max(0, Math.round(g.savedAmount + amount)) }
+        : g,
+    ),
+  };
+}
+
+/** Remove the first goal whose name matches (agent action, partial match). */
+export function removeGoalByName(ledger: Ledger, name: string): Ledger {
+  const q = name.trim().toLowerCase();
+  const idx = getGoals(ledger).findIndex((g) => g.name.toLowerCase().includes(q));
+  if (idx < 0) return ledger;
+  return { ...ledger, goals: getGoals(ledger).filter((_, i) => i !== idx) };
+}
+
+/** Remove a goal by id (precise delete from the Manage sheet). */
+export function removeGoal(ledger: Ledger, id: string): Ledger {
+  return { ...ledger, goals: getGoals(ledger).filter((g) => g.id !== id) };
+}
+
 /** ───────────────── Memory (pure) ───────────────── */
 
 /** Defensive accessor — older cached ledgers (pre-v3) have no `memories`. */
@@ -455,22 +546,24 @@ export function removeMemoryByContent(ledger: Ledger, match: string): Ledger {
 /** ───────────────── Migration ───────────────── */
 
 /**
- * Normalize a ledger loaded from 0G/localStorage into the current (v3)
+ * Normalize a ledger loaded from 0G/localStorage into the current (v4)
  * shape. Guards against NaN when an older v1 ledger (budget: {total,spent})
  * is restored: maps budget.total → monthlyBudget, synthesizes a single
  * expense for the old `spent` so the balance stays consistent. v2 ledgers
- * (no `memories`) get an empty memory list.
+ * (no `memories`) get an empty memory list; pre-v4 ledgers get empty `goals`.
  */
 export function migrateLedger(raw: unknown): Ledger {
   if (!raw || typeof raw !== "object") return EMPTY_LEDGER;
   const r = raw as Record<string, unknown>;
 
-  // Already v2/v3 shape (transactions-based). Backfill memories for v2.
+  // Already v2/v3/v4 shape (transactions-based). Backfill memories (v2) and
+  // goals (pre-v4) so an older cached ledger restores into the current shape.
   if (typeof r.openingBalance === "number" && Array.isArray(r.transactions)) {
     return {
       ...(r as unknown as Ledger),
-      version: 3,
+      version: 4,
       monthlyBudget: (r.monthlyBudget as number | null) ?? null,
+      goals: (r.goals as Goal[]) ?? [],
       memories: (r.memories as Memory[]) ?? [],
     };
   }
@@ -491,7 +584,7 @@ export function migrateLedger(raw: unknown): Ledger {
     });
   }
   return {
-    version: 3,
+    version: 4,
     owner: (r.owner as string) ?? "",
     currency: "NGN",
     openingBalance: 0,
@@ -499,6 +592,7 @@ export function migrateLedger(raw: unknown): Ledger {
     transactions,
     scholarships: (r.scholarships as Ledger["scholarships"]) ?? [],
     hustles: (r.hustles as Ledger["hustles"]) ?? [],
+    goals: (r.goals as Goal[]) ?? [],
     memories: (r.memories as Memory[]) ?? [],
     lastSyncedAt: (r.lastSyncedAt as string | null) ?? null,
   };

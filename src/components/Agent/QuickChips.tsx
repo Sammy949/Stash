@@ -3,6 +3,7 @@ export const SYNC_CHIP = "Sync to 0G";
 
 export const CHIPS = [
   "Analyze my spending",
+  "Review my goals",
   "Scholarship deadlines",
   "Match me to hustles",
   SYNC_CHIP,

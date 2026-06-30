@@ -1,15 +1,17 @@
 import { useEffect } from "react";
 import type { ReactNode } from "react";
 import type { Ledger, SyncPhase } from "@/types";
+import { getGoals } from "@/lib/ledger";
 import { VaultCard } from "./VaultCard";
 import { ScholarshipRadar } from "./ScholarshipRadar";
 import { HustleLedger } from "./HustleLedger";
+import { GoalsPanel } from "./GoalsPanel";
 import { TransactionList } from "./TransactionList";
 import { TrackerTile } from "./TrackerTile";
 import { FadeIn } from "@/components/UI/FadeIn";
-import { BoltIcon, RadarIcon } from "@/components/UI/icons";
+import { BoltIcon, RadarIcon, TargetIcon } from "@/components/UI/icons";
 
-type SectionKey = "activity" | "scholarships" | "hustles";
+type SectionKey = "activity" | "scholarships" | "hustles" | "goals";
 
 /** One-shot accent-ring emphasis when this section just changed. */
 function Highlight({ on, children }: { on: boolean; children: ReactNode }) {
@@ -40,14 +42,18 @@ export function Dashboard({
   /** Drop a starter message into the agent (empty-tile "add" flow). */
   onPrompt: (text: string) => void;
   /** Open the Manage sheet for a tracker domain. */
-  onManage: (domain: "scholarships" | "hustles") => void;
+  onManage: (domain: "scholarships" | "hustles" | "goals") => void;
   /** Section to emphasise on this mount, or null. */
   highlight: SectionKey | null;
   /** Called once the highlight has been shown, so it doesn't replay. */
   onHighlightConsumed: () => void;
 }) {
+  // Use the getGoals accessor — pre-v4 cached ledgers have no `goals` field,
+  // and reading `.length` off undefined crashes the whole dashboard render.
+  const goals = getGoals(ledger);
   const noScholarships = ledger.scholarships.length === 0;
   const noHustles = ledger.hustles.length === 0;
+  const noGoals = goals.length === 0;
 
   // Consume the highlight after it has had time to play (the dashboard remounts
   // when the user returns to it, so this runs each time there's one pending).
@@ -107,6 +113,23 @@ export function Dashboard({
             )}
           </Highlight>
         </div>
+
+        <Highlight on={highlight === "goals"}>
+          {noGoals ? (
+            <TrackerTile
+              icon={<TargetIcon className="h-5 w-5" />}
+              title="Goals"
+              subtitle="No savings targets yet"
+              onAdd={() => onPrompt("I want to set a savings goal.")}
+            />
+          ) : (
+            <GoalsPanel
+              goals={goals}
+              currency={ledger.currency}
+              onManage={() => onManage("goals")}
+            />
+          )}
+        </Highlight>
       </div>
     </FadeIn>
   );

@@ -83,6 +83,33 @@ export interface Hustle {
   tag: IncomeTag;
 }
 
+/** ───────────────── Goals (savings targets) ───────────────── */
+
+/**
+ * A savings target — money the user is working TOWARD ("save £1000 for the
+ * scholarship", "£8k for a semester abroad"). Distinct from a `goal` MEMORY
+ * (a vague, number-less aspiration): a Goal is structured and trackable.
+ *
+ * Progress is an EARMARK model: `savedAmount` is money the user has mentally
+ * set aside, bumped only by explicit "I set aside £X" actions. It is NOT a
+ * transaction and NEVER changes the spendable balance — balance stays derived
+ * from transactions alone. Actually paying for the thing is a normal expense
+ * that, separately, can close the goal.
+ */
+export interface Goal {
+  id: string;
+  /** What they're saving for, e.g. "Scholarship payment", "Fix phone". */
+  name: string;
+  /** The target amount to reach. */
+  targetAmount: number;
+  /** Money earmarked so far (0..targetAmount-ish). Never touches balance. */
+  savedAmount: number;
+  /** Optional ISO date they want to hit the target by. */
+  targetDate?: string;
+  /** ISO 8601 timestamp. */
+  createdAt: string;
+}
+
 /** ───────────────── Memory ───────────────── */
 
 /**
@@ -130,6 +157,8 @@ export interface Ledger {
   transactions: Transaction[];
   scholarships: Scholarship[];
   hustles: Hustle[];
+  /** Structured savings targets (earmark progress, never balance). */
+  goals: Goal[];
   /** Soft memory — goals, habits, preferences. Grows from conversation. */
   memories: Memory[];
   /** ISO timestamp of the last successful 0G Storage sync. */

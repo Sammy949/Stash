@@ -1,12 +1,19 @@
 import type { ExpenseCategory, Ledger, MemoryKind } from "@/types";
 import {
+  addGoal,
   addHustle,
   addMemory,
   addScholarship,
   addTransaction,
+  contributeToGoal,
   decisionContext,
+  getGoals,
+  goalProgressPct,
+  goalRemaining,
+  isDuplicateGoal,
   isDuplicateMemory,
   isDuplicateTransaction,
+  removeGoalByName,
   removeHustleByName,
   removeLastTransaction,
   removeMemoryByContent,
@@ -288,6 +295,68 @@ export const AGENT_TOOLS = [
   {
     type: "function",
     function: {
+      name: "add_goal",
+      description:
+        "Create a savings target the user is working TOWARD (e.g. 'save £1000 for the scholarship', '£8k for a semester abroad'). Use when they state something they need to save up for, OR after they accept your offer to track an upcoming cost as a goal. This does NOT move money — it sets a target with progress starting at zero.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "What they're saving for, e.g. 'Scholarship payment', 'Fix phone'.",
+          },
+          target_amount: {
+            type: ["number", "string"],
+            description: "The amount to reach, in the user's currency.",
+          },
+          target_date: {
+            type: "string",
+            description:
+              "Optional ISO date YYYY-MM-DD to hit it by. Resolve relative dates using today's date from the snapshot.",
+          },
+        },
+        required: ["name", "target_amount"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "contribute_to_goal",
+      description:
+        "Earmark money toward an existing goal when the user says they SET ASIDE / saved / put money toward it (e.g. 'I put £200 toward the phone fund'). This bumps the goal's progress ONLY — it is NOT spending and does NOT change their balance. Never use this for an actual purchase (that's log_expense).",
+      parameters: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "(Partial) name of the goal to add to, e.g. 'phone'.",
+          },
+          amount: {
+            type: ["number", "string"],
+            description: "Amount set aside toward the goal, in the user's currency.",
+          },
+        },
+        required: ["name", "amount"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "remove_goal",
+      description:
+        "Remove a savings goal by (partial) name (they abandoned it or it's done).",
+      parameters: {
+        type: "object",
+        properties: { name: { type: "string" } },
+        required: ["name"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "remember",
       description:
         "Save a lasting fact about WHO the user is — a goal, habit, preference, opportunity, or identity detail — that should shape future advice. Use for non-money statements with long-term value ('I'm saving for a laptop', 'I overspend after payday', 'I prefer cooking', 'I'm a final-year student'). Do NOT use for money events (use log_expense/log_income), questions, or throwaway chit-chat.",
@@ -501,6 +570,60 @@ export function applyAction(
           next === ledger
             ? "No matching income stream found."
             : `Removed income stream matching "${args.name}".`,
+      };
+    }
+    case "add_goal": {
+      const goalName = String(args.name ?? "").trim();
+      if (!goalName) return { ledger, summary: "No goal name given." };
+      if (!isFinite(amount) || amount <= 0)
+        return { ledger, summary: "Invalid goal target; nothing added." };
+      if (isDuplicateGoal(ledger, goalName)) {
+        return {
+          ledger,
+          summary: `A goal named "${goalName}" already exists — no need to add it again. To add progress, use contribute_to_goal.`,
+        };
+      }
+      const next = addGoal(ledger, {
+        name: goalName,
+        targetAmount: amount,
+        targetDate: args.target_date ? String(args.target_date) : null,
+      });
+      const g = getGoals(next)[getGoals(next).length - 1];
+      const by = g.targetDate ? ` by ${g.targetDate}` : "";
+      return {
+        ledger: next,
+        summary: `Created goal "${g.name}" — target ${formatMoney(g.targetAmount, cur)}${by}, ${formatMoney(0, cur)} saved so far. This is a target only; it did NOT change their balance.`,
+      };
+    }
+    case "contribute_to_goal": {
+      const match = String(args.name ?? "").trim();
+      if (!match) return { ledger, summary: "No goal name given." };
+      if (!isFinite(amount) || amount === 0)
+        return { ledger, summary: "Invalid contribution amount; goal unchanged." };
+      const next = contributeToGoal(ledger, match, amount);
+      if (next === ledger)
+        return {
+          ledger,
+          summary: `No goal matching "${match}" — nothing to add to. Offer to create it with add_goal.`,
+        };
+      const g = getGoals(next).find((x) => x.name.toLowerCase().includes(match.toLowerCase()));
+      if (!g) return { ledger: next, summary: "Goal updated." };
+      const done = goalRemaining(g) === 0;
+      return {
+        ledger: next,
+        summary: done
+          ? `Earmarked ${formatMoney(amount, cur)} toward "${g.name}" — that's the full ${formatMoney(g.targetAmount, cur)} target reached! (Earmark only — their spendable balance is unchanged.)`
+          : `Earmarked ${formatMoney(amount, cur)} toward "${g.name}". FACTS (use verbatim): ${formatMoney(g.savedAmount, cur)} of ${formatMoney(g.targetAmount, cur)} saved (${Math.round(goalProgressPct(g))}%), ${formatMoney(goalRemaining(g), cur)} to go. Earmark only — balance unchanged.`,
+      };
+    }
+    case "remove_goal": {
+      const next = removeGoalByName(ledger, String(args.name ?? ""));
+      return {
+        ledger: next,
+        summary:
+          next === ledger
+            ? "No matching goal found."
+            : `Removed goal matching "${args.name}".`,
       };
     }
     case "remember": {

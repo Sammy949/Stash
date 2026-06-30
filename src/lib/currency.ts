@@ -32,3 +32,23 @@ export function formatMoney(amount: number, currency: Currency = "NGN"): string 
   // Multi-character symbols (KSh, FRw) read better with a space.
   return sym.length > 1 ? `${sign}${sym} ${num}` : `${sign}${sym}${num}`;
 }
+
+/**
+ * Compact money for tight UI like goal progress ("£3k / £5k", "₦1.2m").
+ * Abbreviates thousands/millions; values under 1,000 fall back to full format.
+ */
+export function formatMoneyCompact(
+  amount: number,
+  currency: Currency = "NGN",
+): string {
+  const abs = Math.abs(amount);
+  if (abs < 1000) return formatMoney(amount, currency);
+  const sym = currencySymbol(currency);
+  const sign = amount < 0 ? "-" : "";
+  const [value, suffix] =
+    abs >= 1_000_000 ? [abs / 1_000_000, "m"] : [abs / 1000, "k"];
+  // One decimal only when it adds information (3.2k, not 3.0k).
+  const trimmed = value.toFixed(1).replace(/\.0$/, "");
+  const space = sym.length > 1 ? " " : "";
+  return `${sign}${sym}${space}${trimmed}${suffix}`;
+}

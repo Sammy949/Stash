@@ -34,6 +34,16 @@ export function RadarIcon({ className }: IconProps) {
   );
 }
 
+export function TargetIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5" />
+      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function BoltIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>

@@ -15,7 +15,14 @@ import { deriveObservation } from "@/lib/observations";
 import { deriveWelcomeBack } from "@/lib/welcomeBack";
 import type { WelcomeBack as WelcomeBackData } from "@/lib/welcomeBack";
 import { analyzeSpending, isSpendingQuery } from "@/lib/analysis";
-import { radarBadge, removeHustle, removeScholarship } from "@/lib/ledger";
+import {
+  goalProgressPct,
+  radarBadge,
+  removeGoal,
+  removeHustle,
+  removeScholarship,
+} from "@/lib/ledger";
+import { formatMoneyCompact } from "@/lib/currency";
 import { ManageSheet } from "@/components/Dashboard/ManageSheet";
 import type { ManageItem } from "@/components/Dashboard/ManageSheet";
 import type { Ledger } from "@/types";
@@ -27,7 +34,7 @@ ensureStorageSchema();
 const ONBOARDED_KEY = "stash_onboarded";
 const LAST_VISIT_KEY = "stash_last_visit";
 
-type SectionKey = "activity" | "scholarships" | "hustles";
+type SectionKey = "activity" | "scholarships" | "hustles" | "goals";
 
 /** Which dashboard section a turn touched. Pure reducers swap only the changed
  *  array, so reference inequality pinpoints it exactly. */
@@ -35,6 +42,7 @@ function changedSection(before: Ledger, after: Ledger): SectionKey | null {
   if (before.transactions !== after.transactions) return "activity";
   if (before.scholarships !== after.scholarships) return "scholarships";
   if (before.hustles !== after.hustles) return "hustles";
+  if (before.goals !== after.goals) return "goals";
   return null;
 }
 
@@ -64,7 +72,9 @@ export default function App() {
   const [highlight, setHighlight] = useState<SectionKey | null>(null);
 
   // Which tracker's Manage sheet is open (null = closed).
-  const [manage, setManage] = useState<"scholarships" | "hustles" | null>(null);
+  const [manage, setManage] = useState<
+    "scholarships" | "hustles" | "goals" | null
+  >(null);
 
   // Welcome-back greeting — "Since you were last here…". Computed ONCE per load,
   // after the ledger has hydrated, from the deterministic delta vs the last
@@ -169,26 +179,37 @@ export default function App() {
     })();
   }
 
-  // Remove a tracked scholarship/hustle directly (from the Manage sheet).
-  function removeTracked(domain: "scholarships" | "hustles", id: string) {
+  // Remove a tracked scholarship/hustle/goal directly (from the Manage sheet).
+  function removeTracked(
+    domain: "scholarships" | "hustles" | "goals",
+    id: string,
+  ) {
     const next =
       domain === "scholarships"
         ? removeScholarship(ledger, id)
-        : removeHustle(ledger, id);
+        : domain === "hustles"
+          ? removeHustle(ledger, id)
+          : removeGoal(ledger, id);
     applyLedger(next);
     void sync(next);
     const remaining =
-      domain === "scholarships" ? next.scholarships.length : next.hustles.length;
+      domain === "scholarships"
+        ? next.scholarships.length
+        : domain === "hustles"
+          ? next.hustles.length
+          : next.goals.length;
     if (remaining === 0) setManage(null); // nothing left to manage
   }
 
   // Adding always flows through the agent — close the sheet, prime the chat.
-  function addViaAgent(domain: "scholarships" | "hustles") {
+  function addViaAgent(domain: "scholarships" | "hustles" | "goals") {
     setManage(null);
     void handleSend(
       domain === "scholarships"
         ? "I want to track a new scholarship deadline."
-        : "I want to add a side income stream.",
+        : domain === "hustles"
+          ? "I want to add a side income stream."
+          : "I want to set a savings goal.",
     );
   }
 
@@ -207,7 +228,14 @@ export default function App() {
             secondary: h.amountLabel,
             badge: h.status.charAt(0).toUpperCase() + h.status.slice(1),
           }))
-        : [];
+        : manage === "goals"
+          ? ledger.goals.map((g) => ({
+              id: g.id,
+              primary: g.name,
+              secondary: `${formatMoneyCompact(g.savedAmount, ledger.currency)} / ${formatMoneyCompact(g.targetAmount, ledger.currency)}`,
+              badge: `${Math.round(goalProgressPct(g))}%`,
+            }))
+          : [];
 
   return (
     <div className="h-screen bg-bg text-ink">
@@ -262,12 +290,20 @@ export default function App() {
 
       {manage && manageItems.length > 0 && (
         <ManageSheet
-          title={manage === "scholarships" ? "Scholarship Radar" : "Hustle Ledger"}
+          title={
+            manage === "scholarships"
+              ? "Scholarship Radar"
+              : manage === "hustles"
+                ? "Hustle Ledger"
+                : "Goals"
+          }
           items={manageItems}
           addLabel={
             manage === "scholarships"
               ? "Add a deadline with Stash"
-              : "Add an income stream with Stash"
+              : manage === "hustles"
+                ? "Add an income stream with Stash"
+                : "Add a savings goal with Stash"
           }
           onRemove={(id) => removeTracked(manage, id)}
           onAdd={() => addViaAgent(manage)}
