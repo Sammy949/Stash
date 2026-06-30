@@ -44,7 +44,7 @@ React 18 + TypeScript (strict) + Vite 6 · Tailwind v4 (dark only; deep-navy + s
 ## 0G integrations — honest framing (state this to judges)
 
 - **0G Storage — REAL, verified live.** The genuine on-chain feature: encrypted ledger finalized on 0G (~45–60s), restores on reload.
-- **0G Compute — code Router-ready, demo on Groq.** The 0G Router needs a *mainnet* balance (real money; no testnet router), so the demo runs **Groq** (`llama-3.3-70b-versatile`) via swappable env (`VITE_AI_BASE_URL`/`_API_KEY`/`_MODEL`). Provider-agnostic — point the three env vars at `router-api.0g.ai/v1` + `glm-5` to run natively on 0G, zero code change.
+- **0G Compute — code Router-ready, demo on Groq.** The 0G Router needs a *mainnet* balance (real money; no testnet router), so the demo runs **Groq** (`openai/gpt-oss-120b`, with `llama-3.3-70b-versatile` as a rate-limit fallback) via swappable env (`VITE_AI_BASE_URL`/`_API_KEY`/`_MODEL`/`_FALLBACK_MODEL`). Provider-agnostic — point the three env vars at `router-api.0g.ai/v1` + `glm-5` to run natively on 0G, zero code change.
 
 ## Conventions & gotchas
 
