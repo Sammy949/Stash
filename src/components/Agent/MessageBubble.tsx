@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "@/types";
 import { CloseIcon, PencilIcon, SendIcon } from "@/components/UI/icons";
 import { RowButton } from "@/components/UI/RowButton";
+import { CopyButton } from "@/components/UI/CopyButton";
 import { SpendingCard } from "./SpendingCard";
+import { Markdown } from "./Markdown";
 
 /** Stash avatar — small emerald vault glyph. */
 function StashAvatar() {
@@ -122,16 +124,19 @@ export function MessageBubble({
   if (mine) {
     return (
       <div className="group flex items-start justify-end gap-1.5 animate-slide-up">
-        {editable && onEdit && (
-          <button
-            type="button"
-            aria-label="Edit message"
-            onClick={startEdit}
-            className="mt-1.5 flex h-7 w-7 items-center justify-center rounded-lg text-muted opacity-100 transition-colors hover:bg-bg hover:text-ink md:opacity-0 md:group-hover:opacity-100"
-          >
-            <PencilIcon className="h-3.5 w-3.5" />
-          </button>
-        )}
+        <div className="mt-1.5 flex items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+          <CopyButton text={message.content} />
+          {editable && onEdit && (
+            <button
+              type="button"
+              aria-label="Edit message"
+              onClick={startEdit}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-bg hover:text-ink"
+            >
+              <PencilIcon className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
         <p className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-slate px-3.5 py-2.5 text-sm leading-relaxed text-ink">
           {message.content}
         </p>
@@ -141,7 +146,7 @@ export function MessageBubble({
 
   // ── Assistant message ──────────────────────────────────────────────
   return (
-    <div className="flex items-start gap-2.5 animate-slide-up">
+    <div className="group flex items-start gap-2.5 animate-slide-up">
       <StashAvatar />
       <div className="flex max-w-[85%] flex-col items-start gap-1.5">
         {message.pending ? (
@@ -152,11 +157,16 @@ export function MessageBubble({
           <>
             {message.content && (
               <div className="rounded-2xl rounded-tl-sm border border-line bg-bg/60 px-3.5 py-2.5 text-sm leading-relaxed text-ink">
-                <p className="whitespace-pre-wrap">{message.content}</p>
+                <Markdown>{message.content}</Markdown>
               </div>
             )}
             {message.card?.type === "spending" && (
               <SpendingCard data={message.card.data} />
+            )}
+            {message.content && (
+              <div className="-ml-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                <CopyButton text={message.content} />
+              </div>
             )}
           </>
         )}
