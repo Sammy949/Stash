@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChatMessage, Currency, Goal } from "@/types";
+import type { ChatMessage, Currency, Goal, Scholarship } from "@/types";
 import { CloseIcon, PencilIcon, SendIcon } from "@/components/UI/icons";
 import { RowButton } from "@/components/UI/RowButton";
 import { CopyButton } from "@/components/UI/CopyButton";
 import { GoalCard } from "@/components/UI/GoalCard";
+import { ScholarshipCard } from "@/components/UI/ScholarshipCard";
 import { SpendingCard } from "./SpendingCard";
 import { Markdown } from "./Markdown";
 
@@ -45,6 +46,7 @@ export function MessageBubble({
   editable,
   isThinking,
   goals,
+  scholarships,
   currency,
 }: {
   message: ChatMessage;
@@ -56,6 +58,8 @@ export function MessageBubble({
   isThinking?: boolean;
   /** Live goals — used to resolve this message's relatedGoalIds to cards. */
   goals?: Goal[];
+  /** Live scholarships — resolves this message's relatedScholarshipIds to cards. */
+  scholarships?: Scholarship[];
   /** Ledger currency for the goal cards. */
   currency?: Currency;
 }) {
@@ -180,6 +184,33 @@ export function MessageBubble({
                     <GoalCard key={g.id} goal={g} currency={currency} />
                   ))
               : null}
+            {/* Inline scholarship proof — same pattern as goals; a since-removed
+                one is skipped silently. The "+N more" hint only appears on the
+                capped deadlines stack (3 shown while more are tracked). */}
+            {(() => {
+              if (!message.relatedScholarshipIds) return null;
+              const shown = message.relatedScholarshipIds
+                .map((id) => scholarships?.find((s) => s.id === id))
+                .filter((s): s is Scholarship => Boolean(s));
+              if (!shown.length) return null;
+              const total = scholarships?.length ?? 0;
+              const more =
+                shown.length >= 3 && total > shown.length
+                  ? total - shown.length
+                  : 0;
+              return (
+                <>
+                  {shown.map((s) => (
+                    <ScholarshipCard key={s.id} scholarship={s} />
+                  ))}
+                  {more > 0 && (
+                    <p className="px-1 text-xs text-muted">
+                      +{more} more on your radar
+                    </p>
+                  )}
+                </>
+              );
+            })()}
             {message.content && (
               <div className="-ml-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                 <CopyButton text={message.content} />

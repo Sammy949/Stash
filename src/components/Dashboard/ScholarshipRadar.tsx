@@ -1,22 +1,7 @@
-import type { Scholarship, UrgencyColor } from "@/types";
-import { deriveUrgency, radarBadge } from "@/lib/ledger";
+import type { Scholarship } from "@/types";
 import { RadarIcon } from "@/components/UI/icons";
 import { EmptyState } from "@/components/UI/EmptyState";
-
-/** Literal class strings per urgency band (kept whole for Tailwind scanning). */
-const BADGE: Record<UrgencyColor, string> = {
-  emerald: "border-emerald/30 bg-emerald/10 text-emerald",
-  amber: "border-amber/30 bg-amber/10 text-amber",
-  red: "border-red/30 bg-red/10 text-red",
-  muted: "border-line bg-bg/40 text-muted",
-};
-
-const DOT: Record<UrgencyColor, string> = {
-  emerald: "bg-emerald",
-  amber: "bg-amber",
-  red: "bg-red",
-  muted: "bg-muted",
-};
+import { ScholarshipCard } from "@/components/UI/ScholarshipCard";
 
 const VISIBLE = 2;
 
@@ -46,29 +31,12 @@ export function ScholarshipRadar({
         />
       )}
 
-      <ul className="mt-4 space-y-1">
-        {shown.map((s) => {
-          const urgency = deriveUrgency(s);
-          return (
-            <li
-              key={s.id}
-              className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-bg/40"
-            >
-              <span
-                className={`mt-1 h-2 w-2 shrink-0 rounded-full ${DOT[urgency]}`}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{s.name}</p>
-                <p className="truncate text-xs text-muted">{s.statusLabel}</p>
-              </div>
-              <span
-                className={`font-data shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${BADGE[urgency]}`}
-              >
-                {radarBadge(s)}
-              </span>
-            </li>
-          );
-        })}
+      <ul className="mt-4 space-y-2">
+        {shown.map((s) => (
+          <li key={s.id}>
+            <ScholarshipCard scholarship={s} className="w-full" />
+          </li>
+        ))}
       </ul>
 
       {overflow && (

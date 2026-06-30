@@ -8,10 +8,17 @@ export const SYNC_CHIP = "Sync to 0G";
  */
 export const REVIEW_GOALS_CHIP = "Review my goals";
 
+/**
+ * The "Scholarship deadlines" chip. A general query (no scholarship tool
+ * fires), so useAgent recognizes this exact text and attaches the top few most-
+ * urgent scholarships to surface their inline cards.
+ */
+export const SCHOLARSHIP_DEADLINES_CHIP = "Scholarship deadlines";
+
 export const CHIPS = [
   "Analyze my spending",
   REVIEW_GOALS_CHIP,
-  "Scholarship deadlines",
+  SCHOLARSHIP_DEADLINES_CHIP,
   "Match me to hustles",
   SYNC_CHIP,
 ];

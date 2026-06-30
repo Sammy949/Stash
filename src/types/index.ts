@@ -231,6 +231,14 @@ export interface ChatMessage {
    */
   relatedGoalIds?: string[];
   /**
+   * IDs of scholarships this assistant turn surfaced — created (add_scholarship),
+   * referenced by name, proactively nudged for a near deadline, or the top few
+   * for a "Scholarship deadlines" turn. The bubble renders an inline
+   * ScholarshipCard for each still-tracked one. Selection is code-side and
+   * deterministic — see lib/scholarshipContext.ts.
+   */
+  relatedScholarshipIds?: string[];
+  /**
    * The full state Stash held just BEFORE this (user) turn ran — money AND
    * memory. Editing a message restores exactly this, so the ledger is never
    * reconstructed by replaying the model; the snapshot is the source of truth

@@ -262,6 +262,7 @@ export default function App() {
               onSend={handleSend}
               isThinking={isThinking}
               goals={ledger.goals}
+              scholarships={ledger.scholarships}
               currency={ledger.currency}
             />
           </div>

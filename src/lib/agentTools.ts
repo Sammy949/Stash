@@ -436,6 +436,12 @@ export interface ActionResult {
    * gone, so there's nothing to show).
    */
   relatedGoalIds?: string[];
+  /**
+   * IDs of scholarships this action touched (created). The turn collects these
+   * so the bubble can render an inline ScholarshipCard. Omitted for non-
+   * scholarship actions and for remove_scholarship (it's gone).
+   */
+  relatedScholarshipIds?: string[];
 }
 
 /**
@@ -554,6 +560,7 @@ export function applyAction(
       return {
         ledger: next,
         summary: `Added scholarship "${added.name}"${added.deadline ? ` (deadline ${added.deadline})` : ""}.`,
+        relatedScholarshipIds: [added.id],
       };
     }
     case "remove_scholarship": {

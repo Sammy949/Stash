@@ -2,7 +2,19 @@ import { useCallback, useRef, useState } from "react";
 import type { AgentCard, ChatMessage, Ledger } from "@/types";
 import { runAgentTurn, StashComputeError } from "@/lib/ogCompute";
 import { getGoals } from "@/lib/ledger";
-import { REVIEW_GOALS_CHIP } from "@/components/Agent/QuickChips";
+import {
+  matchScholarshipsByMention,
+  mostUrgentScholarships,
+  proactiveDeadlineScholarshipId,
+  recentlyShownScholarshipIds,
+} from "@/lib/scholarshipContext";
+import {
+  REVIEW_GOALS_CHIP,
+  SCHOLARSHIP_DEADLINES_CHIP,
+} from "@/components/Agent/QuickChips";
+
+/** How far back to look when suppressing a repeat proactive deadline nudge. */
+const SCHOLARSHIP_NUDGE_LOOKBACK = 8;
 
 const OPENING_MESSAGE = `Hey. I'm Stash — your personal finance agent.
 I know your balance, your deadlines, and your income streams. Your financial memory is saved here and backed up to 0G. Pick up right where you left off.
@@ -102,6 +114,31 @@ export function useAgent() {
             .filter((g) => g.targetAmount > 0)
             .map((g) => g.id)
         : turn.relatedGoalIds;
+      // Inline scholarship cards — a controlled combination of triggers, all
+      // detected in code (never invented). The "Scholarship deadlines" chip
+      // shows the top 3 most urgent; otherwise: tools that created one (turn),
+      // any scholarship the user NAMED, plus — guarded against repeats — the
+      // single most-urgent near deadline as a proactive nudge.
+      const isDeadlines =
+        text.trim().toLowerCase() === SCHOLARSHIP_DEADLINES_CHIP.toLowerCase();
+      let relatedScholarshipIds: string[];
+      if (isDeadlines) {
+        relatedScholarshipIds = mostUrgentScholarships(turn.ledger, 3).map(
+          (s) => s.id,
+        );
+      } else {
+        const ids = new Set(turn.relatedScholarshipIds);
+        for (const id of matchScholarshipsByMention(turn.ledger, text)) {
+          ids.add(id);
+        }
+        const proactive = proactiveDeadlineScholarshipId(turn.ledger);
+        const recent = recentlyShownScholarshipIds(
+          ref.current,
+          SCHOLARSHIP_NUDGE_LOOKBACK,
+        );
+        if (proactive && !recent.has(proactive)) ids.add(proactive);
+        relatedScholarshipIds = [...ids];
+      }
       commit(
         ref.current.map((m) =>
           m.id === pending.id
@@ -110,6 +147,9 @@ export function useAgent() {
                 content: turn.reply,
                 pending: false,
                 ...(relatedGoalIds.length ? { relatedGoalIds } : {}),
+                ...(relatedScholarshipIds.length
+                  ? { relatedScholarshipIds }
+                  : {}),
               }
             : m,
         ),

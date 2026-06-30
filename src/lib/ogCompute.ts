@@ -551,6 +551,13 @@ export interface AgentTurn {
    * that didn't touch a goal.
    */
   relatedGoalIds: string[];
+  /**
+   * Scholarships this turn created (add_scholarship). Other surfacing triggers
+   * (name mention, proactive deadline, the deadlines chip) are layered on in
+   * useAgent, which has the transcript for the "recently shown" guard. Empty
+   * for turns that didn't create a scholarship.
+   */
+  relatedScholarshipIds: string[];
 }
 
 /**
@@ -658,13 +665,17 @@ async function runAgentTurnInner(
     // not apply it twice (it would double a goal contribution).
     const summaries: string[] = [];
     const goalIds: string[] = [];
+    const scholarshipIds: string[] = [];
     for (const c of dedupeCalls(usable)) {
       const result = applyAction(working, c.name, c.args);
       working = result.ledger;
       summaries.push(result.summary);
       if (result.relatedGoalIds) goalIds.push(...result.relatedGoalIds);
+      if (result.relatedScholarshipIds)
+        scholarshipIds.push(...result.relatedScholarshipIds);
     }
     const relatedGoalIds = [...new Set(goalIds)];
+    const relatedScholarshipIds = [...new Set(scholarshipIds)];
     const didMutate = working !== ledger;
 
     // Finalize WITHOUT tools. The old loop echoed the assistant tool_calls +
@@ -701,7 +712,13 @@ async function runAgentTurnInner(
         ? `Done — that's recorded. Your balance is now ${bal}.`
         : `Your balance is ${bal}.`;
     }
-    return { reply: replyText, ledger: working, mutated: didMutate, relatedGoalIds };
+    return {
+      reply: replyText,
+      ledger: working,
+      mutated: didMutate,
+      relatedGoalIds,
+      relatedScholarshipIds,
+    };
   }
 
   // No structured tool_calls — but the model may have written tool syntax as
@@ -709,10 +726,13 @@ async function runAgentTurnInner(
   const { calls, cleaned } = extractTextToolCalls(msg.content);
   if (calls.length > 0) {
     const goalIds: string[] = [];
+    const scholarshipIds: string[] = [];
     for (const c of dedupeCalls(calls)) {
       const result = applyAction(working, c.name, c.args);
       working = result.ledger;
       if (result.relatedGoalIds) goalIds.push(...result.relatedGoalIds);
+      if (result.relatedScholarshipIds)
+        scholarshipIds.push(...result.relatedScholarshipIds);
     }
     messages[0] = { role: "system", content: buildFinalizePrompt(working) };
     messages.push({
@@ -726,6 +746,7 @@ async function runAgentTurnInner(
       ledger: working,
       mutated: working !== ledger,
       relatedGoalIds: [...new Set(goalIds)],
+      relatedScholarshipIds: [...new Set(scholarshipIds)],
     };
   }
 
@@ -740,6 +761,7 @@ async function runAgentTurnInner(
       ledger: working,
       mutated: false,
       relatedGoalIds: [],
+      relatedScholarshipIds: [],
     };
   }
 
@@ -748,5 +770,6 @@ async function runAgentTurnInner(
     ledger: working,
     mutated: false,
     relatedGoalIds: [],
+    relatedScholarshipIds: [],
   };
 }
