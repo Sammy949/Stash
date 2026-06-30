@@ -338,6 +338,19 @@ export function removeHustleByName(ledger: Ledger, name: string): Ledger {
   return { ...ledger, hustles: ledger.hustles.filter((_, i) => i !== idx) };
 }
 
+/** Remove a scholarship by id (precise delete from the Manage sheet). */
+export function removeScholarship(ledger: Ledger, id: string): Ledger {
+  return {
+    ...ledger,
+    scholarships: ledger.scholarships.filter((s) => s.id !== id),
+  };
+}
+
+/** Remove a hustle by id (precise delete from the Manage sheet). */
+export function removeHustle(ledger: Ledger, id: string): Ledger {
+  return { ...ledger, hustles: ledger.hustles.filter((h) => h.id !== id) };
+}
+
 /** ───────────────── Memory (pure) ───────────────── */
 
 /** Defensive accessor — older cached ledgers (pre-v3) have no `memories`. */

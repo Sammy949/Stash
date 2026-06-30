@@ -15,6 +15,9 @@ import { deriveObservation } from "@/lib/observations";
 import { deriveWelcomeBack } from "@/lib/welcomeBack";
 import type { WelcomeBack as WelcomeBackData } from "@/lib/welcomeBack";
 import { analyzeSpending, isSpendingQuery } from "@/lib/analysis";
+import { radarBadge, removeHustle, removeScholarship } from "@/lib/ledger";
+import { ManageSheet } from "@/components/Dashboard/ManageSheet";
+import type { ManageItem } from "@/components/Dashboard/ManageSheet";
 import type { Ledger } from "@/types";
 
 // One-time forced reset onto the new local-first schema (runs once at load,
@@ -59,6 +62,9 @@ export default function App() {
   // until the dashboard is next viewed and consumes it, since after an action
   // the user is in the agent panel, not looking at the dashboard.
   const [highlight, setHighlight] = useState<SectionKey | null>(null);
+
+  // Which tracker's Manage sheet is open (null = closed).
+  const [manage, setManage] = useState<"scholarships" | "hustles" | null>(null);
 
   // Welcome-back greeting — "Since you were last here…". Computed ONCE per load,
   // after the ledger has hydrated, from the deterministic delta vs the last
@@ -163,6 +169,46 @@ export default function App() {
     })();
   }
 
+  // Remove a tracked scholarship/hustle directly (from the Manage sheet).
+  function removeTracked(domain: "scholarships" | "hustles", id: string) {
+    const next =
+      domain === "scholarships"
+        ? removeScholarship(ledger, id)
+        : removeHustle(ledger, id);
+    applyLedger(next);
+    void sync(next);
+    const remaining =
+      domain === "scholarships" ? next.scholarships.length : next.hustles.length;
+    if (remaining === 0) setManage(null); // nothing left to manage
+  }
+
+  // Adding always flows through the agent — close the sheet, prime the chat.
+  function addViaAgent(domain: "scholarships" | "hustles") {
+    setManage(null);
+    void handleSend(
+      domain === "scholarships"
+        ? "I want to track a new scholarship deadline."
+        : "I want to add a side income stream.",
+    );
+  }
+
+  const manageItems: ManageItem[] =
+    manage === "scholarships"
+      ? ledger.scholarships.map((s) => ({
+          id: s.id,
+          primary: s.name,
+          secondary: s.statusLabel,
+          badge: radarBadge(s),
+        }))
+      : manage === "hustles"
+        ? ledger.hustles.map((h) => ({
+            id: h.id,
+            primary: h.name,
+            secondary: h.amountLabel,
+            badge: h.status.charAt(0).toUpperCase() + h.status.slice(1),
+          }))
+        : [];
+
   return (
     <div className="h-screen bg-bg text-ink">
       {/* Centered platform column — doesn't stretch on wide screens. */}
@@ -201,6 +247,7 @@ export default function App() {
               syncPhase={syncPhase}
               hydrating={hydrating}
               onPrompt={handleSend}
+              onManage={setManage}
               highlight={highlight}
               onHighlightConsumed={() => setHighlight(null)}
             />
@@ -212,6 +259,21 @@ export default function App() {
           <CommandBar onSend={handleSend} onStop={stop} isThinking={isThinking} />
         </div>
       </div>
+
+      {manage && manageItems.length > 0 && (
+        <ManageSheet
+          title={manage === "scholarships" ? "Scholarship Radar" : "Hustle Ledger"}
+          items={manageItems}
+          addLabel={
+            manage === "scholarships"
+              ? "Add a deadline with Stash"
+              : "Add an income stream with Stash"
+          }
+          onRemove={(id) => removeTracked(manage, id)}
+          onAdd={() => addViaAgent(manage)}
+          onClose={() => setManage(null)}
+        />
+      )}
 
       <Toaster theme="dark" position="bottom-right" richColors closeButton />
     </div>

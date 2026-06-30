@@ -19,14 +19,21 @@ const STATUS_LABEL: Record<HustleStatus, string> = {
   building: "Building",
 };
 
+const VISIBLE = 2;
+
 export function HustleLedger({
   hustles,
   currency,
+  onManage,
 }: {
   hustles: Hustle[];
   currency: Currency;
+  /** Open the Manage sheet (shown as "View all" once past VISIBLE). */
+  onManage?: () => void;
 }) {
   const activeIncome = totalActiveIncome(hustles);
+  const overflow = onManage && hustles.length > VISIBLE;
+  const shown = overflow ? hustles.slice(0, VISIBLE) : hustles;
 
   return (
     <section className="rounded-2xl border border-line bg-card p-5">
@@ -44,7 +51,7 @@ export function HustleLedger({
       )}
 
       <ul className="mt-4 space-y-1">
-        {hustles.map((h) => (
+        {shown.map((h) => (
           <li
             key={h.id}
             className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-bg/40"
@@ -76,6 +83,16 @@ export function HustleLedger({
             {formatMoney(activeIncome, currency)}/mo
           </span>
         </div>
+      )}
+
+      {overflow && (
+        <button
+          type="button"
+          onClick={onManage}
+          className="mt-3 w-full text-xs text-muted transition-colors hover:text-ink"
+        >
+          View all ({hustles.length}) →
+        </button>
       )}
     </section>
   );

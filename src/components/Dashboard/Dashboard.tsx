@@ -29,6 +29,7 @@ export function Dashboard({
   syncPhase,
   hydrating,
   onPrompt,
+  onManage,
   highlight,
   onHighlightConsumed,
 }: {
@@ -37,6 +38,8 @@ export function Dashboard({
   hydrating: boolean;
   /** Drop a starter message into the agent (empty-tile "add" flow). */
   onPrompt: (text: string) => void;
+  /** Open the Manage sheet for a tracker domain. */
+  onManage: (domain: "scholarships" | "hustles") => void;
   /** Section to emphasise on this mount, or null. */
   highlight: SectionKey | null;
   /** Called once the highlight has been shown, so it doesn't replay. */
@@ -83,7 +86,10 @@ export function Dashboard({
                 }
               />
             ) : (
-              <ScholarshipRadar scholarships={ledger.scholarships} />
+              <ScholarshipRadar
+                scholarships={ledger.scholarships}
+                onManage={() => onManage("scholarships")}
+              />
             )}
           </Highlight>
         </FadeIn>
@@ -98,7 +104,11 @@ export function Dashboard({
                 onAdd={() => onPrompt("I want to add a side income stream.")}
               />
             ) : (
-              <HustleLedger hustles={ledger.hustles} currency={ledger.currency} />
+              <HustleLedger
+                hustles={ledger.hustles}
+                currency={ledger.currency}
+                onManage={() => onManage("hustles")}
+              />
             )}
           </Highlight>
         </FadeIn>

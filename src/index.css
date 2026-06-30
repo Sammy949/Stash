@@ -188,6 +188,19 @@
     animation: stash-float 5s ease-in-out infinite;
   }
 
+  /* Backdrop fade for overlays/sheets. */
+  @keyframes stash-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  .animate-fade {
+    animation: stash-fade 0.2s ease-out;
+  }
+
   /* "Just updated" section emphasis — a one-shot accent ring that fades. */
   @keyframes stash-highlight {
     0% {

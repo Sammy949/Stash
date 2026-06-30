@@ -18,11 +18,19 @@ const DOT: Record<UrgencyColor, string> = {
   muted: "bg-muted",
 };
 
+const VISIBLE = 2;
+
 export function ScholarshipRadar({
   scholarships,
+  onManage,
 }: {
   scholarships: Scholarship[];
+  /** Open the Manage sheet (shown as "View all" once past VISIBLE). */
+  onManage?: () => void;
 }) {
+  const overflow = onManage && scholarships.length > VISIBLE;
+  const shown = overflow ? scholarships.slice(0, VISIBLE) : scholarships;
+
   return (
     <section className="rounded-2xl border border-line bg-card p-5">
       <div className="flex items-center gap-2 text-muted">
@@ -39,7 +47,7 @@ export function ScholarshipRadar({
       )}
 
       <ul className="mt-4 space-y-1">
-        {scholarships.map((s) => {
+        {shown.map((s) => {
           const urgency = deriveUrgency(s);
           return (
             <li
@@ -62,6 +70,16 @@ export function ScholarshipRadar({
           );
         })}
       </ul>
+
+      {overflow && (
+        <button
+          type="button"
+          onClick={onManage}
+          className="mt-3 w-full border-t border-line pt-3 text-xs text-muted transition-colors hover:text-ink"
+        >
+          View all ({scholarships.length}) →
+        </button>
+      )}
     </section>
   );
 }
