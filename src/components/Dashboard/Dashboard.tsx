@@ -20,9 +20,10 @@ function Highlight({ on, children }: { on: boolean; children: ReactNode }) {
  * Full dashboard — the default, front-facing view.
  *
  * Order: Vault → Recent Activity (the pulse) → the two trackers as a paired
- * 2-col row. Empty trackers show a `+` tile; populated ones show their list.
- * Sections fade in on mount (staggered); the section a turn just changed gets
- * a one-shot highlight, played when the user returns here.
+ * row (stacked on mobile, side-by-side on ≥sm). Empty trackers show a `+`
+ * tile; populated ones show their list. The whole view fades in as one unit
+ * (no stagger — keeps it stable); the section a turn changed gets a one-shot
+ * highlight, played when the user returns here.
  */
 export function Dashboard({
   ledger,
@@ -59,26 +60,22 @@ export function Dashboard({
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-5">
-      <FadeIn delay={0}>
+    <FadeIn className="mx-auto w-full max-w-2xl">
+      <div className="space-y-5">
         <VaultCard ledger={ledger} syncPhase={syncPhase} hydrating={hydrating} />
-      </FadeIn>
 
-      <FadeIn delay={70}>
         <Highlight on={highlight === "activity"}>
           <TransactionList
             transactions={ledger.transactions}
             currency={ledger.currency}
           />
         </Highlight>
-      </FadeIn>
 
-      <div className="grid grid-cols-2 items-start gap-4">
-        <FadeIn delay={140} className="h-full">
+        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
           <Highlight on={highlight === "scholarships"}>
             {noScholarships ? (
               <TrackerTile
-                icon={<RadarIcon className="h-4 w-4" />}
+                icon={<RadarIcon className="h-5 w-5" />}
                 title="Scholarship Radar"
                 subtitle="No active deadlines"
                 onAdd={() =>
@@ -92,13 +89,11 @@ export function Dashboard({
               />
             )}
           </Highlight>
-        </FadeIn>
 
-        <FadeIn delay={210} className="h-full">
           <Highlight on={highlight === "hustles"}>
             {noHustles ? (
               <TrackerTile
-                icon={<BoltIcon className="h-4 w-4" />}
+                icon={<BoltIcon className="h-5 w-5" />}
                 title="Hustle Ledger"
                 subtitle="No active income"
                 onAdd={() => onPrompt("I want to add a side income stream.")}
@@ -111,8 +106,8 @@ export function Dashboard({
               />
             )}
           </Highlight>
-        </FadeIn>
+        </div>
       </div>
-    </div>
+    </FadeIn>
   );
 }
