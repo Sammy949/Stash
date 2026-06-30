@@ -112,6 +112,22 @@
     animation: stash-slide-up 0.25s ease-out;
   }
 
+  /* Dashboard entrance — slower + more travel than slide-up, so it's felt.
+     `both` fill applies the start frame during any delay. */
+  @keyframes stash-enter {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-enter {
+    animation: stash-enter 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
   /* Typing-dots */
   @keyframes stash-blink {
     0%,
@@ -225,7 +241,8 @@
     .animate-float,
     .animate-rise,
     .animate-blink,
-    .animate-highlight {
+    .animate-highlight,
+    .animate-enter {
       animation: none;
     }
   }
