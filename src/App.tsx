@@ -261,6 +261,8 @@ export default function App() {
               onEditMessage={handleEditMessage}
               onSend={handleSend}
               isThinking={isThinking}
+              goals={ledger.goals}
+              currency={ledger.currency}
             />
           </div>
         ) : (

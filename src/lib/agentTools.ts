@@ -429,6 +429,13 @@ export interface ActionResult {
   ledger: Ledger;
   /** Short factual summary fed back to the model (the tool result). */
   summary: string;
+  /**
+   * IDs of goals this action touched (created or contributed to). The turn
+   * collects these so the bubble can render an inline GoalCard as proof of the
+   * change. Omitted for non-goal actions (and for remove_goal — the goal is
+   * gone, so there's nothing to show).
+   */
+  relatedGoalIds?: string[];
 }
 
 /**
@@ -604,6 +611,7 @@ export function applyAction(
       return {
         ledger: next,
         summary: `Created goal "${g.name}" — target ${formatMoney(g.targetAmount, cur)}${by}, ${formatMoney(0, cur)} saved so far. This is a target only; it did NOT change their balance.`,
+        relatedGoalIds: [g.id],
       };
     }
     case "contribute_to_goal": {
@@ -625,6 +633,7 @@ export function applyAction(
         summary: done
           ? `Earmarked ${formatMoney(amount, cur)} toward "${g.name}" — that's the full ${formatMoney(g.targetAmount, cur)} target reached! (Earmark only — their spendable balance is unchanged.)`
           : `Earmarked ${formatMoney(amount, cur)} toward "${g.name}". FACTS (use verbatim): ${formatMoney(g.savedAmount, cur)} of ${formatMoney(g.targetAmount, cur)} saved (${Math.round(goalProgressPct(g))}%), ${formatMoney(goalRemaining(g), cur)} to go. Earmark only — balance unchanged.`,
+        relatedGoalIds: [g.id],
       };
     }
     case "remove_goal": {

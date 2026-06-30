@@ -408,6 +408,12 @@ export interface AgentTurn {
   ledger: Ledger;
   /** True if any tool actually changed the ledger. */
   mutated: boolean;
+  /**
+   * Goals this turn created or contributed to (deduped, in order). The bubble
+   * renders an inline GoalCard for each — proof of the change. Empty for turns
+   * that didn't touch a goal.
+   */
+  relatedGoalIds: string[];
 }
 
 /**
@@ -514,11 +520,14 @@ async function runAgentTurnInner(
     // Dedupe first: a model that emits the same call twice in one response must
     // not apply it twice (it would double a goal contribution).
     const summaries: string[] = [];
+    const goalIds: string[] = [];
     for (const c of dedupeCalls(usable)) {
       const result = applyAction(working, c.name, c.args);
       working = result.ledger;
       summaries.push(result.summary);
+      if (result.relatedGoalIds) goalIds.push(...result.relatedGoalIds);
     }
+    const relatedGoalIds = [...new Set(goalIds)];
     const didMutate = working !== ledger;
 
     // Finalize WITHOUT tools. The old loop echoed the assistant tool_calls +
@@ -555,15 +564,18 @@ async function runAgentTurnInner(
         ? `Done — that's recorded. Your balance is now ${bal}.`
         : `Your balance is ${bal}.`;
     }
-    return { reply: replyText, ledger: working, mutated: didMutate };
+    return { reply: replyText, ledger: working, mutated: didMutate, relatedGoalIds };
   }
 
   // No structured tool_calls — but the model may have written tool syntax as
   // text. Apply those so the ledger actually mutates, then finalize cleanly.
   const { calls, cleaned } = extractTextToolCalls(msg.content);
   if (calls.length > 0) {
+    const goalIds: string[] = [];
     for (const c of dedupeCalls(calls)) {
-      working = applyAction(working, c.name, c.args).ledger;
+      const result = applyAction(working, c.name, c.args);
+      working = result.ledger;
+      if (result.relatedGoalIds) goalIds.push(...result.relatedGoalIds);
     }
     messages[0] = { role: "system", content: buildSystemPrompt(working) };
     messages.push({
@@ -576,6 +588,7 @@ async function runAgentTurnInner(
       reply: (final.content ?? cleaned).trim() || "Done.",
       ledger: working,
       mutated: working !== ledger,
+      relatedGoalIds: [...new Set(goalIds)],
     };
   }
 
@@ -589,6 +602,7 @@ async function runAgentTurnInner(
         "I want to record that exactly right but didn't catch a clear amount. Mind saying it again — like “I earned ₦100,000” or “I spent ₦3,000 on lunch”?",
       ledger: working,
       mutated: false,
+      relatedGoalIds: [],
     };
   }
 
@@ -596,5 +610,6 @@ async function runAgentTurnInner(
     reply: (msg.content ?? "").trim() || "Done.",
     ledger: working,
     mutated: false,
+    relatedGoalIds: [],
   };
 }

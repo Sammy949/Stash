@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 import type { AgentCard, ChatMessage, Ledger } from "@/types";
 import { runAgentTurn, StashComputeError } from "@/lib/ogCompute";
+import { getGoals } from "@/lib/ledger";
+import { REVIEW_GOALS_CHIP } from "@/components/Agent/QuickChips";
 
 const OPENING_MESSAGE = `Hey. I'm Stash — your personal finance agent.
 I know your balance, your deadlines, and your income streams. Your financial memory is saved here and backed up to 0G. Pick up right where you left off.
@@ -90,10 +92,25 @@ export function useAgent() {
     try {
       const turn = await runAgentTurn(history, ledger, controller.signal);
       if (turn.mutated) onLedgerUpdate?.(turn.ledger);
+      // Inline goal cards: tools that touched a goal already report their IDs.
+      // The "Review my goals" chip is a plain query (no tool fires), so on that
+      // exact prompt we surface ALL active goals — the grouped-stack moment.
+      const isReview =
+        text.trim().toLowerCase() === REVIEW_GOALS_CHIP.toLowerCase();
+      const relatedGoalIds = isReview
+        ? getGoals(turn.ledger)
+            .filter((g) => g.targetAmount > 0)
+            .map((g) => g.id)
+        : turn.relatedGoalIds;
       commit(
         ref.current.map((m) =>
           m.id === pending.id
-            ? { ...m, content: turn.reply, pending: false }
+            ? {
+                ...m,
+                content: turn.reply,
+                pending: false,
+                ...(relatedGoalIds.length ? { relatedGoalIds } : {}),
+              }
             : m,
         ),
       );

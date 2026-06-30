@@ -224,6 +224,13 @@ export interface ChatMessage {
    *  breakdown). Code-computed — see lib/analysis.ts. */
   card?: AgentCard;
   /**
+   * IDs of goals this assistant turn touched (created/contributed-to) or, for a
+   * "review my goals" turn, the active goals to show. The bubble renders an
+   * inline GoalCard for each still-existing goal — visible proof of goal state,
+   * shown only at the moments it matters, not on every message.
+   */
+  relatedGoalIds?: string[];
+  /**
    * The full state Stash held just BEFORE this (user) turn ran — money AND
    * memory. Editing a message restores exactly this, so the ledger is never
    * reconstructed by replaying the model; the snapshot is the source of truth

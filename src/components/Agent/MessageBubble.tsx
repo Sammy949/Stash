@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChatMessage } from "@/types";
+import type { ChatMessage, Currency, Goal } from "@/types";
 import { CloseIcon, PencilIcon, SendIcon } from "@/components/UI/icons";
 import { RowButton } from "@/components/UI/RowButton";
 import { CopyButton } from "@/components/UI/CopyButton";
+import { GoalCard } from "@/components/UI/GoalCard";
 import { SpendingCard } from "./SpendingCard";
 import { Markdown } from "./Markdown";
 
@@ -43,6 +44,8 @@ export function MessageBubble({
   onEdit,
   editable,
   isThinking,
+  goals,
+  currency,
 }: {
   message: ChatMessage;
   /** Edit + re-run this user message (replaces everything below it). */
@@ -51,6 +54,10 @@ export function MessageBubble({
   editable?: boolean;
   /** True while a turn is in flight. */
   isThinking?: boolean;
+  /** Live goals — used to resolve this message's relatedGoalIds to cards. */
+  goals?: Goal[];
+  /** Ledger currency for the goal cards. */
+  currency?: Currency;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
@@ -163,6 +170,16 @@ export function MessageBubble({
             {message.card?.type === "spending" && (
               <SpendingCard data={message.card.data} />
             )}
+            {/* Inline goal proof — resolve IDs to live goals; skip any that
+                were since removed (the card silently disappears, never errors). */}
+            {message.relatedGoalIds && currency
+              ? message.relatedGoalIds
+                  .map((id) => goals?.find((g) => g.id === id))
+                  .filter((g): g is Goal => Boolean(g))
+                  .map((g) => (
+                    <GoalCard key={g.id} goal={g} currency={currency} />
+                  ))
+              : null}
             {message.content && (
               <div className="-ml-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                 <CopyButton text={message.content} />

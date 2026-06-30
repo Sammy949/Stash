@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { ChatMessage } from "@/types";
+import type { ChatMessage, Currency, Goal } from "@/types";
 import { MessageBubble } from "./MessageBubble";
 import { CHIPS, SYNC_CHIP } from "./QuickChips";
 
@@ -24,11 +24,17 @@ export function AgentPanel({
   onEditMessage,
   onSend,
   isThinking,
+  goals,
+  currency,
 }: {
   messages: ChatMessage[];
   onEditMessage: (id: string, text: string) => void;
   onSend: (text: string) => void;
   isThinking: boolean;
+  /** Live goals — passed to bubbles to render inline goal cards. */
+  goals: Goal[];
+  /** Ledger currency for the goal cards. */
+  currency: Currency;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -87,6 +93,8 @@ export function AgentPanel({
               onEdit={onEditMessage}
               editable={!isThinking}
               isThinking={isThinking}
+              goals={goals}
+              currency={currency}
             />
           ))
         )}

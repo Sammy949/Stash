@@ -1,9 +1,16 @@
 /** The "Sync to 0G" chip is intercepted by App; the rest go to the agent. */
 export const SYNC_CHIP = "Sync to 0G";
 
+/**
+ * The "Review my goals" chip. A general query (no goal tool fires), so the
+ * agent turn carries no relatedGoalIds — useAgent recognizes this exact text
+ * and attaches all active goals so the reply shows the full goal stack.
+ */
+export const REVIEW_GOALS_CHIP = "Review my goals";
+
 export const CHIPS = [
   "Analyze my spending",
-  "Review my goals",
+  REVIEW_GOALS_CHIP,
   "Scholarship deadlines",
   "Match me to hustles",
   SYNC_CHIP,
