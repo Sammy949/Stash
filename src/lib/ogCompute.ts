@@ -15,6 +15,7 @@ import { CURRENCIES, formatMoney } from "@/lib/currency";
 import { AGENT_TOOLS, applyAction } from "@/lib/agentTools";
 import { extractTextToolCalls, sanitizeToolCall } from "@/lib/toolCalls";
 import { extractPrimaryAmount, purchaseImpactFacts } from "@/lib/goalContext";
+import { proactiveDeadlineNudge } from "@/lib/scholarshipContext";
 
 /**
  * 0G Compute integration — the Stash AI agent.
@@ -596,7 +597,14 @@ export async function runAgentTurn(
     purchaseNote = purchaseImpactFacts(ledger, amount, ledger.currency);
   }
 
-  return runAgentTurnInner(history, ledger, forceTool, purchaseNote, signal);
+  // Proactive deadline nudge: a near scholarship deadline worth raising
+  // unprompted. Computed here (we have the transcript for the "recently shown"
+  // guard); its FACTS line is injected so the model MENTIONS it, and its id is
+  // returned so the inline card attaches. Null when nothing's close or it was
+  // just surfaced.
+  const nudge = proactiveDeadlineNudge(ledger, history);
+
+  return runAgentTurnInner(history, ledger, forceTool, purchaseNote, nudge, signal);
 }
 
 async function runAgentTurnInner(
@@ -604,6 +612,7 @@ async function runAgentTurnInner(
   ledger: Ledger,
   forceTool: boolean,
   purchaseNote: string | null,
+  nudge: { id: string; facts: string } | null,
   signal?: AbortSignal,
 ): Promise<AgentTurn> {
   if (!isComputeConfigured()) {
@@ -613,6 +622,9 @@ async function runAgentTurnInner(
   }
 
   let working = ledger;
+  // The proactive nudge's scholarship is surfaced on every return path so the
+  // card attaches regardless of whether a tool also ran this turn.
+  const nudgeIds = nudge ? [nudge.id] : [];
   const messages: RouterMessage[] = [
     { role: "system", content: buildSystemPrompt(ledger), tool_calls: undefined },
     ...toRouterMessages(history),
@@ -621,6 +633,12 @@ async function runAgentTurnInner(
   // freshest thing the model sees before it advises (code owns the numbers).
   if (purchaseNote) {
     messages.push({ role: "system", content: purchaseNote, tool_calls: undefined });
+  }
+  // Same mechanism for the deadline nudge — a trailing system fact the model
+  // weaves into its reply. It persists into the finalize call too (that step
+  // only swaps messages[0]), so it lands whether or not a tool runs.
+  if (nudge) {
+    messages.push({ role: "system", content: nudge.facts, tool_calls: undefined });
   }
 
   // One model call → sanitized, validated tool calls. Retries once on a
@@ -675,7 +693,7 @@ async function runAgentTurnInner(
         scholarshipIds.push(...result.relatedScholarshipIds);
     }
     const relatedGoalIds = [...new Set(goalIds)];
-    const relatedScholarshipIds = [...new Set(scholarshipIds)];
+    const relatedScholarshipIds = [...new Set([...scholarshipIds, ...nudgeIds])];
     const didMutate = working !== ledger;
 
     // Finalize WITHOUT tools. The old loop echoed the assistant tool_calls +
@@ -746,7 +764,7 @@ async function runAgentTurnInner(
       ledger: working,
       mutated: working !== ledger,
       relatedGoalIds: [...new Set(goalIds)],
-      relatedScholarshipIds: [...new Set(scholarshipIds)],
+      relatedScholarshipIds: [...new Set([...scholarshipIds, ...nudgeIds])],
     };
   }
 
@@ -761,7 +779,7 @@ async function runAgentTurnInner(
       ledger: working,
       mutated: false,
       relatedGoalIds: [],
-      relatedScholarshipIds: [],
+      relatedScholarshipIds: nudgeIds,
     };
   }
 
@@ -770,6 +788,6 @@ async function runAgentTurnInner(
     ledger: working,
     mutated: false,
     relatedGoalIds: [],
-    relatedScholarshipIds: [],
+    relatedScholarshipIds: nudgeIds,
   };
 }

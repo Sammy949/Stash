@@ -5,16 +5,11 @@ import { getGoals } from "@/lib/ledger";
 import {
   matchScholarshipsByMention,
   mostUrgentScholarships,
-  proactiveDeadlineScholarshipId,
-  recentlyShownScholarshipIds,
 } from "@/lib/scholarshipContext";
 import {
   REVIEW_GOALS_CHIP,
   SCHOLARSHIP_DEADLINES_CHIP,
 } from "@/components/Agent/QuickChips";
-
-/** How far back to look when suppressing a repeat proactive deadline nudge. */
-const SCHOLARSHIP_NUDGE_LOOKBACK = 8;
 
 const OPENING_MESSAGE = `Hey. I'm Stash — your personal finance agent.
 I know your balance, your deadlines, and your income streams. Your financial memory is saved here and backed up to 0G. Pick up right where you left off.
@@ -116,9 +111,10 @@ export function useAgent() {
         : turn.relatedGoalIds;
       // Inline scholarship cards — a controlled combination of triggers, all
       // detected in code (never invented). The "Scholarship deadlines" chip
-      // shows the top 3 most urgent; otherwise: tools that created one (turn),
-      // any scholarship the user NAMED, plus — guarded against repeats — the
-      // single most-urgent near deadline as a proactive nudge.
+      // shows the top 3 most urgent. Otherwise the turn already carries the
+      // add_scholarship and proactive-nudge ids (computed in ogCompute, where
+      // the nudge's FACTS line is injected so the model MENTIONS it); here we
+      // only layer on any scholarship the user NAMED this turn.
       const isDeadlines =
         text.trim().toLowerCase() === SCHOLARSHIP_DEADLINES_CHIP.toLowerCase();
       let relatedScholarshipIds: string[];
@@ -131,12 +127,6 @@ export function useAgent() {
         for (const id of matchScholarshipsByMention(turn.ledger, text)) {
           ids.add(id);
         }
-        const proactive = proactiveDeadlineScholarshipId(turn.ledger);
-        const recent = recentlyShownScholarshipIds(
-          ref.current,
-          SCHOLARSHIP_NUDGE_LOOKBACK,
-        );
-        if (proactive && !recent.has(proactive)) ids.add(proactive);
         relatedScholarshipIds = [...ids];
       }
       commit(

@@ -118,3 +118,40 @@ export function recentlyShownScholarshipIds(
   }
   return ids;
 }
+
+/** How far back the proactive nudge looks before it'll repeat a deadline. */
+export const NUDGE_LOOKBACK = 8;
+
+/**
+ * The proactive deadline nudge: the most-urgent near deadline worth raising
+ * UNPROMPTED, paired with the code-owned FACTS line the model should weave into
+ * its reply so it actually MENTIONS it (not just renders a silent card). Returns
+ * null when nothing is in the red band, or when that scholarship was already
+ * surfaced in the last `lookback` messages — the guard that keeps Stash from
+ * harping on the same deadline every turn.
+ *
+ * Computed on the PRE-turn ledger by design: a scholarship the user is adding
+ * THIS turn isn't here yet, so the add-trigger owns that moment, not the nudge.
+ */
+export function proactiveDeadlineNudge(
+  ledger: Ledger,
+  transcript: ChatMessage[],
+  lookback: number = NUDGE_LOOKBACK,
+  now: Date = new Date(),
+): { id: string; facts: string } | null {
+  const id = proactiveDeadlineScholarshipId(ledger, now);
+  if (!id) return null;
+  if (recentlyShownScholarshipIds(transcript, lookback).has(id)) return null;
+  const s = ledger.scholarships.find((x) => x.id === id);
+  if (!s || !s.deadline) return null;
+
+  const d = daysUntil(s.deadline, now);
+  const when = d === 0 ? "today" : d === 1 ? "tomorrow" : `in ${d} days`;
+  const who = ledger.owner?.trim() ? `${ledger.owner.trim()}'s` : "their";
+  const facts =
+    `DEADLINE NUDGE (code-owned fact — use it verbatim, don't recompute): ` +
+    `${who} "${s.name}" application is due ${when} (${s.deadline}). ` +
+    `Give a brief, warm heads-up about it — one line — then get back to what they asked. ` +
+    `Mention it naturally; don't nag or repeat it if it's already been raised.`;
+  return { id, facts };
+}
