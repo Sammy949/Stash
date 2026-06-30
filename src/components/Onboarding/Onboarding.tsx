@@ -36,10 +36,19 @@ export function Onboarding({
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg px-6 text-ink">
       <div className="w-full max-w-sm">
-        <img src="/vault.svg" alt="" className="mb-6 h-12 w-12" />
+        {/* Brand + step indicator — the redesign's precision cue. */}
+        <div className="mb-5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img src="/vault.svg" alt="" className="h-8 w-8" />
+            <span className="label-caps text-sm text-ink">Stash</span>
+          </div>
+          <span className="label-caps text-[10px] text-muted">
+            Step {step + 1} of {total}
+          </span>
+        </div>
 
-        {/* Progress dots */}
-        <div className="mb-6 flex gap-1.5">
+        {/* Progress segments */}
+        <div className="mb-8 flex gap-1.5">
           {Array.from({ length: total }).map((_, i) => (
             <span
               key={i}
@@ -52,7 +61,7 @@ export function Onboarding({
 
         {step === 0 && (
           <div className="animate-slide-up">
-            <h1 className="text-2xl font-semibold">Welcome to Stash</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Welcome to Stash</h1>
             <p className="mt-3 text-sm leading-relaxed text-muted">
               Your money, understood. Track what comes in and goes out, stay
               ahead of deadlines, and ask Stash anything.
@@ -73,7 +82,7 @@ export function Onboarding({
               if (name.trim()) setStep(2);
             }}
           >
-            <h1 className="text-2xl font-semibold">What should I call you?</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">What should I call you?</h1>
             <p className="mt-2 text-sm text-muted">
               Just a name — no email, no password.
             </p>
@@ -92,7 +101,7 @@ export function Onboarding({
 
         {step === 2 && (
           <div className="animate-slide-up">
-            <h1 className="text-2xl font-semibold">Which currency?</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Which currency?</h1>
             <p className="mt-2 text-sm text-muted">
               The currency you earn and spend in.
             </p>
@@ -107,7 +116,7 @@ export function Onboarding({
                       : "border-line bg-card text-muted hover:text-ink"
                   }`}
                 >
-                  <span className="w-7 shrink-0 text-base font-semibold tabular-nums">
+                  <span className="font-data w-7 shrink-0 text-base font-semibold">
                     {c.symbol}
                   </span>
                   <span className="min-w-0">
@@ -131,14 +140,14 @@ export function Onboarding({
               finish();
             }}
           >
-            <h1 className="text-2xl font-semibold">
+            <h1 className="text-2xl font-semibold tracking-tight">
               How much do you have right now?
             </h1>
             <p className="mt-2 text-sm text-muted">
               Your current balance to start from. Skip it to start at zero.
             </p>
             <div className="mt-5 flex items-center rounded-xl border border-line bg-card px-3.5 focus-within:border-emerald/50">
-              <span className="mr-2 text-sm text-muted">
+              <span className="font-data mr-2 text-sm text-muted">
                 {currencySymbol(currency)}
               </span>
               <input
@@ -147,7 +156,7 @@ export function Onboarding({
                 value={openingText}
                 onChange={(e) => setOpeningText(e.target.value)}
                 placeholder="0"
-                className="w-full bg-transparent py-2.5 text-sm outline-none placeholder:text-muted"
+                className="font-data w-full bg-transparent py-2.5 text-sm outline-none placeholder:text-muted"
               />
             </div>
             <Primary type="submit">Enter Stash</Primary>
