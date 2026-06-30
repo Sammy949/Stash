@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import type { ChatMessage, Ledger } from "@/types";
+import type { AgentCard, ChatMessage, Ledger } from "@/types";
 import { runAgentTurn, StashComputeError } from "@/lib/ogCompute";
 
 const OPENING_MESSAGE = `Hey. I'm Stash — your personal finance agent.
@@ -55,6 +55,11 @@ export function useAgent() {
   /** Append a free-form assistant message (used by step-5 actions). */
   const pushAssistant = useCallback((content: string) => {
     commit([...ref.current, makeMessage("assistant", content)]);
+  }, []);
+
+  /** Append an assistant message carrying a structured card (code-computed). */
+  const pushCard = useCallback((card: AgentCard, content = "") => {
+    commit([...ref.current, makeMessage("assistant", content, { card })]);
   }, []);
 
   /**
@@ -166,5 +171,5 @@ export function useAgent() {
     [send],
   );
 
-  return { messages, isThinking, send, stop, pushAssistant, editMessage };
+  return { messages, isThinking, send, stop, pushAssistant, pushCard, editMessage };
 }

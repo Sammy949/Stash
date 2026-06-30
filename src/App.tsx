@@ -14,6 +14,7 @@ import { ensureStorageSchema, getStoredRootHash } from "@/lib/ogStorage";
 import { deriveObservation } from "@/lib/observations";
 import { deriveWelcomeBack } from "@/lib/welcomeBack";
 import type { WelcomeBack as WelcomeBackData } from "@/lib/welcomeBack";
+import { analyzeSpending, isSpendingQuery } from "@/lib/analysis";
 
 // One-time forced reset onto the new local-first schema (runs once at load,
 // before any hook reads localStorage).
@@ -28,7 +29,7 @@ const SYNC_CONFIRMATION =
 export default function App() {
   const { ledger, hydrating, syncPhase, sync, applyLedger, initProfile } =
     useLedger();
-  const { messages, isThinking, send, stop, pushAssistant, editMessage } =
+  const { messages, isThinking, send, stop, pushAssistant, pushCard, editMessage } =
     useAgent();
 
   // Returning users (a synced ledger exists) skip onboarding.
@@ -83,7 +84,10 @@ export default function App() {
     // 2. Everything else → the agent. It may call tools that mutate the
     //    ledger; when it does, persist the new ledger and sync to 0G.
     const before = ledger;
+    let latest = ledger;
+    const wantsBreakdown = isSpendingQuery(text);
     void send(text, ledger, (updated) => {
+      latest = updated;
       applyLedger(updated);
       void sync(updated);
       // Proactive observation — code (not the model) notices when a money
@@ -91,6 +95,12 @@ export default function App() {
       // after the agent's reply. Stays silent when there's nothing to say.
       const observation = deriveObservation(before, updated);
       if (observation) pushAssistant(observation);
+    }).then((ok) => {
+      // Inline spending breakdown — code-computed, attached after the agent's
+      // prose reply. Numbers are code-owned; the model never sees/derives them.
+      if (!ok || !wantsBreakdown) return;
+      const breakdown = analyzeSpending(latest);
+      if (breakdown) pushCard({ type: "spending", data: breakdown });
     });
   }
 

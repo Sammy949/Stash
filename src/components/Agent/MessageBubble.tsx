@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "@/types";
 import { CloseIcon, PencilIcon, SendIcon } from "@/components/UI/icons";
 import { RowButton } from "@/components/UI/RowButton";
+import { SpendingCard } from "./SpendingCard";
 
 /** Stash avatar — small emerald vault glyph. */
 function StashAvatar() {
@@ -142,11 +143,22 @@ export function MessageBubble({
   return (
     <div className="flex items-start gap-2.5 animate-slide-up">
       <StashAvatar />
-      <div className="max-w-[80%] rounded-2xl rounded-tl-sm border border-line bg-bg/60 px-3.5 py-2.5 text-sm leading-relaxed text-ink">
+      <div className="flex max-w-[85%] flex-col items-start gap-1.5">
         {message.pending ? (
-          <TypingDots />
+          <div className="rounded-2xl rounded-tl-sm border border-line bg-bg/60 px-3.5 py-2.5">
+            <TypingDots />
+          </div>
         ) : (
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          <>
+            {message.content && (
+              <div className="rounded-2xl rounded-tl-sm border border-line bg-bg/60 px-3.5 py-2.5 text-sm leading-relaxed text-ink">
+                <p className="whitespace-pre-wrap">{message.content}</p>
+              </div>
+            )}
+            {message.card?.type === "spending" && (
+              <SpendingCard data={message.card.data} />
+            )}
+          </>
         )}
       </div>
     </div>

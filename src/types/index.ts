@@ -153,6 +153,33 @@ export type SyncPhase =
    *  (no auto-clear) until a sync succeeds. */
   | "pending";
 
+/** ───────────────── Agent cards (structured replies) ───────────────── */
+
+/** One row in a spending breakdown — a category and its share of the total. */
+export interface SpendRow {
+  label: string;
+  amount: number;
+  pct: number;
+}
+
+/**
+ * A deterministic spending breakdown, computed in code (never the model) and
+ * rendered as an inline card in chat. Numbers are code-owned — see
+ * `analyzeSpending` in lib/analysis.ts.
+ */
+export interface SpendingBreakdown {
+  currency: Currency;
+  windowDays: number;
+  total: number;
+  /** Top categories, largest first. */
+  rows: SpendRow[];
+  topLabel: string;
+  topShare: number;
+}
+
+/** Structured payload the agent can attach to a message for rich rendering. */
+export type AgentCard = { type: "spending"; data: SpendingBreakdown };
+
 /** ───────────────── Agent / Chat ───────────────── */
 
 export type ChatRole = "user" | "assistant" | "system";
@@ -164,6 +191,9 @@ export interface ChatMessage {
   createdAt: string;
   /** Transient flag for the typing indicator placeholder. */
   pending?: boolean;
+  /** Optional structured card rendered with this message (e.g. a spending
+   *  breakdown). Code-computed — see lib/analysis.ts. */
+  card?: AgentCard;
   /**
    * The full state Stash held just BEFORE this (user) turn ran — money AND
    * memory. Editing a message restores exactly this, so the ledger is never
