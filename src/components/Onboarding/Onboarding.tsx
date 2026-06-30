@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { Currency } from "@/types";
 import { CURRENCY_LIST, currencySymbol } from "@/lib/currency";
-import { LockIcon } from "@/components/UI/icons";
 import { OnboardingVisual } from "./OnboardingVisual";
 
 export interface OnboardingProfile {
@@ -116,12 +115,6 @@ export function Onboarding({
                   Track money, remember what matters, and get guidance that grows
                   with you.
                 </p>
-                <div className="mt-5 flex items-start gap-2 rounded-lg border border-line bg-bg/40 px-3 py-2.5 text-xs text-muted">
-                  <LockIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald" />
-                  <span>
-                    Your data is encrypted and stored on 0G. Only you can read it.
-                  </span>
-                </div>
                 <Primary onClick={() => go(1)}>Get started</Primary>
               </div>
             )}
