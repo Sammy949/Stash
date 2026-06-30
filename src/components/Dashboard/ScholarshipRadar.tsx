@@ -1,6 +1,7 @@
 import type { Scholarship, UrgencyColor } from "@/types";
 import { deriveUrgency, radarBadge } from "@/lib/ledger";
 import { RadarIcon } from "@/components/UI/icons";
+import { EmptyState } from "@/components/UI/EmptyState";
 
 /** Literal class strings per urgency band (kept whole for Tailwind scanning). */
 const BADGE: Record<UrgencyColor, string> = {
@@ -30,9 +31,11 @@ export function ScholarshipRadar({
       </div>
 
       {scholarships.length === 0 && (
-        <p className="mt-4 rounded-xl border border-dashed border-line px-3 py-4 text-center text-xs text-muted">
-          No scholarships tracked yet.
-        </p>
+        <EmptyState
+          icon={<RadarIcon className="h-4 w-4" />}
+          title="No deadlines tracked yet"
+          hint="Tell Stash: “I'm applying for the MTN scholarship, deadline Aug 30.”"
+        />
       )}
 
       <ul className="mt-4 space-y-1">

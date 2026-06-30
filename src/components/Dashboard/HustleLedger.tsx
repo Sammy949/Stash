@@ -2,6 +2,7 @@ import type { Currency, Hustle, HustleStatus } from "@/types";
 import { totalActiveIncome } from "@/lib/ledger";
 import { formatMoney } from "@/lib/currency";
 import { BoltIcon } from "@/components/UI/icons";
+import { EmptyState } from "@/components/UI/EmptyState";
 
 /** Status → pill styling (literal class strings for Tailwind scanning). */
 const STATUS_PILL: Record<HustleStatus, string> = {
@@ -35,9 +36,11 @@ export function HustleLedger({
       </div>
 
       {hustles.length === 0 && (
-        <p className="mt-4 rounded-xl border border-dashed border-line px-3 py-4 text-center text-xs text-muted">
-          No income streams yet.
-        </p>
+        <EmptyState
+          icon={<BoltIcon className="h-4 w-4" />}
+          title="Track your side income"
+          hint="Tell Stash: “I make ₦40,000 a month tutoring.”"
+        />
       )}
 
       <ul className="mt-4 space-y-1">

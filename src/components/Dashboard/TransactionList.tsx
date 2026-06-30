@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Currency, Transaction } from "@/types";
 import { formatMoney } from "@/lib/currency";
 import { ReceiptIcon } from "@/components/UI/icons";
+import { EmptyState } from "@/components/UI/EmptyState";
 
 const PREVIEW = 3;
 
@@ -44,9 +45,11 @@ export function TransactionList({
       </div>
 
       {ordered.length === 0 && (
-        <p className="mt-4 rounded-xl border border-dashed border-line px-3 py-4 text-center text-xs text-muted">
-          No transactions yet.
-        </p>
+        <EmptyState
+          icon={<ReceiptIcon className="h-4 w-4" />}
+          title="No activity yet"
+          hint="Log your first one: “I spent ₦3,000 on lunch.”"
+        />
       )}
 
       <ul className="mt-4 space-y-1">
