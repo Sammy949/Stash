@@ -179,6 +179,7 @@ export default function App() {
               ledger={ledger}
               syncPhase={syncPhase}
               hydrating={hydrating}
+              onPrompt={handleSend}
             />
           </main>
         )}
