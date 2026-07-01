@@ -519,13 +519,19 @@ function looksLikePreSpendIntent(text: string): boolean {
 }
 
 /**
- * OBLIGATION / future-cost intent: the user is naming money they OWE or will
- * have to spend, not money that has moved ("I have to pay £1000 for the
- * scholarship", "need to fix my phone, it's £400", "I owe rent"). Like a
- * pre-spend intent these carry amount + a money verb, so looksLikeMoneyEvent
- * would force a log — booking a phantom expense for money still in the account.
- * When obligation phrasing is present we drop the force and let the model
- * advise (or capture it as something to track) instead of logging a spend.
+ * OBLIGATION / future-cost intent: the user is naming money they OWE or are
+ * ABOUT to spend, not money that has moved ("I have to pay £1000 for the
+ * scholarship", "need to fix my phone, it's £400", "I owe rent", "I'm gonna
+ * spend 20k", "I'll buy a car"). Like a pre-spend intent these carry amount + a
+ * money verb, so looksLikeMoneyEvent would force a log — booking a phantom
+ * expense for money still in the account. When this phrasing is present we drop
+ * the force and let the model advise (or capture it as something to track).
+ *
+ * Future-tense intentions ("gonna/will/'ll/about to spend|buy|invest") are
+ * treated exactly like an obligation: nothing has moved, so a stated plan to
+ * spend must NOT be force-logged as a real expense. (Note the first pattern
+ * already covers "going to spend/buy" via "going to"; the last covers the
+ * gonna/will/'ll contractions the first misses.)
  */
 function looksLikeObligation(text: string): boolean {
   const t = text.toLowerCase();
@@ -535,10 +541,76 @@ function looksLikeObligation(text: string): boolean {
     /\b(owe|owing|owed)\b/,
     /\b(due|payable|outstanding)\b/,
     /\b(supposed|meant|expected) to pay\b/,
-    /\b(will|gonna|gotta|must) (have to )?(pay|cover|fix|settle)\b/,
+    /\b(will|'ll|gonna|gotta|must|about to|planning to|plan to|intend to) (have to )?(pay|cover|fix|settle|spend|buy|get|cop|grab|invest|purchase)\b/,
     /\bbill(s)? (due|coming|to pay)\b/,
   ];
   return OBLIGATION.some((re) => re.test(t));
+}
+
+/**
+ * Explicit "act on it NOW" imperative — the user isn't just musing or naming a
+ * future cost, they're telling Stash to DO something ("sort that out for me",
+ * "just do it", "go ahead", "log it"). This matters when it lands ON TOP of
+ * obligation/pre-spend phrasing: "I have to buy a car… sort that out" reads as
+ * a future cost to looksLikeObligation (so we don't force a phantom log), yet
+ * the user clearly wants action. Detecting it lets us hand the model a note to
+ * ask ONE sharp question instead of silently no-opping into bare filler.
+ */
+function looksLikeActionRequest(text: string): boolean {
+  const t = text.toLowerCase();
+  return (
+    /\b(sort (that|this|it|them|those|these) out|sort it out|handle (that|this|it|them|those|these)|take care of (that|this|it|them|those|these)|deal with (that|this|it|them)|just do (it|that)|go ahead|make it happen|log (it|that|them|these|those)|record (it|that|them)|add (it|that|them))\b/.test(
+      t,
+    ) || /\bplease\b.*\b(sort|handle|do|log|record|add|take care)\b/.test(t)
+  );
+}
+
+/**
+ * A RELATIVE amount — a percentage of their money ("invest 6% of my remaining
+ * cash", "put 10% of my balance aside"). The model must NEVER do arithmetic
+ * (the code-owns-the-math invariant), so a bare "%" would otherwise be dropped
+ * silently. We resolve it here against the live balance and hand the model the
+ * concrete figure to act on (or, more often, to ask about, since the base is
+ * usually ambiguous). Null when no percentage-of-money phrase is present.
+ */
+function resolvePercentOfBalance(text: string, ledger: Ledger): string | null {
+  const m = text
+    .toLowerCase()
+    .match(
+      /(\d+(?:\.\d+)?)\s*(?:%|percent)\s*(?:of\s+)?(?:my\s+|the\s+|his\s+|her\s+|their\s+)?(?:remaining\s+|current\s+|available\s+)?(cash|balance|money|remaining|savings|what'?s left)\b/,
+    );
+  if (!m) return null;
+  const pct = Number(m[1]);
+  if (!Number.isFinite(pct) || pct <= 0) return null;
+  const cur = ledger.currency;
+  const bal = balance(ledger);
+  const resolved = Math.round((pct / 100) * bal);
+  return `RELATIVE AMOUNT (computed in code, use verbatim — do NOT recompute): ${pct}% of their current ${formatMoney(bal, cur)} balance = ${formatMoney(resolved, cur)}. If they want to act on a percentage, use this exact figure; if the base or intent is unclear, ask which they mean.`;
+}
+
+/**
+ * Bare acknowledgement filler the system prompt explicitly forbids ("Never
+ * reply with empty filler like 'okay', 'got it', 'done'"). When the model
+ * returns one of these — or nothing — we swap in a grounded reply instead of
+ * showing the forbidden word.
+ */
+function isFillerReply(text: string): boolean {
+  return /^(done|ok(ay)?|got it|alright|sure|noted|great|cool|nice)[.! ]*$/i.test(
+    text.trim(),
+  );
+}
+
+/**
+ * Deterministic, on-brand fallback for when the model hands back nothing
+ * usable (empty or bare filler). Always grounded in the code-owned balance —
+ * never the forbidden bare "Done.". Mutation-aware so a real change still reads
+ * as confirmed.
+ */
+function groundedFallback(ledger: Ledger, mutated: boolean): string {
+  const bal = formatMoney(balance(ledger), ledger.currency);
+  return mutated
+    ? `Done — that's in. Your balance is now ${bal}.`
+    : `Your balance is ${bal}. Tell me what you'd like me to do — log a spend, record income, or set a goal?`;
 }
 
 export interface AgentTurn {
@@ -587,14 +659,45 @@ export async function runAgentTurn(
       !looksLikeObligation(lastUser.content)
     : false;
 
+  // Trailing system notes injected before the model acts — each is a
+  // code-computed fact or instruction the model weaves into its reply. Order is
+  // priority (freshest last is what the model weighs most).
+  const extraNotes: string[] = [];
+
   // Living goal context at the pre-spend moment: when they're WEIGHING a
   // purchase ("should I buy a 50k jacket?") and an open goal exists, hand the
   // agent a code-computed impact note (weeks of goal progress, or money terms
   // when undated) so its advice is grounded, not guessed. Nothing is logged.
-  let purchaseNote: string | null = null;
   if (lastUser && looksLikePreSpendIntent(lastUser.content)) {
     const amount = extractPrimaryAmount(lastUser.content);
-    purchaseNote = purchaseImpactFacts(ledger, amount, ledger.currency);
+    const note = purchaseImpactFacts(ledger, amount, ledger.currency);
+    if (note) extraNotes.push(note);
+  }
+
+  // RELATIVE amount ("invest 6% of my remaining cash"): the model can't do the
+  // arithmetic, so resolve it in code and hand over the concrete figure. Without
+  // this the percentage is silently dropped — exactly the "…please sort that out
+  // → Done." bug where the NGO 6% just vanished.
+  if (lastUser) {
+    const pctNote = resolvePercentOfBalance(lastUser.content, ledger);
+    if (pctNote) extraNotes.push(pctNote);
+  }
+
+  // Ambiguous "act on a future cost": obligation/pre-spend phrasing ("I have to
+  // buy a car") that ALSO carries an explicit act-now request ("…sort that out
+  // for me"). Force is (correctly) suppressed so we don't book a phantom
+  // expense — but the model must not no-op into bare "Done." either. Hand it an
+  // instruction to weigh the amounts honestly and ask ONE sharp question.
+  if (
+    lastUser &&
+    !forceTool &&
+    looksLikeMoneyEvent(lastUser.content) &&
+    looksLikeActionRequest(lastUser.content)
+  ) {
+    const name = ledger.owner?.trim() || "there";
+    extraNotes.push(
+      `ACTION REQUESTED ON MONEY THAT HASN'T MOVED: ${name} used future/obligation phrasing ("have to buy", "gonna", "planning to") AND asked you to act ("sort that out for me"). Nothing has left the account yet, so do NOT log these as expenses. Instead: weigh each amount against their balance in the snapshot, flag honestly anything that's over-balance or a real stretch, and ask ONE sharp question — have they ALREADY paid (then you'll log it), or should you track it as a savings goal? Never reply with bare filler like "Done.".`,
+    );
   }
 
   // Proactive deadline nudge: a near scholarship deadline worth raising
@@ -604,14 +707,14 @@ export async function runAgentTurn(
   // just surfaced.
   const nudge = proactiveDeadlineNudge(ledger, history);
 
-  return runAgentTurnInner(history, ledger, forceTool, purchaseNote, nudge, signal);
+  return runAgentTurnInner(history, ledger, forceTool, extraNotes, nudge, signal);
 }
 
 async function runAgentTurnInner(
   history: ChatMessage[],
   ledger: Ledger,
   forceTool: boolean,
-  purchaseNote: string | null,
+  extraNotes: string[],
   nudge: { id: string; facts: string } | null,
   signal?: AbortSignal,
 ): Promise<AgentTurn> {
@@ -629,10 +732,11 @@ async function runAgentTurnInner(
     { role: "system", content: buildSystemPrompt(ledger), tool_calls: undefined },
     ...toRouterMessages(history),
   ];
-  // Surface the pre-spend impact as a trailing system instruction so it's the
-  // freshest thing the model sees before it advises (code owns the numbers).
-  if (purchaseNote) {
-    messages.push({ role: "system", content: purchaseNote, tool_calls: undefined });
+  // Surface the pre-call notes (pre-spend impact, resolved percentage, ambiguous
+  // action instruction) as trailing system messages so they're the freshest
+  // thing the model sees before it advises (code owns the numbers).
+  for (const note of extraNotes) {
+    messages.push({ role: "system", content: note, tool_calls: undefined });
   }
   // Same mechanism for the deadline nudge — a trailing system fact the model
   // weaves into its reply. It persists into the finalize call too (that step
@@ -759,8 +863,12 @@ async function runAgentTurnInner(
         "Confirm what changed in one short, warm sentence. State the new balance from the snapshot. Do NOT output any function/tool syntax.",
     });
     const final = await chatCompletion(messages, undefined, "auto", signal);
+    const text = (final.content ?? cleaned).trim();
     return {
-      reply: (final.content ?? cleaned).trim() || "Done.",
+      reply:
+        text && !isFillerReply(text)
+          ? text
+          : groundedFallback(working, working !== ledger),
       ledger: working,
       mutated: working !== ledger,
       relatedGoalIds: [...new Set(goalIds)],
@@ -783,8 +891,10 @@ async function runAgentTurnInner(
     };
   }
 
+  const text = (msg.content ?? "").trim();
   return {
-    reply: (msg.content ?? "").trim() || "Done.",
+    reply:
+      text && !isFillerReply(text) ? text : groundedFallback(working, false),
     ledger: working,
     mutated: false,
     relatedGoalIds: [],
