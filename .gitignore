@@ -147,3 +147,11 @@ notes/
 
 # Stray local Solana test-validator scratch (not part of Stash)
 test-ledger/
+
+# Sibyl memory sidecar: the venv and any local memory.db are machine-local.
+# A committed memory.db would leak real user memory into the repo.
+sibyl-svc/.venv/
+__pycache__/
+*.db
+*.db-wal
+*.db-shm

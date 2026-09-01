@@ -1,0 +1,4 @@
+# Pinned: this service is the durable home of user memory, so builds stay reproducible.
+sibyl-memory-client==0.8.0
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
