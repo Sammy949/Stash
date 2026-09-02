@@ -3,28 +3,11 @@ import type { ChatMessage, Currency, Goal, Scholarship } from "@/types";
 import { CloseIcon, PencilIcon, SendIcon } from "@/components/UI/icons";
 import { RowButton } from "@/components/UI/RowButton";
 import { CopyButton } from "@/components/UI/CopyButton";
+import { StashMark } from "@/components/UI/StashMark";
 import { GoalCard } from "@/components/UI/GoalCard";
 import { ScholarshipCard } from "@/components/UI/ScholarshipCard";
 import { SpendingCard } from "./SpendingCard";
 import { Markdown } from "./Markdown";
-
-/** Stash avatar — small emerald vault glyph. */
-function StashAvatar() {
-  return (
-    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-emerald/30 bg-emerald/10">
-      <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-emerald">
-        <circle
-          cx="12"
-          cy="12"
-          r="7"
-          stroke="currentColor"
-          strokeWidth="1.75"
-        />
-        <circle cx="12" cy="12" r="2" fill="currentColor" />
-      </svg>
-    </div>
-  );
-}
 
 function TypingDots() {
   return (
@@ -158,7 +141,7 @@ export function MessageBubble({
   // ── Assistant message ──────────────────────────────────────────────
   return (
     <div className="group flex items-start gap-2.5 animate-slide-up">
-      <StashAvatar />
+      <StashMark className="h-7 w-7" />
       <div className="flex max-w-[85%] flex-col items-start gap-1.5">
         {message.pending ? (
           <div className="rounded-2xl rounded-tl-sm border border-line bg-bg/60 px-3.5 py-2.5">

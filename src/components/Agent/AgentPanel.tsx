@@ -1,22 +1,8 @@
 import { useEffect, useRef } from "react";
 import type { ChatMessage, Currency, Goal, Scholarship } from "@/types";
 import { BuildBadge } from "@/components/UI/BuildBadge";
+import { StashMark } from "@/components/UI/StashMark";
 import { MessageBubble } from "./MessageBubble";
-
-/** Stash's vault glyph in its accent ring. */
-function StashGlyph({ size = 7 }: { size?: number }) {
-  return (
-    <div
-      className={`flex items-center justify-center rounded-full border border-emerald/30 bg-emerald/10`}
-      style={{ height: `${size * 4}px`, width: `${size * 4}px` }}
-    >
-      <svg viewBox="0 0 24 24" fill="none" className="text-emerald" style={{ height: `${size * 2.3}px`, width: `${size * 2.3}px` }}>
-        <circle cx="12" cy="12" r="7" stroke="currentColor" strokeWidth="1.75" />
-        <circle cx="12" cy="12" r="2" fill="currentColor" />
-      </svg>
-    </div>
-  );
-}
 
 /** The conversation transcript — fills the space under the strip when active. */
 export function AgentPanel({
@@ -75,7 +61,7 @@ export function AgentPanel({
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-2.5 border-b border-line px-5 py-3">
-        <StashGlyph size={7} />
+        <StashMark className="h-7 w-7" />
         <h2 className="shrink-0 text-sm font-semibold">Stash AI</h2>
         {/* Hidden on the narrowest screens so the header can't overflow now that
             it also carries the reset and the build badge. */}
@@ -107,7 +93,7 @@ export function AgentPanel({
       >
         {greeting ? (
           <div className="flex h-full flex-col items-center justify-center px-2 text-center">
-            <StashGlyph size={12} />
+            <StashMark className="h-12 w-12" />
             <p className="mt-4 max-w-sm whitespace-pre-wrap text-sm leading-relaxed text-muted">
               {greeting.content}
             </p>
