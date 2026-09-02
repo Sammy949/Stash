@@ -3,6 +3,7 @@ import type { AgentCard, ChatMessage, Ledger } from "@/types";
 import { runAgentTurn, StashComputeError } from "@/lib/ogCompute";
 import { getGoals } from "@/lib/ledger";
 import { EMPTY_RECALL, type MemoryPort } from "@/lib/memory";
+import { PLAIN_OPENER, deterministicOpener } from "@/lib/opener";
 import {
   matchScholarshipsByMention,
   mostUrgentScholarships,
@@ -11,12 +12,6 @@ import {
   REVIEW_GOALS_CHIP,
   SCHOLARSHIP_DEADLINES_CHIP,
 } from "@/components/Agent/QuickChips";
-
-const OPENING_MESSAGE = `Welcome back.
-
-I remember your financial world, so you don't have to.
-
-What do you want to stay ahead of today?`;
 
 function makeMessage(
   role: ChatMessage["role"],
@@ -44,7 +39,10 @@ function makeMessage(
  * which is exactly what the deletion test looks like.
  */
 export function useAgent(memory?: MemoryPort) {
-  const ref = useRef<ChatMessage[]>([makeMessage("assistant", OPENING_MESSAGE)]);
+  // Seeded with the no-memory greeting so the transcript is readable from the
+  // first frame. openerFromMemory() upgrades it once the recall pack lands; if
+  // that never happens, this text is what ships, which is the point.
+  const ref = useRef<ChatMessage[]>([makeMessage("assistant", PLAIN_OPENER)]);
   const [messages, setMessages] = useState<ChatMessage[]>(ref.current);
   const [isThinking, setIsThinking] = useState(false);
   // Lets the user cancel an in-flight turn (slow node, wrong message). The
@@ -77,6 +75,44 @@ export function useAgent(memory?: MemoryPort) {
   const pushCard = useCallback((card: AgentCard, content = "") => {
     commit([...ref.current, makeMessage("assistant", content, { card })]);
   }, []);
+
+  /**
+   * Recompute the cold-start opener from what Stash currently remembers.
+   *
+   * Only rewrites the transcript while it is still JUST the opener, so it can
+   * never edit a real conversation. Deterministic and synchronous: the recalled
+   * greeting is code-computed, so there is no window where the first thing on
+   * screen is empty or waiting.
+   */
+  const openerFromMemory = useCallback(
+    (ledger: Ledger, lastVisitAt: string | null) => {
+      if (ref.current.length !== 1 || ref.current[0].role !== "assistant") return;
+      const recall = memory?.read() ?? EMPTY_RECALL;
+      const content = deterministicOpener(ledger, recall, lastVisitAt);
+      if (content === ref.current[0].content) return;
+      commit([{ ...ref.current[0], content }]);
+    },
+    [memory],
+  );
+
+  /**
+   * Start a new session. The transcript clears; memory does NOT. This is the
+   * demo's reset, and the gap between the two is the whole point: an empty chat
+   * whose first line still knows the user.
+   */
+  const startFresh = useCallback(
+    (ledger: Ledger, lastVisitAt: string | null) => {
+      if (inFlightRef.current) return;
+      const recall = memory?.read() ?? EMPTY_RECALL;
+      commit([
+        makeMessage(
+          "assistant",
+          deterministicOpener(ledger, recall, lastVisitAt),
+        ),
+      ]);
+    },
+    [memory],
+  );
 
   /**
    * Send a user turn. The agent may call tools that mutate the ledger; if
@@ -229,5 +265,15 @@ export function useAgent(memory?: MemoryPort) {
     [send],
   );
 
-  return { messages, isThinking, send, stop, pushAssistant, pushCard, editMessage };
+  return {
+    messages,
+    isThinking,
+    send,
+    stop,
+    pushAssistant,
+    pushCard,
+    editMessage,
+    openerFromMemory,
+    startFresh,
+  };
 }

@@ -1,7 +1,25 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { execSync } from "node:child_process";
 import path from "node:path";
+
+/**
+ * Short commit hash of the build, surfaced in the UI next to a live clock.
+ * The hackathon's recall beat has to be one continuous unedited take, and a
+ * constant SHA beside a running clock is what makes that visible on camera.
+ */
+function buildSha(): string {
+  try {
+    return execSync("git rev-parse --short HEAD", {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+  } catch {
+    return "dev"; // building outside a git checkout (e.g. a source tarball)
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -18,6 +36,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
+    define: {
+      __BUILD_SHA__: JSON.stringify(buildSha()),
+    },
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),

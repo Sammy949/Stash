@@ -32,8 +32,8 @@ function StashGlyph() {
 
 /**
  * The welcome-back greeting card — memory felt as Stash greeting you on return,
- * not a static "what I know" list. Deterministic content (see deriveWelcomeBack);
- * dismissible.
+ * not a static "what I know" list. Deterministic content (see deriveWelcomeBack),
+ * and it only exists when Sibyl actually remembers something; dismissible.
  */
 export function WelcomeBack({
   data,
@@ -48,12 +48,7 @@ export function WelcomeBack({
         {/* <StashGlyph /> */}
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-lg font-semibold text-ink">{data.greeting}</p>
-              <p className="label-caps mt-0.5 text-[10px] text-muted">
-                Since you were last here
-              </p>
-            </div>
+            <p className="text-lg font-semibold text-ink">{data.greeting}</p>
             <button
               type="button"
               onClick={onDismiss}

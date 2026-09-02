@@ -1,5 +1,8 @@
 /// <reference types="vite/client" />
 
+/** Short commit hash of this build, injected by vite.config.ts. */
+declare const __BUILD_SHA__: string;
+
 interface ImportMetaEnv {
   /** 0G Compute Router API key (OpenAI-compatible). */
   readonly VITE_OG_COMPUTE_API_KEY: string;
@@ -18,6 +21,11 @@ interface ImportMetaEnv {
   readonly VITE_OG_RPC_URL: string;
   /** 0G Storage turbo indexer gateway. */
   readonly VITE_OG_INDEXER_URL: string;
+  /**
+   * Which wallet's Sibyl memory to read. A stand-in until wallet-connect
+   * supplies the connected account. Not secret.
+   */
+  readonly VITE_MEMORY_TENANT?: string;
 }
 
 interface ImportMeta {

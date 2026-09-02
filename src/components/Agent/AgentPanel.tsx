@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { ChatMessage, Currency, Goal, Scholarship } from "@/types";
+import { BuildBadge } from "@/components/UI/BuildBadge";
 import { MessageBubble } from "./MessageBubble";
 
 /** Stash's vault glyph in its accent ring. */
@@ -21,6 +22,7 @@ function StashGlyph({ size = 7 }: { size?: number }) {
 export function AgentPanel({
   messages,
   onEditMessage,
+  onStartFresh,
   isThinking,
   goals,
   scholarships,
@@ -28,6 +30,11 @@ export function AgentPanel({
 }: {
   messages: ChatMessage[];
   onEditMessage: (id: string, text: string) => void;
+  /**
+   * Clear the transcript without touching memory. The reason it exists: a new
+   * session should meet a Stash that still knows you.
+   */
+  onStartFresh?: () => void;
   isThinking: boolean;
   /** Live goals — passed to bubbles to render inline goal cards. */
   goals: Goal[];
@@ -69,14 +76,27 @@ export function AgentPanel({
       {/* Header */}
       <div className="flex items-center gap-2.5 border-b border-line px-5 py-3">
         <StashGlyph size={7} />
-        <h2 className="text-sm font-semibold">Stash AI</h2>
-        <span className="flex items-center gap-1.5">
+        <h2 className="shrink-0 text-sm font-semibold">Stash AI</h2>
+        {/* Hidden on the narrowest screens so the header can't overflow now that
+            it also carries the reset and the build badge. */}
+        <span className="hidden items-center gap-1.5 sm:flex">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald" />
           <span className="label-caps text-[10px] text-muted">Active</span>
         </span>
-        <span className="label-caps ml-auto rounded-full border border-line px-2 py-1 text-[10px] text-muted">
-          0G Powered
-        </span>
+        <div className="ml-auto flex items-center gap-2">
+          {onStartFresh && (
+            <button
+              type="button"
+              onClick={onStartFresh}
+              disabled={isThinking}
+              title="Clear this conversation. Stash keeps what it remembers."
+              className="flex h-9 items-center rounded-lg px-2 text-[11px] text-muted transition-colors hover:bg-bg hover:text-ink disabled:opacity-40"
+            >
+              Start fresh
+            </button>
+          )}
+          <BuildBadge />
+        </div>
       </div>
 
       {/* Transcript */}

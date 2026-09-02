@@ -11,6 +11,7 @@ import type { OnboardingProfile } from "@/components/Onboarding/Onboarding";
 import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
 import { useMemory } from "@/hooks/useMemory";
+import { BuildBadge } from "@/components/UI/BuildBadge";
 import { ensureStorageSchema, getStoredRootHash } from "@/lib/ogStorage";
 import { deriveObservation } from "@/lib/observations";
 import { deriveWelcomeBack } from "@/lib/welcomeBack";
@@ -64,6 +65,8 @@ export default function App() {
     pushAssistant,
     pushCard,
     editMessage,
+    openerFromMemory,
+    startFresh,
   } = useAgent(memoryPort);
 
   // Returning users (a synced ledger exists) skip onboarding.
@@ -95,10 +98,13 @@ export default function App() {
     if (!onboarded || hydrating || recalling) return;
     const last = localStorage.getItem(LAST_VISIT_KEY);
     setWelcome(deriveWelcomeBack(ledger, last, recall));
+    // The transcript's first line is the same recall, as prose. Computed here so
+    // both surfaces say the same thing from the same facts.
+    openerFromMemory(ledger, last);
     localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString());
     // Intentionally keyed on hydration settling, not on every ledger change —
     // the greeting is a one-shot snapshot of "since last visit". It also waits
-    // on the Sibyl read, since the remembered goal is part of the greeting.
+    // on the Sibyl read, since what Stash remembers IS the greeting.
   }, [onboarded, hydrating, recalling]);
 
   function completeOnboarding(profile: OnboardingProfile) {
@@ -262,6 +268,7 @@ export default function App() {
             <div>
               <h1 className="text-lg font-semibold leading-none">Stash</h1>
             </div>
+            <BuildBadge className="ml-auto" />
           </header>
         )}
 
@@ -275,6 +282,9 @@ export default function App() {
             <AgentPanel
               messages={messages}
               onEditMessage={handleEditMessage}
+              onStartFresh={() =>
+                startFresh(ledger, localStorage.getItem(LAST_VISIT_KEY))
+              }
               isThinking={isThinking}
               goals={ledger.goals}
               scholarships={ledger.scholarships}
@@ -283,13 +293,19 @@ export default function App() {
           </div>
         ) : (
           <main className="flex-1 overflow-y-auto px-4 py-6">
-            {welcome && (
-              <div className="mx-auto mb-5 w-full max-w-2xl">
-                <WelcomeBack
-                  data={welcome}
-                  onDismiss={() => setWelcome(null)}
-                />
-              </div>
+            {recalling ? (
+              <p className="mx-auto mb-5 w-full max-w-2xl animate-pulse text-sm text-muted">
+                Recalling what I know about you…
+              </p>
+            ) : (
+              welcome && (
+                <div className="mx-auto mb-5 w-full max-w-2xl">
+                  <WelcomeBack
+                    data={welcome}
+                    onDismiss={() => setWelcome(null)}
+                  />
+                </div>
+              )
             )}
             <Dashboard
               ledger={ledger}
