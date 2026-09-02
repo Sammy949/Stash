@@ -23,6 +23,12 @@ export const CHIPS = [
   SYNC_CHIP,
 ];
 
+/**
+ * Conversation starters. Kept as real buttons rather than wrapped in Badge: the
+ * 44px touch target and the horizontal-scroll row are load-bearing on phones,
+ * and Badge's own sizing fights both. What it does borrow from the new system is
+ * scroll-fade-e, so the cut edge reads as "more to the right" instead of clipped.
+ */
 export function QuickChips({
   onPick,
   disabled = false,
@@ -33,13 +39,14 @@ export function QuickChips({
   return (
     // Single horizontally-scrollable row on phones (no wrap stealing vertical
     // space above the keyboard); wraps normally once there's room.
-    <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden">
+    <div className="no-scrollbar scroll-fade-e -mx-4 flex gap-2 overflow-x-auto px-4 pb-0.5 sm:mx-0 sm:flex-wrap sm:px-0 sm:[--scroll-fade-mask:none]">
       {CHIPS.map((c) => (
         <button
           key={c}
+          type="button"
           onClick={() => onPick(c)}
           disabled={disabled}
-          className="inline-flex min-h-[44px] shrink-0 items-center whitespace-nowrap rounded-full border border-border bg-background px-3.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-full border border-border bg-background px-3.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
         >
           {c}
         </button>

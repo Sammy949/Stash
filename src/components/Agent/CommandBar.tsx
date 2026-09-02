@@ -1,3 +1,4 @@
+import { Button } from "@/components/shadcn/button";
 import { QuickChips } from "./QuickChips";
 import { InputBar } from "./InputBar";
 import { ChatIcon } from "@/components/UI/icons";
@@ -30,25 +31,28 @@ export function CommandBar({
   return (
     <div className="px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
       <div className="mx-auto w-full max-w-2xl">
-        {/* Chips float above the pill; the pill (InputBar) carries its own
-            border + shadow so it reads as a floating command line. */}
-        <div className="mb-2.5">
-          <QuickChips onPick={onSend} disabled={isThinking} />
-        </div>
-        {/* Quiet ghost affordance + the input pill. The chat button reopens the
-            transcript without triggering a turn; it sits out of the way until
-            there's a conversation to return to. */}
-        <div className="flex items-center gap-1.5">
+        {/* Starters sit above the composer, and only before the conversation
+            starts — once the panel is open they are noise, since the transcript
+            is the context. */}
+        {!active && (
+          <div className="mb-2.5">
+            <QuickChips onPick={onSend} disabled={isThinking} />
+          </div>
+        )}
+        {/* Aligned to the bottom so the reopen button stays level with the send
+            button as the composer grows. */}
+        <div className="flex items-end gap-1.5">
           {canOpenPanel && onOpenPanel && (
-            <button
-              type="button"
+            <Button
+              variant="outline"
+              size="icon-lg"
               onClick={onOpenPanel}
               aria-label="Open conversation"
               title="Open conversation"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
+              className="mb-1 size-11 shrink-0 rounded-full text-muted-foreground"
             >
-              <ChatIcon className="h-4 w-4" />
-            </button>
+              <ChatIcon className="size-4" />
+            </Button>
           )}
           <div className="min-w-0 flex-1">
             <InputBar

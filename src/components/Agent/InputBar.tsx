@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { SendIcon, SparkleIcon, StopIcon } from "@/components/UI/icons";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupTextarea,
+} from "@/components/shadcn/input-group";
+import { Kbd } from "@/components/shadcn/kbd";
 
 /** Rotating prompt hints — keeps the command bar feeling alive (and teaches the
  *  range of things Stash can do) instead of one fixed example. */
@@ -13,6 +20,15 @@ const PLACEHOLDERS = [
   "Try: “I earn ₦40,000/mo tutoring”",
 ];
 
+/**
+ * The composer, built on InputGroup.
+ *
+ * The primitive owns the parts that were previously hand-rolled and slightly
+ * wrong: the focus ring lives on the group rather than the textarea (so the
+ * whole control lights up as one object), clicking any padding focuses the
+ * field, and `field-sizing-content` on the textarea grows it without a
+ * scrollHeight measurement on every keystroke.
+ */
 export function InputBar({
   onSend,
   onStop,
@@ -31,16 +47,14 @@ export function InputBar({
   const [text, setText] = useState("");
   const taRef = useRef<HTMLTextAreaElement>(null);
   // Start on a random hint so each session opens a little differently.
-  const [phIdx, setPhIdx] = useState(
-    () => Math.floor(Math.random() * PLACEHOLDERS.length),
+  const [phIdx, setPhIdx] = useState(() =>
+    Math.floor(Math.random() * PLACEHOLDERS.length),
   );
 
   // Focus when the panel becomes active, and refocus after a turn settles
   // (disabled → false) while still active — but never on the dashboard.
   useEffect(() => {
-    if (autoFocus && !disabled) {
-      taRef.current?.focus();
-    }
+    if (autoFocus && !disabled) taRef.current?.focus();
   }, [autoFocus, disabled]);
 
   // Gently cycle the placeholder hint while idle. Held still during a turn and
@@ -55,71 +69,73 @@ export function InputBar({
     return () => window.clearInterval(id);
   }, [disabled]);
 
-  function grow() {
-    const ta = taRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`; // cap ~6 lines
-  }
-
   function send() {
     const t = text.trim();
     if (!t || disabled) return;
     onSend(t);
     setText("");
-    requestAnimationFrame(() => {
-      if (taRef.current) taRef.current.style.height = "auto";
-    });
   }
 
-  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    // Enter sends; Shift+Enter inserts a newline (long prompts on mobile).
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      send();
-    }
-  }
+  const canSend = Boolean(text.trim()) && !disabled;
 
   return (
-    // Floating command pill — one row: AI glyph · input · circular action.
-    <div className="flex items-center gap-1.5 rounded-full border border-border bg-background px-2 py-1 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.7)] transition-colors focus-within:border-primary/50">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center text-primary">
-        <SparkleIcon className="h-4 w-4" />
-      </span>
-      <textarea
+    <InputGroup className="rounded-2xl bg-card">
+      <InputGroupAddon align="inline-start" className="self-start pt-2">
+        <SparkleIcon className="size-4 text-primary" aria-hidden="true" />
+      </InputGroupAddon>
+
+      <InputGroupTextarea
         ref={taRef}
         rows={1}
         value={text}
         disabled={disabled}
-        onChange={(e) => {
-          setText(e.target.value);
-          grow();
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          // Enter sends; Shift+Enter inserts a newline (long prompts on mobile).
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            send();
+          }
         }}
-        onKeyDown={onKeyDown}
         placeholder={PLACEHOLDERS[phIdx]}
-        className="max-h-40 flex-1 resize-none bg-transparent py-2 text-sm leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-50"
+        aria-label="Message Stash"
+        className="max-h-40 min-h-9"
       />
-      {disabled && onStop ? (
-        <button
-          type="button"
-          onClick={onStop}
-          aria-label="Stop"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-card text-foreground transition-opacity hover:opacity-90"
-        >
-          {/* Phosphor's Stop at fill weight is already a solid square. */}
-          <StopIcon className="h-4 w-4" />
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={send}
-          disabled={disabled || !text.trim()}
-          aria-label="Send"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <SendIcon className="h-5 w-5 text-white" />
-        </button>
-      )}
-    </div>
+
+      <InputGroupAddon align="inline-end" className="self-end pb-1.5">
+        {/* The hint is decoration for pointer users; it never replaces the
+            button, and it hides on small screens where space is scarce. */}
+        {canSend && (
+          <span
+            aria-hidden="true"
+            className="hidden items-center gap-1 text-[10px] text-muted-foreground sm:flex"
+          >
+            <Kbd>↵</Kbd> send
+          </span>
+        )}
+        {disabled && onStop ? (
+          <InputGroupButton
+            size="icon-sm"
+            variant="outline"
+            onClick={onStop}
+            aria-label="Stop generating"
+            className="rounded-full"
+          >
+            <StopIcon className="size-4" />
+          </InputGroupButton>
+        ) : (
+          <InputGroupButton
+            size="icon-sm"
+            variant="default"
+            onClick={send}
+            disabled={!canSend}
+            aria-label="Send message"
+            className="rounded-full"
+          >
+            <SendIcon className="size-4" />
+          </InputGroupButton>
+        )}
+      </InputGroupAddon>
+    </InputGroup>
   );
 }
