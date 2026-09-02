@@ -1,5 +1,10 @@
 @import "tailwindcss";
-/* scroll-fade-*, shimmer, no-scrollbar and friends — 24 utilities the vendored
+/* animate-in / fade-in-0 / zoom-in-95 / slide-in-from-*: the enter and exit
+   utilities every vendored popup (dropdown, dialog, sheet, tooltip, toast)
+   references. Without this they resolve to nothing and a menu renders with zero
+   size, which reads as "the trigger does nothing". Ferry imports the same. */
+@import "tw-animate-css";
+/* scroll-fade-*, shimmer, no-scrollbar and friends: 24 utilities the vendored
    primitives reference. Resolves via the package's ./tailwind.css export. */
 @import "shadcn/tailwind.css";
 
