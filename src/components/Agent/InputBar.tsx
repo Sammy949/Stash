@@ -6,28 +6,34 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from "@/components/shadcn/input-group";
-import { Kbd } from "@/components/shadcn/kbd";
 
-/** Rotating prompt hints — keeps the command bar feeling alive (and teaches the
- *  range of things Stash can do) instead of one fixed example. */
+/**
+ * Rotating prompt hints. These teach the range of what Stash can do, which a
+ * single fixed example cannot. They are hints, never labels: the field carries a
+ * real aria-label of its own.
+ */
 const PLACEHOLDERS = [
-  "Try: “I got paid ₦20,000”",
-  "Try: “I spent ₦3,000 on lunch”",
-  "Ask: “Can I afford ₦15k this week?”",
-  "Try: “Save ₦50,000 for a laptop”",
-  "Try: “Track a scholarship deadline”",
-  "Ask: “Where’s my money going?”",
-  "Try: “I earn ₦40,000/mo tutoring”",
+  "I got paid ₦20,000",
+  "I spent ₦3,000 on lunch",
+  "Can I afford ₦15k this week?",
+  "Save ₦50,000 for a laptop",
+  "Track a scholarship deadline",
+  "Where's my money going?",
+  "I earn ₦40,000/mo tutoring",
 ];
 
 /**
- * The composer, built on InputGroup.
+ * The composer.
  *
- * The primitive owns the parts that were previously hand-rolled and slightly
- * wrong: the focus ring lives on the group rather than the textarea (so the
- * whole control lights up as one object), clicking any padding focuses the
- * field, and `field-sizing-content` on the textarea grows it without a
- * scrollHeight measurement on every keystroke.
+ * Built on InputGroup with the actions on a `block-end` row rather than inline,
+ * which is the shape the shadcn docs use for a prompt textarea and the shape that
+ * survives growth: an inline-end button has to align itself against a field whose
+ * height changes, and the vertical-centre-vs-bottom compromise is what made the
+ * old version read as improvised. On its own row the text occupies the full width
+ * and the controls sit on a stable baseline underneath.
+ *
+ * Only one control is ever present: send, or stop while a turn runs. There is no
+ * filled-primary-beside-ghost pair, and no keyboard hint dressed up as a chip.
  */
 export function InputBar({
   onSend,
@@ -52,13 +58,13 @@ export function InputBar({
   );
 
   // Focus when the panel becomes active, and refocus after a turn settles
-  // (disabled → false) while still active — but never on the dashboard.
+  // (disabled → false) while still active, but never on the dashboard.
   useEffect(() => {
     if (autoFocus && !disabled) taRef.current?.focus();
   }, [autoFocus, disabled]);
 
-  // Gently cycle the placeholder hint while idle. Held still during a turn and
-  // for reduced-motion users (auto-changing text reads as motion to some).
+  // Cycle the hint while idle. Held still during a turn, and for reduced-motion
+  // users, since text that changes on its own reads as motion to some people.
   useEffect(() => {
     if (disabled) return;
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
@@ -79,11 +85,7 @@ export function InputBar({
   const canSend = Boolean(text.trim()) && !disabled;
 
   return (
-    <InputGroup className="rounded-2xl bg-card">
-      <InputGroupAddon align="inline-start" className="self-start pt-2">
-        <SparkleIcon className="size-4 text-primary" aria-hidden="true" />
-      </InputGroupAddon>
-
+    <InputGroup className="rounded-2xl border-border bg-card">
       <InputGroupTextarea
         ref={taRef}
         rows={1}
@@ -99,27 +101,27 @@ export function InputBar({
         }}
         placeholder={PLACEHOLDERS[phIdx]}
         aria-label="Message Stash"
-        className="max-h-40 min-h-9"
+        className="max-h-40 min-h-11 px-3.5 pt-3 text-sm leading-relaxed"
       />
 
-      <InputGroupAddon align="inline-end" className="self-end pb-1.5">
-        {/* The hint is decoration for pointer users; it never replaces the
-            button, and it hides on small screens where space is scarce. */}
-        {canSend && (
-          <span
-            aria-hidden="true"
-            className="hidden items-center gap-1 text-[10px] text-muted-foreground sm:flex"
-          >
-            <Kbd>↵</Kbd> send
-          </span>
-        )}
+      {/* Actions on their own row: the field keeps the full width, and the
+          button sits on a fixed baseline instead of chasing the field's height.
+          Ordered after the control in markup so tab order follows reading
+          order; `align` handles the visual placement. */}
+      <InputGroupAddon align="block-end" className="gap-2 px-2.5 pb-2">
+        {/* The one glyph that says "this is the agent", not a search box. It is
+            the only decoration on the row; everything else here is an action. */}
+        <SparkleIcon
+          className="size-4 text-muted-foreground"
+          aria-hidden="true"
+        />
         {disabled && onStop ? (
           <InputGroupButton
             size="icon-sm"
             variant="outline"
             onClick={onStop}
             aria-label="Stop generating"
-            className="rounded-full"
+            className="ml-auto"
           >
             <StopIcon className="size-4" />
           </InputGroupButton>
@@ -130,7 +132,7 @@ export function InputBar({
             onClick={send}
             disabled={!canSend}
             aria-label="Send message"
-            className="rounded-full"
+            className="ml-auto"
           >
             <SendIcon className="size-4" />
           </InputGroupButton>
