@@ -27,6 +27,17 @@ export function rememberedName(ledger: Ledger, recall: RecallPack): string {
   return remembered || ledger.owner.trim();
 }
 
+/** How many things Stash currently remembers, across every category. */
+export function rememberedCount(recall: RecallPack): number {
+  return (
+    (recall.identities?.length ?? 0) +
+    (recall.goals?.length ?? 0) +
+    (recall.habits?.length ?? 0) +
+    (recall.preferences?.length ?? 0) +
+    (recall.opportunities?.length ?? 0)
+  );
+}
+
 /** The remembered goal (a Sibyl `goal` entity), quoted verbatim. */
 export function rememberedGoal(recall: RecallPack): string | null {
   const goal = (recall.goals ?? [])[0];

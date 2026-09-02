@@ -7,7 +7,12 @@ import { IconContext } from "@phosphor-icons/react";
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
 import App from "./App.tsx";
+import { initTheme } from "./hooks/useTheme.ts";
 import "./index.css";
+
+// Resolve the stored theme onto <html> BEFORE the first paint, so the page never
+// flashes the wrong mode and corrects itself a frame later.
+initTheme();
 
 /**
  * One weight for every icon in the app, set once.

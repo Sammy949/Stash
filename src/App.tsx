@@ -12,6 +12,8 @@ import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
 import { useMemory } from "@/hooks/useMemory";
 import { BuildBadge } from "@/components/UI/BuildBadge";
+import { StashMark } from "@/components/UI/StashMark";
+import { AccountMenu } from "@/components/UI/AccountMenu";
 import { MemoryIcon } from "@/components/UI/icons";
 import {
   Marker,
@@ -22,6 +24,7 @@ import { ensureStorageSchema, getStoredRootHash } from "@/lib/ogStorage";
 import { deriveObservation } from "@/lib/observations";
 import { deriveWelcomeBack } from "@/lib/welcomeBack";
 import type { WelcomeBack as WelcomeBackData } from "@/lib/welcomeBack";
+import { rememberedCount, rememberedName } from "@/lib/opener";
 import { analyzeSpending, isSpendingQuery } from "@/lib/analysis";
 import {
   goalProgressPct,
@@ -270,11 +273,16 @@ export default function App() {
             we drop this third bar to give the transcript back its height. */}
         {!agentActive && (
           <header className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-            <img src="/logo.svg" alt="Stash" className="h-7 w-7 rounded-lg" />
-            <div>
-              <h1 className="text-lg font-semibold leading-none">Stash</h1>
+            <StashMark className="h-7 w-7" />
+            <h1 className="text-lg font-semibold leading-none">Stash</h1>
+            <div className="ml-auto flex items-center gap-3">
+              <BuildBadge />
+              <AccountMenu
+                name={rememberedName(ledger, recall)}
+                currency={ledger.currency}
+                memoryCount={rememberedCount(recall)}
+              />
             </div>
-            <BuildBadge className="ml-auto" />
           </header>
         )}
 
