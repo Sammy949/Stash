@@ -53,7 +53,7 @@ export function GoalCard({ goal, currency }: { goal: Goal; currency: Currency })
         </span>
       </div>
 
-      {/* Progress bar — blue fill, capped at 100% by goalProgressPct */}
+      {/* Progress bar: blue fill, capped at 100% by goalProgressPct */}
       <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-background">
         <div
           className="h-full rounded-full bg-primary"

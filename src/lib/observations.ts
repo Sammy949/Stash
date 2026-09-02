@@ -41,5 +41,5 @@ export function deriveObservation(
   if (!goal) return null;
 
   const amount = formatMoney(income.amount, next.currency);
-  return `By the way — you just brought in ${amount}, and you told me: “${memoryLine(goal)}”. Want to set some aside for that before it gets spent?`;
+  return `By the way: you just brought in ${amount}, and you told me: “${memoryLine(goal)}”. Want to set some aside for that before it gets spent?`;
 }

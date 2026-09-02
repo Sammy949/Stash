@@ -57,7 +57,7 @@ export function VaultCard({
             }`}
           />
 
-          {/* Sync / persistence status — one quiet line under the balance. */}
+          {/* Sync / persistence status: one quiet line under the balance. */}
           <div className="mt-3 h-4 text-xs">
             {hydrating ? (
               <span className="text-muted-foreground">Restoring from 0G Storage…</span>
@@ -129,7 +129,7 @@ export function VaultCard({
         />
       </div>
 
-      {/* Empty-first nudge — only before any money is logged. */}
+      {/* Empty-first nudge: only before any money is logged. */}
       {!hydrating && ledger.transactions.length === 0 && (
         <p className="mt-4 text-center text-[11px] text-muted-foreground">
           Tell Stash about your money below to get started.

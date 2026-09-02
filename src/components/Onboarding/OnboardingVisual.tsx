@@ -28,7 +28,7 @@ const SCENES = [
   {
     tag: "Baseline",
     title: "Your starting point",
-    body: "Tell Stash where you stand today — every number from here on is derived, never guessed.",
+    body: "Tell Stash where you stand today: every number from here on is derived, never guessed.",
   },
 ];
 
@@ -58,7 +58,7 @@ export function OnboardingVisual({
         <Scene step={step} currency={currency} />
       </div>
 
-      {/* Caption — re-keyed per step so it re-animates on change */}
+      {/* Caption: re-keyed per step so it re-animates on change */}
       <div key={step} className="relative z-10 animate-slide-up">
         <p className="label-caps text-[10px] text-primary">{scene.tag}</p>
         <p className="mt-2 text-lg font-semibold tracking-tight text-foreground">
@@ -224,7 +224,7 @@ function CurrencyScene({ currency }: { currency: Currency }) {
         ))}
       </div>
 
-      {/* chosen currency — glowing centre coin */}
+      {/* chosen currency: glowing centre coin */}
       <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-primary/50 bg-primary/15 shadow-[0_0_30px_-4px_rgba(59,130,246,0.55)]">
         <span className="font-data text-3xl font-semibold text-primary">
           {currencySymbol(currency)}

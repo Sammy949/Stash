@@ -136,7 +136,7 @@ export default function App() {
       pushAssistant(
         ok
           ? SYNC_CONFIRMATION
-          : "I couldn't sync to 0G Storage just now — the upload didn't go through. Check the toast for details and try again.",
+          : "I couldn't sync to 0G Storage just now: the upload didn't go through. Check the toast for details and try again.",
       );
       return;
     }
@@ -201,7 +201,7 @@ export default function App() {
         // sync a rewind that never took effect. Tell the user so the silent
         // revert doesn't read as "nothing happened".
         applyLedger(prevLedger);
-        toast("Edit rolled back — your conversation is unchanged.");
+        toast("Edit rolled back: your conversation is unchanged.");
       }
     })();
   }
@@ -266,9 +266,9 @@ export default function App() {
 
   return (
     <div className="h-dvh bg-background text-foreground">
-      {/* Centered platform column — doesn't stretch on wide screens. */}
+      {/* Centered platform column: doesn't stretch on wide screens. */}
       <div className="mx-auto flex h-full max-w-2xl flex-col">
-        {/* Top bar — only on the dashboard. In chat mode the balance strip +
+        {/* Top bar: only on the dashboard. In chat mode the balance strip +
             "Stash AI" header are the chrome (matches the Stitch reference), so
             we drop this third bar to give the transcript back its height. */}
         {!agentActive && (
@@ -286,7 +286,7 @@ export default function App() {
           </header>
         )}
 
-        {/* Content — Split-Shift */}
+        {/* Content: Split-Shift */}
         {agentActive ? (
           <div className="flex min-h-0 flex-1 animate-slide-up flex-col">
             <DashboardStrip
@@ -340,9 +340,9 @@ export default function App() {
           </main>
         )}
 
-        {/* Command bar — always present. While the panel is closed and a
+        {/* Command bar: always present. While the panel is closed and a
             conversation already exists, it offers a quiet way to reopen the
-            transcript (review only — no message sent, no agent turn). */}
+            transcript (review only: no message sent, no agent turn). */}
         <div className="shrink-0">
           <CommandBar
             onSend={handleSend}

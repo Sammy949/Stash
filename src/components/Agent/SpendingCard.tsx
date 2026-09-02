@@ -43,7 +43,7 @@ export function SpendingCard({ data }: { data: SpendingBreakdown }) {
 
       <p className="mt-3 text-xs text-muted-foreground">
         <span className="font-medium text-foreground">{data.topLabel}</span> is your
-        biggest category — {data.topShare}% of the last {data.windowDays} days.
+        biggest category: {data.topShare}% of the last {data.windowDays} days.
       </p>
     </div>
   );

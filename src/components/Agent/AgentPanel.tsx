@@ -112,9 +112,9 @@ export function AgentPanel({
         </MessageScroller>
       </MessageScrollerProvider>
 
-      {/* Disclaimer — code owns the numbers, but advice/prose can still err. */}
+      {/* Disclaimer: code owns the numbers, but advice/prose can still err. */}
       <p className="shrink-0 px-5 pb-2 text-center text-[10px] text-muted-foreground">
-        Stash can make mistakes — double-check anything important.
+        Stash can make mistakes, so double-check anything important.
       </p>
     </div>
   );

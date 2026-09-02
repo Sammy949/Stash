@@ -32,7 +32,7 @@ export function CommandBar({
     <div className="px-4 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
       <div className="mx-auto w-full max-w-2xl">
         {/* Starters sit above the composer, and only before the conversation
-            starts — once the panel is open they are noise, since the transcript
+            starts: once the panel is open they are noise, since the transcript
             is the context. */}
         {!active && (
           <div className="mb-2.5">

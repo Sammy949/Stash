@@ -51,7 +51,7 @@ export function Onboarding({
 
   return (
     <div className="flex min-h-dvh overflow-y-auto bg-background p-4 py-[max(1rem,env(safe-area-inset-top))] text-foreground md:p-8">
-      {/* Floating card — split on desktop, form-only on mobile. `m-auto` centers
+      {/* Floating card: split on desktop, form-only on mobile. `m-auto` centers
           when there's room but lets the card scroll into view (top and bottom)
           when a small screen + open keyboard make it taller than the viewport,
           so the primary CTA is never trapped behind the keyboard. */}
@@ -70,9 +70,9 @@ export function Onboarding({
               </span>
             </div>
 
-            {/* Progress segments — click a reached one to jump back and edit.
+            {/* Progress segments: click a reached one to jump back and edit.
                 Unreached steps are inert (plain spans): not clickable, and the
-                cursor stays normal — no disabled/blocked-cursor affordance. */}
+                cursor stays normal: no disabled/blocked-cursor affordance. */}
             <div className="mb-8 flex gap-1.5">
               {Array.from({ length: total }).map((_, i) => {
                 const reached = i <= maxStep;
@@ -134,7 +134,7 @@ export function Onboarding({
                   What should I call you?
                 </h1>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Just a name — no email, no password.
+                  Just a name: no email, no password.
                 </p>
                 <input
                   autoFocus
