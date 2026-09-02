@@ -42,6 +42,11 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
+        // The vendored shadcn components import lucide (stroke-only) icons.
+        // Point them at the phosphor shim so the whole interface renders one
+        // filled weight instead of mixing outline chevrons into filled icons.
+        // Mirrored in tsconfig.app.json paths so tsc checks what actually runs.
+        "lucide-react": path.resolve(__dirname, "./src/lib/lucide-shim.ts"),
       },
     },
     // ethers and the 0G SDK are loaded via dynamic import() in ogStorage.ts

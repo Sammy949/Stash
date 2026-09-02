@@ -106,8 +106,8 @@ export function InputBar({
           aria-label="Stop"
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-card text-foreground transition-opacity hover:opacity-90"
         >
-          {/* Filled so it reads as a stop button rather than an empty box. */}
-          <StopIcon className="h-4 w-4" fill="currentColor" />
+          {/* Phosphor's Stop at fill weight is already a solid square. */}
+          <StopIcon className="h-4 w-4" />
         </button>
       ) : (
         <button

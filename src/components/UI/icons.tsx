@@ -1,13 +1,13 @@
 /**
- * The app's icon vocabulary, re-exported straight from lucide-react.
+ * The app's icon vocabulary, re-exported from @phosphor-icons/react.
  *
- * No wrappers and no hand-drawn paths: lucide's own `*Icon` exports are aliased
- * to the names the app already uses, so the 32 call sites are untouched and this
- * file adds no components at runtime. Icons therefore draw at lucide's native
- * stroke-width 2 rather than the 1.75 the old hand-drawn set used.
+ * No wrappers and no hand-drawn paths. Weight is set once for the whole tree by
+ * the IconContext.Provider in main.tsx (`fill`), so these are pure aliases and
+ * add nothing at runtime. An icon can still opt out by passing `weight` itself,
+ * which beats the context.
  *
- * Adding an icon means adding a line here, not drawing one. If lucide has no
- * suitable mark, ask before inventing one.
+ * Adding an icon means adding a line here. If phosphor has no suitable mark,
+ * ask rather than drawing one.
  *
  * Not icons, so not here: the brand mark (see StashMark), the balance ring in
  * VaultCard, and the onboarding scene art.
@@ -17,20 +17,21 @@ export {
   ArrowDownLeftIcon,
   ArrowUpRightIcon,
   BrainIcon as MemoryIcon,
+  // Phosphor has no "radar"; Broadcast is the concentric-sweep mark and reads
+  // correctly for the scholarship deadline scanner.
+  BroadcastIcon as RadarIcon,
+  ChatCircleIcon as ChatIcon,
   CheckIcon,
   CopyIcon,
+  LightningIcon as BoltIcon,
   LockIcon,
-  MessageSquareIcon as ChatIcon,
-  PencilIcon,
+  PaperPlaneTiltIcon as SendIcon,
+  PencilSimpleIcon as PencilIcon,
   PlusIcon,
-  RadarIcon,
   ReceiptIcon,
-  SendIcon,
-  SparklesIcon as SparkleIcon,
-  // Outline by default; the one call site fills it so it reads as "stop".
-  SquareIcon as StopIcon,
+  SparkleIcon,
+  StopIcon,
   TargetIcon,
-  Trash2Icon as TrashIcon,
+  TrashIcon,
   XIcon as CloseIcon,
-  ZapIcon as BoltIcon,
-} from "lucide-react";
+} from "@phosphor-icons/react";
