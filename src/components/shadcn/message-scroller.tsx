@@ -32,6 +32,12 @@ function MessageScroller({
   )
 }
 
+// Upstream ships `data-pending-scroll:invisible` on the viewport, which hides
+// the whole transcript until the primitive's effect clears that attribute. The
+// attribute IS present in the initial render, so any failure or delay in that
+// effect leaves a blank transcript inside an otherwise working app. Removed: the
+// cost is a possible brief flash at the top before it settles at the bottom,
+// which is a far better failure than content that is simply not there.
 function MessageScrollerViewport({
   className,
   ...props
@@ -40,7 +46,7 @@ function MessageScrollerViewport({
     <MessageScrollerPrimitive.Viewport
       data-slot="message-scroller-viewport"
       className={cn(
-        "size-full min-h-0 min-w-0 scroll-fade-b scrollbar-thin scrollbar-gutter-stable overflow-y-auto overscroll-contain contain-content data-autoscrolling:scrollbar-thumb-transparent data-autoscrolling:scrollbar-track-transparent data-pending-scroll:invisible",
+        "size-full min-h-0 min-w-0 scroll-fade-b scrollbar-thin scrollbar-gutter-stable overflow-y-auto overscroll-contain contain-content data-autoscrolling:scrollbar-thumb-transparent data-autoscrolling:scrollbar-track-transparent",
         className
       )}
       {...props}

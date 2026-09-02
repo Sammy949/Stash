@@ -1,7 +1,14 @@
-import { useEffect, useRef } from "react";
 import type { ChatMessage, Currency, Goal, Scholarship } from "@/types";
 import { BuildBadge } from "@/components/UI/BuildBadge";
 import { StashMark } from "@/components/UI/StashMark";
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport,
+} from "@/components/shadcn/message-scroller";
 import { MessageBubble } from "./MessageBubble";
 
 /** The conversation transcript — fills the space under the strip when active. */
@@ -29,26 +36,6 @@ export function AgentPanel({
   /** Ledger currency for the goal cards. */
   currency: Currency;
 }) {
-  const endRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  // Whether the user is parked at (or near) the bottom. Only then do we
-  // auto-follow new messages — so reading older history isn't yanked away
-  // when a reply lands or a proactive observation/card is appended.
-  const pinnedRef = useRef(true);
-
-  function onScroll() {
-    const el = scrollRef.current;
-    if (!el) return;
-    pinnedRef.current =
-      el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-  }
-
-  useEffect(() => {
-    if (pinnedRef.current) {
-      endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-    }
-  }, [messages]);
-
   // Before the first user turn, show a centered greeting instead of a lone
   // left-aligned bubble. The starter chips live on the command bar (above the
   // input) — no need to repeat them here.
@@ -85,35 +72,45 @@ export function AgentPanel({
         </div>
       </div>
 
-      {/* Transcript */}
-      <div
-        ref={scrollRef}
-        onScroll={onScroll}
-        className="mx-auto w-full max-w-2xl flex-1 space-y-4 overflow-y-auto px-5 py-4"
-      >
-        {greeting ? (
-          <div className="flex h-full flex-col items-center justify-center px-2 text-center">
-            <StashMark className="h-12 w-12" />
-            <p className="mt-4 max-w-sm whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-              {greeting.content}
-            </p>
-          </div>
-        ) : (
-          messages.map((m) => (
-            <MessageBubble
-              key={m.id}
-              message={m}
-              onEdit={onEditMessage}
-              editable={!isThinking}
-              isThinking={isThinking}
-              goals={goals}
-              scholarships={scholarships}
-              currency={currency}
-            />
-          ))
-        )}
-        <div ref={endRef} />
-      </div>
+      {/* Transcript. MessageScroller owns the scrolling: it sticks to the
+          bottom only while you are at the live edge, anchors each user turn so
+          the reply streams in below it, and holds position when history is
+          prepended. Its viewport carries scroll-fade-b, so the top edge softens
+          as content runs under the header. */}
+      <MessageScrollerProvider>
+        <MessageScroller className="min-h-0 flex-1">
+          <MessageScrollerViewport>
+            {greeting ? (
+              <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+                <StashMark className="h-12 w-12" />
+                <p className="mt-4 max-w-sm whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                  {greeting.content}
+                </p>
+              </div>
+            ) : (
+              <MessageScrollerContent className="mx-auto w-full max-w-2xl gap-4 px-5 py-4">
+                {messages.map((m) => (
+                  <MessageScrollerItem
+                    key={m.id}
+                    scrollAnchor={m.role === "user"}
+                  >
+                    <MessageBubble
+                      message={m}
+                      onEdit={onEditMessage}
+                      editable={!isThinking}
+                      isThinking={isThinking}
+                      goals={goals}
+                      scholarships={scholarships}
+                      currency={currency}
+                    />
+                  </MessageScrollerItem>
+                ))}
+              </MessageScrollerContent>
+            )}
+          </MessageScrollerViewport>
+          <MessageScrollerButton />
+        </MessageScroller>
+      </MessageScrollerProvider>
 
       {/* Disclaimer — code owns the numbers, but advice/prose can still err. */}
       <p className="shrink-0 px-5 pb-2 text-center text-[10px] text-muted-foreground">

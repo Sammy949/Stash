@@ -3,23 +3,37 @@ import type { ChatMessage, Currency, Goal, Scholarship } from "@/types";
 import { CloseIcon, PencilIcon, SendIcon } from "@/components/UI/icons";
 import { RowButton } from "@/components/UI/RowButton";
 import { CopyButton } from "@/components/UI/CopyButton";
-import { StashMark } from "@/components/UI/StashMark";
 import { GoalCard } from "@/components/UI/GoalCard";
 import { ScholarshipCard } from "@/components/UI/ScholarshipCard";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/components/shadcn/avatar";
+import { Bubble, BubbleContent } from "@/components/shadcn/bubble";
+import {
+  Message,
+  MessageContent,
+  MessageFooter,
+} from "@/components/shadcn/message";
+import { Marker, MarkerContent, MarkerIcon } from "@/components/shadcn/marker";
+import { Spinner } from "@/components/shadcn/spinner";
 import { SpendingCard } from "./SpendingCard";
 import { Markdown } from "./Markdown";
 
-function TypingDots() {
+/**
+ * Stash's mark, as the assistant's avatar.
+ *
+ * Deliberately rounded-lg rather than the primitive's default circle: the mark
+ * is a square tile in the header too, and an exclusively-circular avatar is its
+ * own generic tell. Decorative — the message text carries the meaning.
+ */
+function StashAvatar() {
   return (
-    <span className="flex items-center gap-1 py-1">
-      {[0, 0.2, 0.4].map((d) => (
-        <span
-          key={d}
-          className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-blink"
-          style={{ animationDelay: `${d}s` }}
-        />
-      ))}
-    </span>
+    <Avatar className="rounded-lg after:rounded-lg">
+      <AvatarImage src="/logo.svg" alt="" className="rounded-lg" />
+      <AvatarFallback className="rounded-lg">S</AvatarFallback>
+    </Avatar>
   );
 }
 
@@ -82,8 +96,8 @@ export function MessageBubble({
   // ── User message, editing ──────────────────────────────────────────
   if (mine && editing) {
     return (
-      <div className="animate-slide-up">
-        <div className="ml-auto max-w-[85%]">
+      <Message align="end">
+        <MessageContent>
           <textarea
             ref={taRef}
             value={draft}
@@ -96,112 +110,134 @@ export function MessageBubble({
               }
               if (e.key === "Escape") setEditing(false);
             }}
-            className="w-full resize-none overflow-hidden rounded-2xl rounded-br-sm bg-secondary px-3.5 py-2.5 text-sm leading-relaxed text-foreground outline-none ring-1 ring-primary/50 focus:ring-primary"
+            className="w-full max-w-[80%] resize-none self-end overflow-hidden rounded-xl bg-secondary px-3 py-2 text-sm leading-relaxed text-foreground outline-none ring-1 ring-ring/50 focus:ring-ring"
           />
-          <div className="mt-1 flex items-center justify-end gap-1">
+          <MessageFooter className="gap-1">
             <RowButton label="Cancel edit" onClick={() => setEditing(false)}>
               <CloseIcon className="h-4 w-4" />
             </RowButton>
             <RowButton label="Save and resend" tone="emerald" onClick={save}>
               <SendIcon className="h-4 w-4" />
             </RowButton>
-          </div>
-          <p className="mt-0.5 text-right text-[10px] text-muted-foreground">
-            Saving replaces everything below.
-          </p>
-        </div>
-      </div>
+            <span className="text-[10px] text-muted-foreground">
+              Saving replaces everything below.
+            </span>
+          </MessageFooter>
+        </MessageContent>
+      </Message>
     );
   }
-
-  // ── User message, default ──────────────────────────────────────────
-  if (mine) {
-    return (
-      <div className="group flex items-start justify-end gap-1.5 animate-slide-up">
-        <div className="mt-1.5 flex items-center gap-0.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
-          <CopyButton text={message.content} />
-          {editable && onEdit && (
-            <button
-              type="button"
-              aria-label="Edit message"
-              onClick={startEdit}
-              className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-            >
-              <PencilIcon className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-        <p className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-secondary px-3.5 py-2.5 text-sm leading-relaxed text-foreground">
-          {message.content}
-        </p>
-      </div>
-    );
-  }
-
-  // ── Assistant message ──────────────────────────────────────────────
   return (
-    <div className="group flex items-start gap-2.5 animate-slide-up">
-      <StashMark className="h-7 w-7" />
-      <div className="flex max-w-[85%] flex-col items-start gap-1.5">
+    <MessageRow
+      message={message}
+      mine={mine}
+      editable={editable}
+      onEdit={onEdit}
+      startEdit={startEdit}
+      goals={goals}
+      scholarships={scholarships}
+      currency={currency}
+    />
+  );
+}
+
+/** The settled row: bubble, any inline proof cards, then the hover actions. */
+function MessageRow({
+  message,
+  mine,
+  editable,
+  onEdit,
+  startEdit,
+  goals,
+  scholarships,
+  currency,
+}: {
+  message: ChatMessage;
+  mine: boolean;
+  editable?: boolean;
+  onEdit?: (id: string, text: string) => void;
+  startEdit: () => void;
+  goals?: Goal[];
+  scholarships?: Scholarship[];
+  currency?: Currency;
+}) {
+  // Resolve related ids to live records. Anything since removed is skipped
+  // silently, so a card disappears rather than erroring.
+  const relatedGoals = (message.relatedGoalIds ?? [])
+    .map((id) => goals?.find((g) => g.id === id))
+    .filter((g): g is Goal => Boolean(g));
+  const relatedScholarships = (message.relatedScholarshipIds ?? [])
+    .map((id) => scholarships?.find((s) => s.id === id))
+    .filter((s): s is Scholarship => Boolean(s));
+  // The "+N more" hint only appears on the capped deadlines stack.
+  const moreScholarships =
+    relatedScholarships.length >= 3 &&
+    (scholarships?.length ?? 0) > relatedScholarships.length
+      ? (scholarships?.length ?? 0) - relatedScholarships.length
+      : 0;
+
+  return (
+    <Message align={mine ? "end" : "start"} className="group/row">
+      {!mine && <StashAvatar />}
+      <MessageContent>
         {message.pending ? (
-          <div className="rounded-2xl rounded-tl-sm border border-border bg-background/60 px-3.5 py-2.5">
-            <TypingDots />
-          </div>
+          // Thinking: a status line rather than an empty bubble, so assistive
+          // tech is told a turn is in flight instead of meeting a blank row.
+          <Marker role="status" className="w-fit">
+            <MarkerIcon>
+              <Spinner />
+            </MarkerIcon>
+            <MarkerContent className="shimmer">Thinking…</MarkerContent>
+          </Marker>
         ) : (
           <>
             {message.content && (
-              <div className="break-words rounded-2xl rounded-tl-sm border border-border bg-background/60 px-3.5 py-2.5 text-sm leading-relaxed text-foreground">
-                <Markdown>{message.content}</Markdown>
-              </div>
+              <Bubble
+                variant={mine ? "secondary" : "outline"}
+                align={mine ? "end" : "start"}
+              >
+                <BubbleContent>
+                  {mine ? (
+                    <span className="whitespace-pre-wrap">{message.content}</span>
+                  ) : (
+                    <Markdown>{message.content}</Markdown>
+                  )}
+                </BubbleContent>
+              </Bubble>
             )}
             {message.card?.type === "spending" && (
               <SpendingCard data={message.card.data} />
             )}
-            {/* Inline goal proof — resolve IDs to live goals; skip any that
-                were since removed (the card silently disappears, never errors). */}
-            {message.relatedGoalIds && currency
-              ? message.relatedGoalIds
-                  .map((id) => goals?.find((g) => g.id === id))
-                  .filter((g): g is Goal => Boolean(g))
-                  .map((g) => (
-                    <GoalCard key={g.id} goal={g} currency={currency} />
-                  ))
-              : null}
-            {/* Inline scholarship proof — same pattern as goals; a since-removed
-                one is skipped silently. The "+N more" hint only appears on the
-                capped deadlines stack (3 shown while more are tracked). */}
-            {(() => {
-              if (!message.relatedScholarshipIds) return null;
-              const shown = message.relatedScholarshipIds
-                .map((id) => scholarships?.find((s) => s.id === id))
-                .filter((s): s is Scholarship => Boolean(s));
-              if (!shown.length) return null;
-              const total = scholarships?.length ?? 0;
-              const more =
-                shown.length >= 3 && total > shown.length
-                  ? total - shown.length
-                  : 0;
-              return (
-                <>
-                  {shown.map((s) => (
-                    <ScholarshipCard key={s.id} scholarship={s} />
-                  ))}
-                  {more > 0 && (
-                    <p className="px-1 text-xs text-muted-foreground">
-                      +{more} more on your radar
-                    </p>
-                  )}
-                </>
-              );
-            })()}
+            {currency &&
+              relatedGoals.map((g) => (
+                <GoalCard key={g.id} goal={g} currency={currency} />
+              ))}
+            {relatedScholarships.map((s) => (
+              <ScholarshipCard key={s.id} scholarship={s} />
+            ))}
+            {moreScholarships > 0 && (
+              <p className="px-1 text-xs text-muted-foreground">
+                +{moreScholarships} more on your radar
+              </p>
+            )}
             {message.content && (
-              <div className="-ml-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+              <MessageFooter className="gap-0.5 px-0 opacity-100 transition-opacity md:opacity-0 md:group-hover/row:opacity-100">
                 <CopyButton text={message.content} />
-              </div>
+                {mine && editable && onEdit && (
+                  <button
+                    type="button"
+                    aria-label="Edit message"
+                    onClick={startEdit}
+                    className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                  >
+                    <PencilIcon className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </MessageFooter>
             )}
           </>
         )}
-      </div>
-    </div>
+      </MessageContent>
+    </Message>
   );
 }
