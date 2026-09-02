@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Stash — a personal finance agent for ambitious students, powered by 0G Storage + 0G Compute.",
+  "description": "Stash \u2014 a personal finance agent for ambitious students, powered by 0G Storage + 0G Compute.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -12,14 +12,18 @@
   },
   "dependencies": {
     "@0gfoundation/0g-storage-ts-sdk": "^1.2.10",
+    "@base-ui/react": "1.7.0",
     "@fontsource-variable/geist": "^5.2.9",
     "@fontsource-variable/geist-mono": "^5.2.8",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
     "ethers": "6.13.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "sonner": "^2.0.7"
+    "sonner": "^2.0.7",
+    "tailwind-merge": "3.6.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",

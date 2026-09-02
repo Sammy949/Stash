@@ -28,6 +28,21 @@
     "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", "Cascadia Code",
     Menlo, Consolas, monospace;
+
+  /* ── shadcn bridge ──────────────────────────────────────────────────
+     The vendored primitives in src/components/shadcn reference shadcn's
+     semantic token names. Rather than let `shadcn init` write its own
+     palette over this block (which would repaint every existing surface),
+     we map only the names those components actually use onto Stash's
+     colours. Adding a component may mean adding one line here.
+
+     Deliberately NOT redefined: --color-card and --color-muted. Stash
+     already owns both, and shadcn means something different by `muted`
+     (a surface, where Stash means muted TEXT). Vendored files that reach
+     for bg-muted are re-pointed at bg-line on integration instead. */
+  --color-foreground: #f8fafc;
+  --color-muted-foreground: #8a94a8;
+  --color-border: #1e293b;
 }
 
 @layer base {
@@ -170,6 +185,45 @@
     animation: stash-blink 1.4s infinite both;
   }
 
+  /* ── Recall shimmer ──────────────────────────────────────────────
+     A single-hue sweep across text, for the moment Stash is reading its
+     memory back. Stands in for shadcn's `shimmer` utility, which ships in
+     shadcn/tailwind.css — importing that whole stylesheet would drag in
+     base styles this app has already made its own decisions about.
+
+     The text stays READABLE with no animation at all: the base rule only
+     sets a colour, and the clip-to-text treatment is applied solely where
+     background-clip is supported. Nothing here can leave a label invisible. */
+  .animate-shimmer {
+    color: var(--color-muted);
+  }
+  @supports ((background-clip: text) or (-webkit-background-clip: text)) {
+    @keyframes stash-shimmer {
+      0% {
+        background-position: 180% 0;
+      }
+      100% {
+        background-position: -80% 0;
+      }
+    }
+    .animate-shimmer {
+      background-image: linear-gradient(
+        100deg,
+        var(--color-muted) 0%,
+        var(--color-muted) 42%,
+        var(--color-ink) 50%,
+        var(--color-muted) 58%,
+        var(--color-muted) 100%
+      );
+      background-size: 260% 100%;
+      background-repeat: no-repeat;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: stash-shimmer 2.6s linear infinite;
+    }
+  }
+
   /* Number/count change flash */
   @keyframes stash-flash {
     0% {
@@ -278,6 +332,13 @@
     .animate-stash-pulse,
     .animate-pulse {
       animation: none;
+    }
+    /* The shimmer also has to give its colour back, since the animated
+       version paints the text via a clipped gradient. */
+    .animate-shimmer {
+      animation: none;
+      background-image: none;
+      color: var(--color-muted);
     }
   }
 }

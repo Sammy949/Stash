@@ -12,6 +12,12 @@ import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
 import { useMemory } from "@/hooks/useMemory";
 import { BuildBadge } from "@/components/UI/BuildBadge";
+import { MemoryIcon } from "@/components/UI/icons";
+import {
+  Marker,
+  MarkerContent,
+  MarkerIcon,
+} from "@/components/shadcn/marker";
 import { ensureStorageSchema, getStoredRootHash } from "@/lib/ogStorage";
 import { deriveObservation } from "@/lib/observations";
 import { deriveWelcomeBack } from "@/lib/welcomeBack";
@@ -294,9 +300,16 @@ export default function App() {
         ) : (
           <main className="flex-1 overflow-y-auto px-4 py-6">
             {recalling ? (
-              <p className="mx-auto mb-5 w-full max-w-2xl animate-pulse text-sm text-muted">
-                Recalling what I know about you…
-              </p>
+              <div className="mx-auto mb-5 w-full max-w-2xl">
+                <Marker role="status">
+                  <MarkerIcon>
+                    <MemoryIcon className="h-4 w-4" />
+                  </MarkerIcon>
+                  <MarkerContent className="animate-shimmer">
+                    Recalling what I know about you…
+                  </MarkerContent>
+                </Marker>
+              </div>
             ) : (
               welcome && (
                 <div className="mx-auto mb-5 w-full max-w-2xl">
