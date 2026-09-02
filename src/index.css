@@ -1,26 +1,57 @@
 @import "tailwindcss";
+/* scroll-fade-*, shimmer, no-scrollbar and friends — 24 utilities the vendored
+   primitives reference. Resolves via the package's ./tailwind.css export. */
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 
 /* ───────────────────────────────────────────────
-   Stash design tokens — dark mode only
-   Exposed as Tailwind utilities (bg-bg, text-muted,
-   border-line, text-emerald, etc.) via @theme.
+   Stash design tokens — light and dark.
+
+   Structure follows Ferry: every colour is a mode variable declared in :root
+   and overridden under .dark, mapped into Tailwind through @theme inline.
+   Values are oklch, so a tonal step is a lightness change at the same hue.
+
+   The dark values are the exact oklch of the hexes this app already shipped,
+   so dark mode is unchanged by this commit. Light mode is new.
 ─────────────────────────────────────────────── */
-@theme {
-  /* Calm deep-navy surfaces — one accent (blue). */
-  --color-bg: #080c14;
-  --color-card: #0f172a;
-  --color-line: #1e293b;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 
-  --color-ink: #f8fafc;
-  --color-muted: #8a94a8;
+  /* Stash's current vocabulary, still live. The consolidation pass retires
+     these in favour of the semantic names above.
 
-  /* NOTE: `emerald` is now the BLUE brand accent (interim name — the
-     whole app references `*-emerald`; we rename the token in a later
-     cosmetic pass). Amber/red stay strictly for urgency/warnings. */
-  --color-emerald: #3b82f6;
-  --color-amber: #f59e0b;
-  --color-red: #ef4444;
-  --color-slate: #1e293b;
+     --color-muted stays Stash's muted TEXT so 81 `text-muted` call sites keep
+     working. That means shadcn's `muted` SURFACE has no utility yet, which is
+     harmless: nothing rendered reaches for bg-muted. It frees up in step 2. */
+  --color-bg: var(--background);
+  --color-ink: var(--foreground);
+  --color-line: var(--border);
+  --color-muted: var(--muted-foreground);
+  --color-emerald: var(--primary);
+  --color-amber: var(--warning);
+  --color-red: var(--destructive);
+  --color-slate: var(--secondary);
 
   /* Geist for everything; Geist Mono is reserved for money/data figures and
      system-status caps labels. */
@@ -28,44 +59,77 @@
     "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", "Cascadia Code",
     Menlo, Consolas, monospace;
+}
 
-  /* ── shadcn bridge ──────────────────────────────────────────────────
-     The vendored primitives in src/components/shadcn reference shadcn's
-     semantic token names. Rather than let `shadcn init` write its own
-     palette over this block (which would repaint every existing surface),
-     we map only the names those components actually use onto Stash's
-     colours. Adding a component may mean adding one line here.
+/* Light. Authored, not lifted: same blue hue family as the dark palette, with
+   lightness inverted and the primary darkened so it holds contrast on white. */
+:root {
+  color-scheme: light;
+  --radius: 0.625rem;
 
-     Deliberately NOT redefined: --color-card and --color-muted. Stash
-     already owns both, and shadcn means something different by `muted`
-     (a surface, where Stash means muted TEXT). Vendored files that reach
-     for bg-muted are re-pointed at bg-line on integration instead. */
-  --color-foreground: #f8fafc;
-  --color-muted-foreground: #8a94a8;
-  --color-border: #1e293b;
-  --color-background: #080c14;
-  /* Filled accent follows the house convention already used across the app:
-     the blue fill with the near-black page colour as its text (bg-emerald
-     text-bg), which clears AA at ~6.9:1. */
-  --color-primary: #3b82f6;
-  --color-primary-foreground: #080c14;
-  --color-secondary: #1e293b;
-  --color-secondary-foreground: #f8fafc;
-  --color-destructive: #ef4444;
-  --color-input: #1e293b;
-  --color-ring: #3b82f6;
+  --background: oklch(0.994 0.002 263);
+  --foreground: oklch(0.205 0.032 264);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.205 0.032 264);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.205 0.032 264);
+  --primary: oklch(0.52 0.19 260);
+  --primary-foreground: oklch(0.99 0.002 260);
+  --secondary: oklch(0.968 0.006 263);
+  --secondary-foreground: oklch(0.3 0.032 264);
+  --muted: oklch(0.97 0.005 263);
+  --muted-foreground: oklch(0.52 0.026 264);
+  --accent: oklch(0.956 0.018 260);
+  --accent-foreground: oklch(0.4 0.11 260);
+  --destructive: oklch(0.577 0.222 27.2);
+  --success: oklch(0.52 0.13 156);
+  --success-foreground: oklch(0.99 0.005 156);
+  --warning: oklch(0.7 0.15 70);
+  --warning-foreground: oklch(0.28 0.06 70);
+  --border: oklch(0.918 0.008 263);
+  --input: oklch(0.918 0.008 263);
+  --ring: oklch(0.52 0.19 260);
+}
+
+/* Dark. These are the exact oklch of the hexes Stash already shipped
+   (#080c14, #0f172a, #1e293b, #f8fafc, #8a94a8, #3b82f6, #f59e0b, #ef4444),
+   so this commit changes nothing about how dark mode looks. */
+.dark {
+  color-scheme: dark;
+
+  --background: oklch(0.154 0.019 263.2);
+  --foreground: oklch(0.984 0.003 247.9);
+  --card: oklch(0.208 0.04 265.8);
+  --card-foreground: oklch(0.984 0.003 247.9);
+  --popover: oklch(0.208 0.04 265.8);
+  --popover-foreground: oklch(0.984 0.003 247.9);
+  --primary: oklch(0.623 0.188 259.8);
+  --primary-foreground: oklch(0.154 0.019 263.2);
+  --secondary: oklch(0.279 0.037 260);
+  --secondary-foreground: oklch(0.984 0.003 247.9);
+  --muted: oklch(0.279 0.037 260);
+  --muted-foreground: oklch(0.665 0.032 264.3);
+  --accent: oklch(0.245 0.038 263);
+  --accent-foreground: oklch(0.984 0.003 247.9);
+  --destructive: oklch(0.637 0.208 25.3);
+  --success: oklch(0.72 0.13 156);
+  --success-foreground: oklch(0.18 0.03 156);
+  --warning: oklch(0.769 0.165 70.1);
+  --warning-foreground: oklch(0.22 0.05 70);
+  --border: oklch(0.279 0.037 260);
+  --input: oklch(0.279 0.037 260);
+  --ring: oklch(0.623 0.188 259.8);
 }
 
 @layer base {
-  html {
-    color-scheme: dark;
-  }
+  /* color-scheme now comes from :root / .dark, so the form controls and
+     scrollbars follow the active mode instead of being pinned dark. */
 
   /* Visible keyboard-focus ring on every interactive element — touch/mouse
      users never see it (focus-visible), keyboard users always do. One rule
      keeps it consistent across the custom-styled buttons, chips, and links. */
   :focus-visible {
-    outline: 2px solid var(--color-emerald);
+    outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
 
@@ -196,44 +260,14 @@
     animation: stash-blink 1.4s infinite both;
   }
 
-  /* ── Recall shimmer ──────────────────────────────────────────────
-     A single-hue sweep across text, for the moment Stash is reading its
-     memory back. Stands in for shadcn's `shimmer` utility, which ships in
-     shadcn/tailwind.css — importing that whole stylesheet would drag in
-     base styles this app has already made its own decisions about.
+  /* shadcn's `shimmer` utility (from shadcn/tailwind.css) is what paints the
+     recalling label, so this app no longer hand-rolls one. It is better built
+     than mine was: the highlight is derived from currentColor via oklch
+     color-mix, with --shimmer-angle / --shimmer-spread to tune it.
 
-     The text stays READABLE with no animation at all: the base rule only
-     sets a colour, and the clip-to-text treatment is applied solely where
-     background-clip is supported. Nothing here can leave a label invisible. */
-  .animate-shimmer {
-    color: var(--color-muted);
-  }
-  @supports ((background-clip: text) or (-webkit-background-clip: text)) {
-    @keyframes stash-shimmer {
-      0% {
-        background-position: 180% 0;
-      }
-      100% {
-        background-position: -80% 0;
-      }
-    }
-    .animate-shimmer {
-      background-image: linear-gradient(
-        100deg,
-        var(--color-muted) 0%,
-        var(--color-muted) 42%,
-        var(--color-ink) 50%,
-        var(--color-muted) 58%,
-        var(--color-muted) 100%
-      );
-      background-size: 260% 100%;
-      background-repeat: no-repeat;
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
-      animation: stash-shimmer 2.6s linear infinite;
-    }
-  }
+     It has one gap, patched in the reduced-motion block below: it sets
+     -webkit-text-fill-color: transparent with no prefers-reduced-motion
+     fallback, so the colour has to be handed back explicitly. */
 
   /* Number/count change flash */
   @keyframes stash-flash {
@@ -344,12 +378,15 @@
     .animate-pulse {
       animation: none;
     }
-    /* The shimmer also has to give its colour back, since the animated
-       version paints the text via a clipped gradient. */
-    .animate-shimmer {
+    /* shadcn's shimmer paints text through a clipped gradient and ships no
+       reduced-motion fallback, so hand the fill back rather than leaving a
+       label depending on an animation that will not run. */
+    .shimmer,
+    .shimmer-once,
+    .shimmer-reverse {
       animation: none;
       background-image: none;
-      color: var(--color-muted);
+      -webkit-text-fill-color: currentColor;
     }
   }
 }

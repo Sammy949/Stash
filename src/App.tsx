@@ -305,7 +305,7 @@ export default function App() {
                   <MarkerIcon>
                     <MemoryIcon className="h-4 w-4" />
                   </MarkerIcon>
-                  <MarkerContent className="animate-shimmer">
+                  <MarkerContent className="shimmer">
                     Recalling what I know about you…
                   </MarkerContent>
                 </Marker>
