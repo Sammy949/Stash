@@ -11,7 +11,6 @@ import type { OnboardingProfile } from "@/components/Onboarding/Onboarding";
 import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
 import { useMemory } from "@/hooks/useMemory";
-import { BuildBadge } from "@/components/UI/BuildBadge";
 import { StashMark } from "@/components/UI/StashMark";
 import { AccountMenu } from "@/components/UI/AccountMenu";
 import { MemoryIcon } from "@/components/UI/icons";
@@ -276,11 +275,19 @@ export default function App() {
             <StashMark className="h-7 w-7" />
             <h1 className="text-lg font-semibold leading-none">Stash</h1>
             <div className="ml-auto flex items-center gap-3">
-              <BuildBadge />
               <AccountMenu
                 name={rememberedName(ledger, recall)}
                 currency={ledger.currency}
                 memoryCount={rememberedCount(recall)}
+                onCurrencyChange={(next) =>
+                  applyLedger({ ...ledger, currency: next })
+                }
+                onSync={() => void sync()}
+                syncing={syncPhase !== "idle"}
+                onStartFresh={() => {
+                  startFresh(ledger, localStorage.getItem(LAST_VISIT_KEY));
+                  setAgentActive(true);
+                }}
               />
             </div>
           </header>

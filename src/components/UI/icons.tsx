@@ -23,6 +23,7 @@ export {
   ChatCircleIcon as ChatIcon,
   CheckIcon,
   CircleHalfIcon as SystemThemeIcon,
+  CloudArrowUpIcon,
   CopyIcon,
   LightningIcon as BoltIcon,
   LockIcon,
@@ -36,5 +37,6 @@ export {
   SunIcon,
   TargetIcon,
   TrashIcon,
+  WalletIcon,
   XIcon as CloseIcon,
 } from "@phosphor-icons/react";
