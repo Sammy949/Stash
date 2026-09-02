@@ -1,186 +1,117 @@
 /**
- * Inline stroke icons (no icon dependency). All inherit `currentColor`
- * and accept a className for sizing/coloring.
+ * The app's icon set, backed by lucide-react.
+ *
+ * These are thin named wrappers rather than bare re-exports for one reason:
+ * lucide draws at stroke-width 2 and this app draws at 1.75, so the wrapper
+ * pins the weight while passing everything else through. Keeping the existing
+ * `*Icon` names means all 32 call sites stayed untouched.
+ *
+ * Every icon here must come from a pack. If a mark is needed that lucide does
+ * not have, ask rather than drawing one. The brand mark, the balance ring, and
+ * the onboarding scene art are NOT icons and are deliberately still bespoke.
  */
-type IconProps = { className?: string };
+import {
+  ArrowDown,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Brain,
+  Check,
+  Copy,
+  Lock,
+  MessageSquare,
+  Pencil,
+  Plus,
+  Radar,
+  Receipt,
+  Send,
+  Sparkles,
+  Square,
+  Target,
+  Trash2,
+  X,
+  Zap,
+  type LucideProps,
+} from "lucide-react";
 
-const base = {
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.75,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-};
+/** Matches the app's existing line weight; lucide's own default is 2. */
+const STROKE = 1.75;
 
-export function LockIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
-      <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
-      <circle cx="12" cy="15.5" r="1.25" />
-    </svg>
-  );
-}
+export type IconProps = LucideProps;
 
-export function RadarIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M12 12V3.5" />
-      <path d="M12 12a8.5 8.5 0 1 0 6.01 2.49" />
-      <path d="M12 12a4.25 4.25 0 1 0 3 1.25" />
-      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
+export const LockIcon = (props: IconProps) => (
+  <Lock strokeWidth={STROKE} {...props} />
+);
 
-export function TargetIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <circle cx="12" cy="12" r="9" />
-      <circle cx="12" cy="12" r="5" />
-      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
+export const RadarIcon = (props: IconProps) => (
+  <Radar strokeWidth={STROKE} {...props} />
+);
 
-export function BoltIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M13 3 5 13h6l-1 8 8-10h-6l1-8Z" />
-    </svg>
-  );
-}
+export const TargetIcon = (props: IconProps) => (
+  <Target strokeWidth={STROKE} {...props} />
+);
 
-export function SendIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M5 12 20 4l-4 16-4-7-7-1Z" />
-      <path d="m12 13 4-5" />
-    </svg>
-  );
-}
+export const BoltIcon = (props: IconProps) => (
+  <Zap strokeWidth={STROKE} {...props} />
+);
 
-export function StopIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
+export const SendIcon = (props: IconProps) => (
+  <Send strokeWidth={STROKE} {...props} />
+);
 
-export function PencilIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17v3Z" />
-      <path d="m14 7 3 3" />
-    </svg>
-  );
-}
+/** Filled, so it reads as a stop button rather than an empty box. */
+export const StopIcon = (props: IconProps) => (
+  <Square fill="currentColor" strokeWidth={STROKE} {...props} />
+);
 
-export function TrashIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M4 7h16" />
-      <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-      <path d="M6 7v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7" />
-      <path d="M10 11v6M14 11v6" />
-    </svg>
-  );
-}
+export const PencilIcon = (props: IconProps) => (
+  <Pencil strokeWidth={STROKE} {...props} />
+);
 
-export function CheckIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="m5 12 5 5L20 6" />
-    </svg>
-  );
-}
+export const TrashIcon = (props: IconProps) => (
+  <Trash2 strokeWidth={STROKE} {...props} />
+);
 
-export function CloseIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M6 6l12 12M18 6 6 18" />
-    </svg>
-  );
-}
+export const CheckIcon = (props: IconProps) => (
+  <Check strokeWidth={STROKE} {...props} />
+);
 
-export function ReceiptIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" />
-      <path d="M9 8h6M9 12h6" />
-    </svg>
-  );
-}
+export const CloseIcon = (props: IconProps) => (
+  <X strokeWidth={STROKE} {...props} />
+);
 
-export function PlusIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M12 5v14M5 12h14" />
-    </svg>
-  );
-}
+export const ReceiptIcon = (props: IconProps) => (
+  <Receipt strokeWidth={STROKE} {...props} />
+);
 
-export function CopyIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <rect x="9" y="9" width="11" height="11" rx="2" />
-      <path d="M5 15V5a2 2 0 0 1 2-2h8" />
-    </svg>
-  );
-}
+export const PlusIcon = (props: IconProps) => (
+  <Plus strokeWidth={STROKE} {...props} />
+);
 
-export function SparkleIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M12 4l1.7 5 5 1.7-5 1.7L12 17.4l-1.7-4.9-5-1.7 5-1.7L12 4Z" />
-      <path d="M18.5 5.5v3M20 7h-3" strokeWidth="1.4" />
-    </svg>
-  );
-}
+export const CopyIcon = (props: IconProps) => (
+  <Copy strokeWidth={STROKE} {...props} />
+);
 
-export function ArrowDownLeftIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M17 7 7 17" />
-      <path d="M16 17H7V8" />
-    </svg>
-  );
-}
+export const SparkleIcon = (props: IconProps) => (
+  <Sparkles strokeWidth={STROKE} {...props} />
+);
+
+export const ArrowDownLeftIcon = (props: IconProps) => (
+  <ArrowDownLeft strokeWidth={STROKE} {...props} />
+);
 
 /** Jump-to-latest affordance on the transcript scroller. */
-export function ArrowDownIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M12 5v14" />
-      <path d="m19 12-7 7-7-7" />
-    </svg>
-  );
-}
+export const ArrowDownIcon = (props: IconProps) => (
+  <ArrowDown strokeWidth={STROKE} {...props} />
+);
 
-export function ArrowUpRightIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M7 17 17 7" />
-      <path d="M8 7h9v9" />
-    </svg>
-  );
-}
+export const ArrowUpRightIcon = (props: IconProps) => (
+  <ArrowUpRight strokeWidth={STROKE} {...props} />
+);
 
-export function ChatIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 16H9l-4 3.5V6.5A1.5 1.5 0 0 1 5 5Z" />
-    </svg>
-  );
-}
+export const ChatIcon = (props: IconProps) => (
+  <MessageSquare strokeWidth={STROKE} {...props} />
+);
 
-export function MemoryIcon({ className }: IconProps) {
-  return (
-    <svg {...base} className={className}>
-      <path d="M12 5a3 3 0 0 0-3 3 3 3 0 0 0-1 5.8V16a2 2 0 0 0 4 0" />
-      <path d="M12 5a3 3 0 0 1 3 3 3 3 0 0 1 1 5.8V16a2 2 0 0 1-4 0V5Z" />
-    </svg>
-  );
-}
+export const MemoryIcon = (props: IconProps) => (
+  <Brain strokeWidth={STROKE} {...props} />
+);
