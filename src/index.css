@@ -43,6 +43,17 @@
   --color-foreground: #f8fafc;
   --color-muted-foreground: #8a94a8;
   --color-border: #1e293b;
+  --color-background: #080c14;
+  /* Filled accent follows the house convention already used across the app:
+     the blue fill with the near-black page colour as its text (bg-emerald
+     text-bg), which clears AA at ~6.9:1. */
+  --color-primary: #3b82f6;
+  --color-primary-foreground: #080c14;
+  --color-secondary: #1e293b;
+  --color-secondary-foreground: #f8fafc;
+  --color-destructive: #ef4444;
+  --color-input: #1e293b;
+  --color-ring: #3b82f6;
 }
 
 @layer base {

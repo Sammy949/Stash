@@ -149,6 +149,16 @@ export function ArrowDownLeftIcon({ className }: IconProps) {
   );
 }
 
+/** Jump-to-latest affordance on the transcript scroller. */
+export function ArrowDownIcon({ className }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M12 5v14" />
+      <path d="m19 12-7 7-7-7" />
+    </svg>
+  );
+}
+
 export function ArrowUpRightIcon({ className }: IconProps) {
   return (
     <svg {...base} className={className}>
