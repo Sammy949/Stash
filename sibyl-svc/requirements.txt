@@ -2,3 +2,5 @@
 sibyl-memory-client==0.8.0
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
+# Loads sibyl-svc/.env so the service starts identically from any cwd.
+python-dotenv==1.2.3

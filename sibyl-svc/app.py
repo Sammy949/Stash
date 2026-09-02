@@ -15,12 +15,20 @@ from __future__ import annotations
 
 import os
 import secrets
+from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from gateway import CATEGORIES, CategoryError, Gateway, TenantError, normalize_tenant
+
+# Load sibyl-svc/.env if it exists, resolved relative to THIS file rather than the
+# working directory, so the service starts the same way from anywhere. Real
+# environment variables already set always win (override=False), which keeps a
+# deployed host's secrets authoritative over any file that ships beside the code.
+load_dotenv(Path(__file__).with_name(".env"), override=False)
 
 DB_PATH = os.getenv("SIBYL_DB_PATH", os.path.expanduser("~/.sibyl-memory/memory.db"))
 SVC_TOKEN = os.getenv("STASH_SVC_TOKEN", "")

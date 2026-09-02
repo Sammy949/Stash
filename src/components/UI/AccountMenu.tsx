@@ -105,11 +105,14 @@ export function AccountMenu({
         </div>
 
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Appearance</DropdownMenuLabel>
         <DropdownMenuRadioGroup
           value={theme}
           onValueChange={(v) => setTheme(v as ThemeChoice)}
         >
+          {/* Inside the RadioGroup, not beside it: GroupLabel reads
+              MenuGroupContext, which only Group and RadioGroup provide. Outside,
+              it throws and takes the whole popup down with it. */}
+          <DropdownMenuLabel>Appearance</DropdownMenuLabel>
           {THEMES.map(({ value, label: l, Icon }) => (
             <DropdownMenuRadioItem key={value} value={value}>
               <Icon className="size-4 text-muted-foreground" />
