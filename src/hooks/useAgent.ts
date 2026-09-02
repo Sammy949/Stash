@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import type { AgentCard, ChatMessage, Ledger } from "@/types";
 import { runAgentTurn, StashComputeError } from "@/lib/ogCompute";
 import { getGoals } from "@/lib/ledger";
+import { EMPTY_RECALL, type MemoryPort } from "@/lib/memory";
 import {
   matchScholarshipsByMention,
   mostUrgentScholarships,
@@ -36,8 +37,13 @@ function makeMessage(
  *
  * A ref mirrors the transcript so async handlers always read the latest
  * state (no stale closures); `setMessages` just pushes the ref to React.
+ *
+ * `memory` is the Sibyl port from useMemory: every turn reads the current recall
+ * pack through it, and a turn that writes memory refreshes it so the next prompt
+ * sees what was just learned. Omit it and the agent runs with no memory at all,
+ * which is exactly what the deletion test looks like.
  */
-export function useAgent() {
+export function useAgent(memory?: MemoryPort) {
   const ref = useRef<ChatMessage[]>([makeMessage("assistant", OPENING_MESSAGE)]);
   const [messages, setMessages] = useState<ChatMessage[]>(ref.current);
   const [isThinking, setIsThinking] = useState(false);
@@ -98,8 +104,12 @@ export function useAgent() {
     abortRef.current = controller;
 
     try {
-      const turn = await runAgentTurn(history, ledger, controller.signal);
+      const recall = memory?.read() ?? EMPTY_RECALL;
+      const turn = await runAgentTurn(history, ledger, recall, controller.signal);
       if (turn.mutated) onLedgerUpdate?.(turn.ledger);
+      // A turn that wrote to Sibyl: re-read so the NEXT prompt already carries
+      // what was just learned. Not awaited — the reply must not wait on it.
+      if (turn.memoryChanged) void memory?.refresh();
       // Inline goal cards: tools that touched a goal already report their IDs.
       // The "Review my goals" chip is a plain query (no tool fires), so on that
       // exact prompt we surface ALL active goals — the grouped-stack moment.
@@ -165,7 +175,7 @@ export function useAgent() {
       inFlightRef.current = false;
       setIsThinking(false);
     }
-  }, []);
+  }, [memory]);
 
   /**
    * Edit a past user message and re-run from there (ChatGPT-style). The old

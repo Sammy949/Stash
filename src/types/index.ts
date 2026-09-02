@@ -113,10 +113,15 @@ export interface Goal {
 /** ───────────────── Memory ───────────────── */
 
 /**
- * Soft memory — what Stash KNOWS about the user, beyond the money math.
- * The conversation creates these; they're model-written and fuzzy, and they
- * NEVER feed balance math (that stays deterministic + code-owned). The ledger
- * is a special, stricter kind of memory; this is everything else.
+ * The kinds of soft memory Stash holds — what it KNOWS about the user, beyond
+ * the money math. The conversation creates these; they're model-written and
+ * fuzzy, and they NEVER feed balance math (that stays deterministic and
+ * code-owned). The ledger is a special, stricter kind of memory; this is
+ * everything else.
+ *
+ * The memories themselves are NOT in this file: they live in Sibyl as WARM
+ * entities (one row per kind + subject) and are read through src/lib/memory.ts.
+ * These names are exactly Sibyl's entity categories.
  */
 export type MemoryKind =
   | "goal" // "Saving for a MacBook"
@@ -124,15 +129,6 @@ export type MemoryKind =
   | "preference" // "Prefers cooking", "Avoids debt"
   | "opportunity" // a gig/application not already in scholarships/hustles
   | "identity"; // "Final-year student in Lagos"
-
-export interface Memory {
-  id: string;
-  kind: MemoryKind;
-  /** Free-text, first-person-about-the-user, e.g. "Saving for a MacBook". */
-  content: string;
-  /** ISO 8601 timestamp. */
-  createdAt: string;
-}
 
 /** ───────────────── The persisted ledger ───────────────── */
 
@@ -159,8 +155,6 @@ export interface Ledger {
   hustles: Hustle[];
   /** Structured savings targets (earmark progress, never balance). */
   goals: Goal[];
-  /** Soft memory — goals, habits, preferences. Grows from conversation. */
-  memories: Memory[];
   /** ISO timestamp of the last successful 0G Storage sync. */
   lastSyncedAt: string | null;
 }

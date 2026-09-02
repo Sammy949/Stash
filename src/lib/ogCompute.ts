@@ -3,14 +3,21 @@ import {
   balance,
   daysUntil,
   getGoals,
-  getMemories,
   goalProgressPct,
   goalRemaining,
   totalActiveIncome,
   totalExpenses,
   totalIncome,
 } from "@/lib/ledger";
-import type { MemoryKind } from "@/types";
+import {
+  EMPTY_RECALL,
+  applyMemoryOps,
+  memoryLine,
+  resolveTenant,
+  type MemoryEntity,
+  type MemoryOp,
+  type RecallPack,
+} from "@/lib/memory";
 import { CURRENCIES, formatMoney } from "@/lib/currency";
 import { AGENT_TOOLS, applyAction } from "@/lib/agentTools";
 import { extractTextToolCalls, sanitizeToolCall } from "@/lib/toolCalls";
@@ -75,31 +82,36 @@ export class StashComputeError extends Error {}
 
 /** ───────────────── system prompt ───────────────── */
 
-/** Memory kinds in prompt order, with human group headings. */
-const MEMORY_GROUPS: { kind: MemoryKind; heading: string }[] = [
-  { kind: "identity", heading: "Who they are" },
-  { kind: "goal", heading: "Goals" },
-  { kind: "habit", heading: "Habits" },
-  { kind: "preference", heading: "Preferences" },
-  { kind: "opportunity", heading: "Opportunities" },
-];
-
 /**
  * Render soft memory ("what Stash remembers") grouped by kind. This is the
  * recall half of the memory loop — every reply sees who the user is, not just
- * their numbers. Stated explicitly when empty so the model doesn't invent.
+ * their numbers. It reads the Sibyl recall pack, NOT the local ledger: with the
+ * memory layer gone this block is empty and Stash meets a stranger.
+ *
+ * Each line carries its [subject], which is the handle the model reuses to
+ * revise a memory (consolidating that row) or to forget it.
  */
-function renderMemories(ledger: Ledger, name: string): string {
-  const memories = getMemories(ledger);
-  if (memories.length === 0) {
-    return `\nWhat you remember about ${name}: NOTHING lasting yet (no goals, habits, or preferences learned).`;
+function renderMemories(recall: RecallPack, name: string): string {
+  const identities =
+    recall.identities ?? (recall.identity ? [recall.identity] : []);
+  const groups: { heading: string; items: MemoryEntity[] }[] = [
+    { heading: "Who they are", items: identities },
+    { heading: "Goals", items: recall.goals ?? [] },
+    { heading: "Habits", items: recall.habits ?? [] },
+    { heading: "Preferences", items: recall.preferences ?? [] },
+    { heading: "Opportunities", items: recall.opportunities ?? [] },
+  ];
+  const total = groups.reduce((n, g) => n + g.items.length, 0);
+  if (total === 0) {
+    return `\nWhat you remember about ${name}: NOTHING lasting yet (no goals, habits, or preferences learned). Treat this as a first meeting and never imply you know them already.`;
   }
-  const lines = [`\nWhat you remember about ${name}:`];
-  for (const { kind, heading } of MEMORY_GROUPS) {
-    const items = memories.filter((m) => m.kind === kind);
-    if (items.length === 0) continue;
-    lines.push(`${heading}:`);
-    for (const m of items) lines.push(`- ${m.content}`);
+  const lines = [
+    `\nWhat you remember about ${name} — reuse the [subject] verbatim to revise or forget one:`,
+  ];
+  for (const g of groups) {
+    if (g.items.length === 0) continue;
+    lines.push(`${g.heading}:`);
+    for (const e of g.items) lines.push(`- [${e.name}] ${memoryLine(e)}`);
   }
   return lines.join("\n");
 }
@@ -176,14 +188,14 @@ function renderLedgerSnapshot(ledger: Ledger): string {
   return lines.join("\n");
 }
 
-export function buildSystemPrompt(ledger: Ledger): string {
+export function buildSystemPrompt(ledger: Ledger, recall: RecallPack): string {
   const name = ledger.owner?.trim() || "there";
   const cur = CURRENCIES[ledger.currency];
   return `You are Stash AI — a personal finance agent for ${name}, a student or young hustler with irregular income (freelance, gigs, allowances, scholarships).
 
 ${name}'s current financial snapshot:
 ${renderLedgerSnapshot(ledger)}
-${renderMemories(ledger, name)}
+${renderMemories(recall, name)}
 
 Who you are:
 - ${name}'s financially wise friend — the one who actually knows their money and tells them the truth. Not a receipt printer, not a yes-man.
@@ -225,9 +237,11 @@ Goals — things ${name} is saving TOWARD:
 - A vague aspiration with no number ("I want to save more") is a remember(goal), not an add_goal; only structured targets with an amount become goals.
 
 Memory — remembering who ${name} is (this is what makes you THEIR companion, not a calculator):
-- Beyond money, ${name} reveals lasting things about themselves: goals ("saving for a laptop"), habits ("I overspend after payday"), preferences ("I'd rather cook than eat out"), identity ("final-year student in Lagos"), or an opportunity not already tracked. When something has LONG-TERM value for future advice, call remember(kind, content).
+- Beyond money, ${name} reveals lasting things about themselves: goals ("saving for a laptop"), habits ("I overspend after payday"), preferences ("I'd rather cook than eat out"), identity ("final-year student in Lagos"), or an opportunity not already tracked. When something has LONG-TERM value for future advice, call remember(kind, subject, content).
 - Capture the durable, ignore the disposable. "I'm trying to stop impulse buying" → remember. "lol I'm broke", "thanks", "what's my balance?" → nothing to remember.
-- Phrase it about ${name} in a short line ("Saving for a MacBook", not "I want one"). If they revise it ("tuition now, not the laptop") use update_memory; if it stops being true use forget_memory. NEVER re-save something already under "What you remember".
+- The SUBJECT is the handle: 1-4 plain words naming what the memory is about ("macbook", "post payday spike", "profile"). Every stored memory shows its subject in [brackets] above.
+- To REVISE a memory, call remember again with that EXACT subject — it updates in place, it does not duplicate. So "make it a MacBook Pro, £1,800" is remember(goal, "macbook", "Saving for a MacBook Pro, around £1,800"), reusing [macbook]. Never invent a near-duplicate subject for something you already remember.
+- If a memory stops being true, forget_memory(kind, subject). Do NOT re-save something already listed above unchanged.
 - Memory NEVER changes the numbers — it shapes your judgement, not the balance. When your advice touches a goal or habit they told you, reference it like a friend who actually remembers: "you said you're saving for the laptop — this sets that back a little."
 
 Money is in ${cur.name} (${cur.symbol}). Keep replies concise — a few short sentences unless they ask for depth.`;
@@ -631,6 +645,37 @@ export interface AgentTurn {
    * for turns that didn't create a scholarship.
    */
   relatedScholarshipIds: string[];
+  /**
+   * True when this turn wrote to Sibyl, so the caller re-fetches the recall pack
+   * and the NEXT prompt already sees what was just learned.
+   */
+  memoryChanged: boolean;
+}
+
+/**
+ * Perform the Sibyl writes a turn asked for.
+ *
+ * Returns a note when a write did NOT land, which is appended to the facts the
+ * model finalizes from. A silent failure would have Stash promise to remember
+ * something it dropped, and that is a worse failure than admitting the miss.
+ */
+async function commitMemoryOps(
+  ops: MemoryOp[],
+): Promise<{ changed: boolean; note: string | null }> {
+  if (ops.length === 0) return { changed: false, note: null };
+  const tenant = resolveTenant();
+  if (!tenant) {
+    return {
+      changed: false,
+      note: "NOTE: memory is not configured, so nothing was saved. Do NOT tell them you'll remember it.",
+    };
+  }
+  const { applied, failures } = await applyMemoryOps(tenant, ops);
+  if (failures.length === 0) return { changed: applied > 0, note: null };
+  return {
+    changed: applied > 0,
+    note: `NOTE: ${failures.length} memory write(s) FAILED (${failures[0].message}). Say plainly that you couldn't save that right now — never imply you'll remember it.`,
+  };
 }
 
 /**
@@ -642,6 +687,7 @@ export interface AgentTurn {
 export async function runAgentTurn(
   history: ChatMessage[],
   ledger: Ledger,
+  recall: RecallPack = EMPTY_RECALL,
   signal?: AbortSignal,
 ): Promise<AgentTurn> {
   // If the latest user message describes money moving, force a tool call so
@@ -707,12 +753,13 @@ export async function runAgentTurn(
   // just surfaced.
   const nudge = proactiveDeadlineNudge(ledger, history);
 
-  return runAgentTurnInner(history, ledger, forceTool, extraNotes, nudge, signal);
+  return runAgentTurnInner(history, ledger, recall, forceTool, extraNotes, nudge, signal);
 }
 
 async function runAgentTurnInner(
   history: ChatMessage[],
   ledger: Ledger,
+  recall: RecallPack,
   forceTool: boolean,
   extraNotes: string[],
   nudge: { id: string; facts: string } | null,
@@ -729,7 +776,7 @@ async function runAgentTurnInner(
   // card attaches regardless of whether a tool also ran this turn.
   const nudgeIds = nudge ? [nudge.id] : [];
   const messages: RouterMessage[] = [
-    { role: "system", content: buildSystemPrompt(ledger), tool_calls: undefined },
+    { role: "system", content: buildSystemPrompt(ledger, recall), tool_calls: undefined },
     ...toRouterMessages(history),
   ];
   // Surface the pre-call notes (pre-spend impact, resolved percentage, ambiguous
@@ -788,6 +835,7 @@ async function runAgentTurnInner(
     const summaries: string[] = [];
     const goalIds: string[] = [];
     const scholarshipIds: string[] = [];
+    const memoryOps: MemoryOp[] = [];
     for (const c of dedupeCalls(usable)) {
       const result = applyAction(working, c.name, c.args);
       working = result.ledger;
@@ -795,7 +843,13 @@ async function runAgentTurnInner(
       if (result.relatedGoalIds) goalIds.push(...result.relatedGoalIds);
       if (result.relatedScholarshipIds)
         scholarshipIds.push(...result.relatedScholarshipIds);
+      if (result.memoryOps) memoryOps.push(...result.memoryOps);
     }
+    // Memory writes land HERE, never inside a reducer: applyAction stays pure
+    // and the network call is the turn's job. A failed write appends a note so
+    // the reply can't claim a memory that didn't save.
+    const memory = await commitMemoryOps(memoryOps);
+    if (memory.note) summaries.push(memory.note);
     const relatedGoalIds = [...new Set(goalIds)];
     const relatedScholarshipIds = [...new Set([...scholarshipIds, ...nudgeIds])];
     const didMutate = working !== ledger;
@@ -840,6 +894,7 @@ async function runAgentTurnInner(
       mutated: didMutate,
       relatedGoalIds,
       relatedScholarshipIds,
+      memoryChanged: memory.changed,
     };
   }
 
@@ -849,18 +904,22 @@ async function runAgentTurnInner(
   if (calls.length > 0) {
     const goalIds: string[] = [];
     const scholarshipIds: string[] = [];
+    const textMemoryOps: MemoryOp[] = [];
     for (const c of dedupeCalls(calls)) {
       const result = applyAction(working, c.name, c.args);
       working = result.ledger;
       if (result.relatedGoalIds) goalIds.push(...result.relatedGoalIds);
       if (result.relatedScholarshipIds)
         scholarshipIds.push(...result.relatedScholarshipIds);
+      if (result.memoryOps) textMemoryOps.push(...result.memoryOps);
     }
+    const textMemory = await commitMemoryOps(textMemoryOps);
     messages[0] = { role: "system", content: buildFinalizePrompt(working) };
     messages.push({
       role: "user",
       content:
-        "Confirm what changed in one short, warm sentence. State the new balance from the snapshot. Do NOT output any function/tool syntax.",
+        "Confirm what changed in one short, warm sentence. State the new balance from the snapshot. Do NOT output any function/tool syntax." +
+        (textMemory.note ? `\n${textMemory.note}` : ""),
     });
     const final = await chatCompletion(messages, undefined, "auto", signal);
     const text = (final.content ?? cleaned).trim();
@@ -873,6 +932,7 @@ async function runAgentTurnInner(
       mutated: working !== ledger,
       relatedGoalIds: [...new Set(goalIds)],
       relatedScholarshipIds: [...new Set([...scholarshipIds, ...nudgeIds])],
+      memoryChanged: textMemory.changed,
     };
   }
 
@@ -888,6 +948,7 @@ async function runAgentTurnInner(
       mutated: false,
       relatedGoalIds: [],
       relatedScholarshipIds: nudgeIds,
+      memoryChanged: false,
     };
   }
 
@@ -899,5 +960,6 @@ async function runAgentTurnInner(
     mutated: false,
     relatedGoalIds: [],
     relatedScholarshipIds: nudgeIds,
+    memoryChanged: false,
   };
 }

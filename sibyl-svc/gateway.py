@@ -152,7 +152,10 @@ class Gateway:
         total = sum(len(v) for v in grouped.values())
         return {
             "tenant": tenant,
+            # `identity` is the first row, for the opener's convenience;
+            # `identities` is all of them, so recall never drops the second.
             "identity": grouped["identity"][0] if grouped["identity"] else None,
+            "identities": grouped["identity"],
             "goals": grouped["goal"],
             "habits": grouped["habit"],
             "preferences": grouped["preference"],

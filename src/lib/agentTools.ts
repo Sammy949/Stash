@@ -2,7 +2,6 @@ import type { ExpenseCategory, Ledger, MemoryKind } from "@/types";
 import {
   addGoal,
   addHustle,
-  addMemory,
   addScholarship,
   addTransaction,
   contributeToGoal,
@@ -11,16 +10,14 @@ import {
   goalProgressPct,
   goalRemaining,
   isDuplicateGoal,
-  isDuplicateMemory,
   isDuplicateTransaction,
   removeGoalByName,
   removeHustleByName,
   removeLastTransaction,
-  removeMemoryByContent,
   removeScholarshipByName,
   setMonthlyBudget,
-  updateMemoryByContent,
 } from "@/lib/ledger";
+import { memorySubject, type MemoryOp } from "@/lib/memory";
 import { formatMoney } from "@/lib/currency";
 import { incomeGoalFacts } from "@/lib/goalContext";
 
@@ -360,7 +357,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "remember",
       description:
-        "Save a lasting fact about WHO the user is — a goal, habit, preference, opportunity, or identity detail — that should shape future advice. Use for non-money statements with long-term value ('I'm saving for a laptop', 'I overspend after payday', 'I prefer cooking', 'I'm a final-year student'). Do NOT use for money events (use log_expense/log_income), questions, or throwaway chit-chat.",
+        "Save a lasting fact about WHO the user is — a goal, habit, preference, opportunity, or identity detail — that should shape future advice. Use for non-money statements with long-term value ('I'm saving for a laptop', 'I overspend after payday', 'I prefer cooking', 'I'm a final-year student'). ALSO use this to REVISE a memory: call it again with the SAME subject and the memory is updated in place, never duplicated. Do NOT use for money events (use log_expense/log_income), questions, or throwaway chit-chat.",
       parameters: {
         type: "object",
         properties: {
@@ -369,36 +366,18 @@ export const AGENT_TOOLS = [
             description:
               "One of: goal, habit, preference, opportunity, identity. Anything else is bucketed in code.",
           },
+          subject: {
+            type: "string",
+            description:
+              "A short stable label for WHAT this memory is about — 1-4 words, no punctuation, e.g. 'macbook', 'post payday spike', 'profile'. Reuse it VERBATIM when you learn more about the same thing so the memory evolves instead of forking. Subjects already stored are shown in [brackets] in what you remember.",
+          },
           content: {
             type: "string",
             description:
-              "The memory in a short third-person-about-the-user phrase, e.g. 'Saving for a MacBook', 'Overspends after getting paid'.",
+              "The memory in a short third-person-about-the-user phrase, e.g. 'Saving for a MacBook, around £1,500', 'Overspends the week after getting paid'.",
           },
         },
-        required: ["kind", "content"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "update_memory",
-      description:
-        "Revise an existing memory when the user changes or corrects it (e.g. 'actually I'm saving for tuition now, not a laptop'). Matches the existing memory by a snippet of its current content.",
-      parameters: {
-        type: "object",
-        properties: {
-          match: {
-            type: "string",
-            description:
-              "A snippet of the EXISTING memory to revise, e.g. 'laptop'.",
-          },
-          content: {
-            type: "string",
-            description: "The new memory content, e.g. 'Saving for tuition'.",
-          },
-        },
-        required: ["match", "content"],
+        required: ["kind", "subject", "content"],
       },
     },
   },
@@ -407,16 +386,21 @@ export const AGENT_TOOLS = [
     function: {
       name: "forget_memory",
       description:
-        "Drop a memory that no longer holds (e.g. 'I'm not saving for the laptop anymore'). Matches by a snippet of the memory's content.",
+        "Retire a memory that no longer holds (e.g. 'I'm not saving for the laptop anymore'). It is archived, not destroyed, so it can be recovered. To CHANGE a memory rather than drop it, call remember with the same subject instead.",
       parameters: {
         type: "object",
         properties: {
-          match: {
+          kind: {
             type: "string",
-            description: "A snippet of the memory to remove, e.g. 'laptop'.",
+            description: "The memory's kind: goal, habit, preference, opportunity, or identity.",
+          },
+          subject: {
+            type: "string",
+            description:
+              "The subject shown in [brackets] for that memory, e.g. 'macbook'.",
           },
         },
-        required: ["match"],
+        required: ["kind", "subject"],
       },
     },
   },
@@ -442,6 +426,13 @@ export interface ActionResult {
    * scholarship actions and for remove_scholarship (it's gone).
    */
   relatedScholarshipIds?: string[];
+  /**
+   * Sibyl writes this action asked for. The handler stays PURE by returning the
+   * intent; the agent turn performs the network write and reports any failure
+   * back to the model. Memory lives in Sibyl, not in the ledger, which is what
+   * makes deleting Sibyl actually break recall.
+   */
+  memoryOps?: MemoryOp[];
 }
 
 /**
@@ -657,42 +648,31 @@ export function applyAction(
       const content = String(args.content ?? "").trim();
       if (!content) return { ledger, summary: "No memory content given." };
       const kind = normalizeMemoryKind(args.kind);
-      if (isDuplicateMemory(ledger, kind, content)) {
-        return {
-          ledger,
-          summary: `Already remembered (${kind}: ${content}) — no need to save it again.`,
-        };
-      }
-      const next = addMemory(ledger, { kind, content });
+      // Fall back to the content when the model omits a subject, so a memory is
+      // never dropped for want of a label — it just consolidates less well.
+      const name = memorySubject(args.subject) || memorySubject(content);
+      if (!name) return { ledger, summary: "No memory subject given." };
       return {
-        ledger: next,
-        summary: `Remembered (${kind}): ${content}. Acknowledge naturally — don't read it back like a robot.`,
-      };
-    }
-    case "update_memory": {
-      const match = String(args.match ?? "").trim();
-      const content = String(args.content ?? "").trim();
-      if (!match || !content)
-        return { ledger, summary: "Need both the memory to match and the new content." };
-      const next = updateMemoryByContent(ledger, match, content);
-      return {
-        ledger: next,
-        summary:
-          next === ledger
-            ? `No memory matching "${match}" to update.`
-            : `Updated memory to: ${content}.`,
+        ledger,
+        summary: `Remembered (${kind} · ${name}): ${content}. Acknowledge naturally — don't read it back like a robot.`,
+        memoryOps: [
+          {
+            op: "write",
+            category: kind,
+            name,
+            body: { content, kind, notedAt: new Date().toISOString() },
+          },
+        ],
       };
     }
     case "forget_memory": {
-      const match = String(args.match ?? "").trim();
-      if (!match) return { ledger, summary: "No memory specified to forget." };
-      const next = removeMemoryByContent(ledger, match);
+      const kind = normalizeMemoryKind(args.kind);
+      const name = memorySubject(args.subject ?? args.match);
+      if (!name) return { ledger, summary: "No memory specified to forget." };
       return {
-        ledger: next,
-        summary:
-          next === ledger
-            ? `No memory matching "${match}" to forget.`
-            : `Forgot the memory matching "${match}".`,
+        ledger,
+        summary: `Archived the ${kind} memory "${name}" — it no longer applies.`,
+        memoryOps: [{ op: "archive", category: kind, name, reason: "no longer applies" }],
       };
     }
     default:

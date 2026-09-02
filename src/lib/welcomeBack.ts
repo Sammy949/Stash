@@ -1,5 +1,6 @@
 import type { Ledger } from "@/types";
-import { daysUntil, getMemories } from "@/lib/ledger";
+import { daysUntil } from "@/lib/ledger";
+import { EMPTY_RECALL, memoryLine, type RecallPack } from "@/lib/memory";
 import { formatMoney } from "@/lib/currency";
 
 /**
@@ -29,6 +30,7 @@ export interface WelcomeBack {
 export function deriveWelcomeBack(
   ledger: Ledger,
   lastVisitAt: string | null,
+  recall: RecallPack = EMPTY_RECALL,
   now: Date = new Date(),
 ): WelcomeBack | null {
   if (!lastVisitAt) return null; // first-ever session — nothing to recap
@@ -77,10 +79,13 @@ export function deriveWelcomeBack(
     });
   }
 
-  // A goal Stash is holding for the user — quoted verbatim from memory.
-  const goal = getMemories(ledger).find((m) => m.kind === "goal");
+  // A goal Stash is holding for the user — quoted verbatim from Sibyl memory.
+  const goal = (recall.goals ?? [])[0];
   if (goal) {
-    facts.push({ text: `You're saving toward “${goal.content}”`, tone: "default" });
+    facts.push({
+      text: `You're saving toward “${memoryLine(goal)}”`,
+      tone: "default",
+    });
   }
 
   if (facts.length === 0) return null; // nothing worth interrupting for

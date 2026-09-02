@@ -10,6 +10,7 @@ import { Onboarding } from "@/components/Onboarding/Onboarding";
 import type { OnboardingProfile } from "@/components/Onboarding/Onboarding";
 import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
+import { useMemory } from "@/hooks/useMemory";
 import { ensureStorageSchema, getStoredRootHash } from "@/lib/ogStorage";
 import { deriveObservation } from "@/lib/observations";
 import { deriveWelcomeBack } from "@/lib/welcomeBack";
@@ -52,6 +53,9 @@ const SYNC_CONFIRMATION =
 export default function App() {
   const { ledger, hydrating, syncPhase, sync, applyLedger, initProfile } =
     useLedger();
+  // Sibyl memory: hydrated once on mount and handed to the agent as a port, so
+  // every turn recalls from it and any write refreshes it.
+  const { recall, hydrating: recalling, port: memoryPort } = useMemory();
   const {
     messages,
     isThinking,
@@ -60,7 +64,7 @@ export default function App() {
     pushAssistant,
     pushCard,
     editMessage,
-  } = useAgent();
+  } = useAgent(memoryPort);
 
   // Returning users (a synced ledger exists) skip onboarding.
   const [onboarded, setOnboarded] = useState(
@@ -88,13 +92,14 @@ export default function App() {
   // visit (code owns every number). Null when there's nothing worth saying.
   const [welcome, setWelcome] = useState<WelcomeBackData | null>(null);
   useEffect(() => {
-    if (!onboarded || hydrating) return;
+    if (!onboarded || hydrating || recalling) return;
     const last = localStorage.getItem(LAST_VISIT_KEY);
-    setWelcome(deriveWelcomeBack(ledger, last));
+    setWelcome(deriveWelcomeBack(ledger, last, recall));
     localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString());
     // Intentionally keyed on hydration settling, not on every ledger change —
-    // the greeting is a one-shot snapshot of "since last visit".
-  }, [onboarded, hydrating]);
+    // the greeting is a one-shot snapshot of "since last visit". It also waits
+    // on the Sibyl read, since the remembered goal is part of the greeting.
+  }, [onboarded, hydrating, recalling]);
 
   function completeOnboarding(profile: OnboardingProfile) {
     initProfile(profile);
@@ -135,7 +140,7 @@ export default function App() {
       // Proactive observation — code (not the model) notices when a money
       // event collides with something Stash remembers, and adds one nudge
       // after the agent's reply. Stays silent when there's nothing to say.
-      const observation = deriveObservation(before, updated);
+      const observation = deriveObservation(before, updated, memoryPort.read());
       if (observation) pushAssistant(observation);
     }).then((ok) => {
       // Inline spending breakdown — code-computed, attached after the agent's
@@ -169,7 +174,7 @@ export default function App() {
           applyLedger(updated);
           const changed = changedSection(before, updated);
           if (changed) setHighlight(changed);
-          const observation = deriveObservation(before, updated);
+          const observation = deriveObservation(before, updated, memoryPort.read());
           if (observation) pushAssistant(observation);
         },
       );

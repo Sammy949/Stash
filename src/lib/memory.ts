@@ -49,7 +49,10 @@ export interface MemorySnapshot {
 /** Everything the cold-start opener needs, in one round-trip. */
 export interface RecallPack {
   tenant: string;
+  /** First identity entity, for the opener's convenience. */
   identity: MemoryEntity | null;
+  /** ALL identity entities, so recall never silently drops the 2nd one. */
+  identities: MemoryEntity[];
   goals: MemoryEntity[];
   habits: MemoryEntity[];
   preferences: MemoryEntity[];
@@ -69,6 +72,7 @@ export interface RecallPack {
 export const EMPTY_RECALL: RecallPack = {
   tenant: "",
   identity: null,
+  identities: [],
   goals: [],
   habits: [],
   preferences: [],
@@ -80,6 +84,60 @@ export const EMPTY_RECALL: RecallPack = {
 };
 
 export class MemoryWriteError extends Error {}
+
+/**
+ * One pending Sibyl write, produced by a tool call and executed by the agent
+ * turn. Tool handlers stay pure by RETURNING these instead of performing the
+ * network write themselves (the reducers must never do I/O).
+ */
+export type MemoryOp =
+  | {
+      op: "write";
+      category: MemoryCategory;
+      /** Stable subject slug: re-writing the same one consolidates that row. */
+      name: string;
+      body: Record<string, unknown>;
+    }
+  | { op: "archive"; category: MemoryCategory; name: string; reason?: string };
+
+/**
+ * The seam the agent and the views read memory through. Ref-backed by useMemory,
+ * so a stable object can be handed to useAgent once instead of threading the
+ * recall pack through every call signature.
+ */
+export interface MemoryPort {
+  /** The latest recall pack. Always safe to render; never null. */
+  read(): RecallPack;
+  /** Re-fetch after a write so the next prompt sees what was just learned. */
+  refresh(): Promise<void>;
+}
+
+/**
+ * One human-readable line for a memory entity. Prefers `body.content` (what the
+ * `remember` tool writes) and falls back to the body's fields, then the subject
+ * slug, so a structured entity written by onboarding still renders as prose
+ * instead of vanishing from the prompt.
+ */
+export function memoryLine(entity: MemoryEntity): string {
+  const body = entity.body ?? {};
+  const content = typeof body.content === "string" ? body.content.trim() : "";
+  if (content) return content;
+  const pairs = Object.entries(body)
+    .filter(([, v]) => v !== null && v !== undefined && v !== "")
+    .map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`);
+  return pairs.length > 0 ? pairs.join(", ") : entity.name.replace(/-/g, " ");
+}
+
+/** Slugify a model-supplied subject into a stable entity name. */
+export function memorySubject(raw: unknown): string {
+  return String(raw ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+}
+
 
 const TENANT_RE = /^0x[0-9a-f]{40}$/;
 
@@ -176,3 +234,37 @@ export async function writeSnapshot(
 ): Promise<void> {
   await request("state", tenant, { method: "POST", body: JSON.stringify({ body }) });
 }
+
+export interface MemoryOpOutcome {
+  applied: number;
+  /** Ops that did NOT land. The turn tells the model, so it can't claim to remember. */
+  failures: { op: MemoryOp; message: string }[];
+}
+
+/**
+ * Execute the writes a turn's tool calls asked for. Sequential on purpose: one
+ * SQLite writer, and order matters when a turn both writes and archives the same
+ * subject. Failures are collected rather than thrown so one bad write can't lose
+ * the rest of the turn.
+ */
+export async function applyMemoryOps(
+  tenant: string,
+  ops: MemoryOp[],
+): Promise<MemoryOpOutcome> {
+  let applied = 0;
+  const failures: MemoryOpOutcome["failures"] = [];
+  for (const op of ops) {
+    try {
+      if (op.op === "write") {
+        await writeMemory(tenant, op.category, op.name, op.body);
+      } else {
+        await archiveMemory(tenant, op.category, op.name, op.reason);
+      }
+      applied += 1;
+    } catch (e) {
+      failures.push({ op, message: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  return { applied, failures };
+}
+
