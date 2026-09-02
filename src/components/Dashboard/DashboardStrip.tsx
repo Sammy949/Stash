@@ -25,29 +25,29 @@ export function DashboardStrip({
   return (
     <button
       onClick={onExpand}
-      className="flex w-full items-center gap-4 border-b border-line bg-card/60 px-5 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-left transition-colors hover:bg-card"
+      className="flex w-full items-center gap-4 border-b border-border bg-card/60 px-5 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-left transition-colors hover:bg-card"
     >
       <div className="min-w-0">
-        <span className="label-caps block text-[10px] text-muted">Balance</span>
+        <span className="label-caps block text-[10px] text-muted-foreground">Balance</span>
         <span
-          className={`font-data block text-base font-semibold ${bal < 0 ? "text-red" : ""}`}
+          className={`font-data block text-base font-semibold ${bal < 0 ? "text-destructive" : ""}`}
         >
           {formatMoney(bal, ledger.currency)}
         </span>
       </div>
 
       {next && (
-        <div className="min-w-0 border-l border-line pl-4">
-          <span className="block truncate text-[11px] text-muted">
+        <div className="min-w-0 border-l border-border pl-4">
+          <span className="block truncate text-[11px] text-muted-foreground">
             {next.name}
           </span>
-          <span className="font-data block text-sm font-medium text-emerald">
+          <span className="font-data block text-sm font-medium text-primary">
             {radarBadge(next)}
           </span>
         </div>
       )}
 
-      <span className="label-caps ml-auto shrink-0 text-[10px] text-muted">
+      <span className="label-caps ml-auto shrink-0 text-[10px] text-muted-foreground">
         Dashboard ▴
       </span>
     </button>

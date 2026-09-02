@@ -4,11 +4,11 @@ const PHASE: Record<
   Exclude<SyncPhase, "idle">,
   { label: string; color: string }
 > = {
-  encrypting: { label: "Encrypting ledger…", color: "text-amber" },
-  uploading: { label: "Uploading to 0G…", color: "text-amber" },
-  confirmed: { label: "Synced to 0G ✓", color: "text-emerald" },
-  error: { label: "Sync failed", color: "text-red" },
-  pending: { label: "Saved locally · syncing to 0G when ready", color: "text-amber" },
+  encrypting: { label: "Encrypting ledger…", color: "text-warning" },
+  uploading: { label: "Uploading to 0G…", color: "text-warning" },
+  confirmed: { label: "Synced to 0G ✓", color: "text-primary" },
+  error: { label: "Sync failed", color: "text-destructive" },
+  pending: { label: "Saved locally · syncing to 0G when ready", color: "text-warning" },
 };
 
 /** Live sync status pill; renders nothing when idle. */

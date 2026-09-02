@@ -60,14 +60,14 @@ export function AgentPanel({
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2.5 border-b border-line px-5 py-3">
+      <div className="flex items-center gap-2.5 border-b border-border px-5 py-3">
         <StashMark className="h-7 w-7" />
         <h2 className="shrink-0 text-sm font-semibold">Stash AI</h2>
         {/* Hidden on the narrowest screens so the header can't overflow now that
             it also carries the reset and the build badge. */}
         <span className="hidden items-center gap-1.5 sm:flex">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald" />
-          <span className="label-caps text-[10px] text-muted">Active</span>
+          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+          <span className="label-caps text-[10px] text-muted-foreground">Active</span>
         </span>
         <div className="ml-auto flex items-center gap-2">
           {onStartFresh && (
@@ -76,7 +76,7 @@ export function AgentPanel({
               onClick={onStartFresh}
               disabled={isThinking}
               title="Clear this conversation. Stash keeps what it remembers."
-              className="flex h-9 items-center rounded-lg px-2 text-[11px] text-muted transition-colors hover:bg-bg hover:text-ink disabled:opacity-40"
+              className="flex h-9 items-center rounded-lg px-2 text-[11px] text-muted-foreground transition-colors hover:bg-background hover:text-foreground disabled:opacity-40"
             >
               Start fresh
             </button>
@@ -94,7 +94,7 @@ export function AgentPanel({
         {greeting ? (
           <div className="flex h-full flex-col items-center justify-center px-2 text-center">
             <StashMark className="h-12 w-12" />
-            <p className="mt-4 max-w-sm whitespace-pre-wrap text-sm leading-relaxed text-muted">
+            <p className="mt-4 max-w-sm whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
               {greeting.content}
             </p>
           </div>
@@ -116,7 +116,7 @@ export function AgentPanel({
       </div>
 
       {/* Disclaimer — code owns the numbers, but advice/prose can still err. */}
-      <p className="shrink-0 px-5 pb-2 text-center text-[10px] text-muted">
+      <p className="shrink-0 px-5 pb-2 text-center text-[10px] text-muted-foreground">
         Stash can make mistakes — double-check anything important.
       </p>
     </div>

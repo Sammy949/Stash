@@ -15,7 +15,7 @@ function TypingDots() {
       {[0, 0.2, 0.4].map((d) => (
         <span
           key={d}
-          className="h-1.5 w-1.5 rounded-full bg-muted animate-blink"
+          className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-blink"
           style={{ animationDelay: `${d}s` }}
         />
       ))}
@@ -96,7 +96,7 @@ export function MessageBubble({
               }
               if (e.key === "Escape") setEditing(false);
             }}
-            className="w-full resize-none overflow-hidden rounded-2xl rounded-br-sm bg-slate px-3.5 py-2.5 text-sm leading-relaxed text-ink outline-none ring-1 ring-emerald/50 focus:ring-emerald"
+            className="w-full resize-none overflow-hidden rounded-2xl rounded-br-sm bg-secondary px-3.5 py-2.5 text-sm leading-relaxed text-foreground outline-none ring-1 ring-primary/50 focus:ring-primary"
           />
           <div className="mt-1 flex items-center justify-end gap-1">
             <RowButton label="Cancel edit" onClick={() => setEditing(false)}>
@@ -106,7 +106,7 @@ export function MessageBubble({
               <SendIcon className="h-4 w-4" />
             </RowButton>
           </div>
-          <p className="mt-0.5 text-right text-[10px] text-muted">
+          <p className="mt-0.5 text-right text-[10px] text-muted-foreground">
             Saving replaces everything below.
           </p>
         </div>
@@ -125,13 +125,13 @@ export function MessageBubble({
               type="button"
               aria-label="Edit message"
               onClick={startEdit}
-              className="flex h-11 w-11 items-center justify-center rounded-lg text-muted transition-colors hover:bg-bg hover:text-ink"
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
             >
               <PencilIcon className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
-        <p className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-slate px-3.5 py-2.5 text-sm leading-relaxed text-ink">
+        <p className="max-w-[80%] whitespace-pre-wrap break-words rounded-2xl rounded-br-sm bg-secondary px-3.5 py-2.5 text-sm leading-relaxed text-foreground">
           {message.content}
         </p>
       </div>
@@ -144,13 +144,13 @@ export function MessageBubble({
       <StashMark className="h-7 w-7" />
       <div className="flex max-w-[85%] flex-col items-start gap-1.5">
         {message.pending ? (
-          <div className="rounded-2xl rounded-tl-sm border border-line bg-bg/60 px-3.5 py-2.5">
+          <div className="rounded-2xl rounded-tl-sm border border-border bg-background/60 px-3.5 py-2.5">
             <TypingDots />
           </div>
         ) : (
           <>
             {message.content && (
-              <div className="break-words rounded-2xl rounded-tl-sm border border-line bg-bg/60 px-3.5 py-2.5 text-sm leading-relaxed text-ink">
+              <div className="break-words rounded-2xl rounded-tl-sm border border-border bg-background/60 px-3.5 py-2.5 text-sm leading-relaxed text-foreground">
                 <Markdown>{message.content}</Markdown>
               </div>
             )}
@@ -187,7 +187,7 @@ export function MessageBubble({
                     <ScholarshipCard key={s.id} scholarship={s} />
                   ))}
                   {more > 0 && (
-                    <p className="px-1 text-xs text-muted">
+                    <p className="px-1 text-xs text-muted-foreground">
                       +{more} more on your radar
                     </p>
                   )}

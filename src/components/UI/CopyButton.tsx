@@ -26,10 +26,10 @@ export function CopyButton({
       type="button"
       onClick={copy}
       aria-label={copied ? "Copied" : "Copy"}
-      className={`flex h-11 w-11 items-center justify-center rounded-lg text-muted transition-colors hover:bg-bg hover:text-ink ${className}`}
+      className={`flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-background hover:text-foreground ${className}`}
     >
       {copied ? (
-        <CheckIcon className="h-3.5 w-3.5 text-emerald" />
+        <CheckIcon className="h-3.5 w-3.5 text-primary" />
       ) : (
         <CopyIcon className="h-3.5 w-3.5" />
       )}

@@ -40,11 +40,11 @@ export function VaultCard({
   const offset = CIRCUMFERENCE * (1 - pct / 100);
 
   return (
-    <section className="rounded-2xl border border-line bg-card p-6">
+    <section className="rounded-2xl border border-border bg-card p-6">
       {/* Top region: balance dominant on the left, spent ring on the right. */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-muted">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
             <span className="label-caps text-[11px]">Vault Balance</span>
             <LockIcon className="h-3 w-3" />
           </div>
@@ -53,17 +53,17 @@ export function VaultCard({
             value={bal}
             format={(n) => formatMoney(n, ledger.currency)}
             className={`font-data mt-2 block text-[clamp(1.6rem,7vw,2.6rem)] font-semibold leading-[1.1] ${
-              overdrawn ? "text-red" : "text-ink"
+              overdrawn ? "text-destructive" : "text-foreground"
             }`}
           />
 
           {/* Sync / persistence status — one quiet line under the balance. */}
           <div className="mt-3 h-4 text-xs">
             {hydrating ? (
-              <span className="text-muted">Restoring from 0G Storage…</span>
+              <span className="text-muted-foreground">Restoring from 0G Storage…</span>
             ) : syncPhase === "idle" ? (
-              <span className="flex items-center gap-1.5 text-muted">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald" />
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
                 {formatSyncedAt(ledger.lastSyncedAt)}
               </span>
             ) : (
@@ -87,7 +87,7 @@ export function VaultCard({
               cy={RING_SIZE / 2}
               r={RADIUS}
               fill="none"
-              stroke="var(--color-line)"
+              stroke="var(--border)"
               strokeWidth={STROKE}
             />
             <circle
@@ -95,7 +95,7 @@ export function VaultCard({
               cy={RING_SIZE / 2}
               r={RADIUS}
               fill="none"
-              stroke={overdrawn ? "var(--color-red)" : "var(--color-emerald)"}
+              stroke={overdrawn ? "var(--destructive)" : "var(--primary)"}
               strokeWidth={STROKE}
               strokeLinecap="round"
               strokeDasharray={CIRCUMFERENCE}
@@ -104,7 +104,7 @@ export function VaultCard({
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-            <span className="label-caps text-[8px] text-muted">Spent</span>
+            <span className="label-caps text-[8px] text-muted-foreground">Spent</span>
             <span className="font-data text-sm font-semibold leading-tight">
               {Math.round(pct)}%
             </span>
@@ -131,7 +131,7 @@ export function VaultCard({
 
       {/* Empty-first nudge — only before any money is logged. */}
       {!hydrating && ledger.transactions.length === 0 && (
-        <p className="mt-4 text-center text-[11px] text-muted">
+        <p className="mt-4 text-center text-[11px] text-muted-foreground">
           Tell Stash about your money below to get started.
         </p>
       )}
@@ -155,16 +155,16 @@ function Stat({
   accent?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-bg/40 p-3">
-      <div className="flex items-center gap-1.5 text-muted">
-        <span className={accent ? "text-emerald" : ""}>{icon}</span>
+    <div className="rounded-xl border border-border bg-background/40 p-3">
+      <div className="flex items-center gap-1.5 text-muted-foreground">
+        <span className={accent ? "text-primary" : ""}>{icon}</span>
         <span className="label-caps text-[10px]">{label}</span>
       </div>
       <AnimatedNumber
         value={value}
         format={(n) => formatMoney(n, currency)}
         className={`font-data mt-1.5 block text-lg font-semibold ${
-          accent ? "text-emerald" : "text-ink"
+          accent ? "text-primary" : "text-foreground"
         }`}
       />
     </div>

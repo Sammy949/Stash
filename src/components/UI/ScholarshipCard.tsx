@@ -12,25 +12,25 @@ import { deriveUrgency, radarBadge } from "@/lib/ledger";
 
 /** Left-accent border per urgency band (kept whole for Tailwind scanning). */
 const BORDER: Record<UrgencyColor, string> = {
-  emerald: "border-l-emerald",
-  amber: "border-l-amber",
-  red: "border-l-red",
-  muted: "border-l-line",
+  emerald: "border-l-primary",
+  amber: "border-l-warning",
+  red: "border-l-destructive",
+  muted: "border-l-border",
 };
 
 /** Countdown/status pill colors per urgency band. */
 const BADGE: Record<UrgencyColor, string> = {
-  emerald: "border-emerald/30 bg-emerald/10 text-emerald",
-  amber: "border-amber/30 bg-amber/10 text-amber",
-  red: "border-red/30 bg-red/10 text-red",
-  muted: "border-line bg-bg/40 text-muted",
+  emerald: "border-primary/30 bg-primary/10 text-primary",
+  amber: "border-warning/30 bg-warning/10 text-warning",
+  red: "border-destructive/30 bg-destructive/10 text-destructive",
+  muted: "border-border bg-background/40 text-muted-foreground",
 };
 
 const DOT: Record<UrgencyColor, string> = {
-  emerald: "bg-emerald",
-  amber: "bg-amber",
-  red: "bg-red",
-  muted: "bg-muted",
+  emerald: "bg-primary",
+  amber: "bg-warning",
+  red: "bg-destructive",
+  muted: "bg-muted-foreground",
 };
 
 const MONTHS = [
@@ -59,11 +59,11 @@ export function ScholarshipCard({
 
   return (
     <div
-      className={`rounded-2xl border border-line border-l-2 ${BORDER[urgency]} bg-card/80 p-3.5 ${className}`}
+      className={`rounded-2xl border border-border border-l-2 ${BORDER[urgency]} bg-card/80 p-3.5 ${className}`}
     >
       {/* Name + countdown/status badge */}
       <div className="flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-ink">
+        <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-foreground">
           <span className={`h-2 w-2 shrink-0 rounded-full ${DOT[urgency]}`} />
           <span className="truncate">{scholarship.name}</span>
         </span>
@@ -75,7 +75,7 @@ export function ScholarshipCard({
       </div>
 
       {/* Status label + deadline date */}
-      <div className="mt-2 flex items-baseline justify-between gap-2 text-xs text-muted">
+      <div className="mt-2 flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
         <span className="truncate">{scholarship.statusLabel}</span>
         {scholarship.deadline && (
           <span className="font-data shrink-0">

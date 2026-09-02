@@ -41,37 +41,37 @@ export function GoalCard({ goal, currency }: { goal: Goal; currency: Currency })
   const deadline = deadlineLabel(goal);
 
   return (
-    <div className="w-full max-w-[18rem] rounded-2xl border border-line border-l-2 border-l-emerald bg-card/80 p-3.5">
+    <div className="w-full max-w-[18rem] rounded-2xl border border-border border-l-2 border-l-primary bg-card/80 p-3.5">
       {/* Name + percentage */}
       <div className="flex items-baseline justify-between gap-2">
-        <span className="flex items-center gap-1.5 text-sm font-medium text-ink">
+        <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
           <span aria-hidden>{goalEmoji(goal.name)}</span>
           <span className="truncate">{goal.name}</span>
         </span>
-        <span className="font-data shrink-0 text-sm font-semibold text-emerald">
+        <span className="font-data shrink-0 text-sm font-semibold text-primary">
           {pct}%
         </span>
       </div>
 
       {/* Progress bar — blue fill, capped at 100% by goalProgressPct */}
-      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-bg">
+      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-background">
         <div
-          className="h-full rounded-full bg-emerald"
+          className="h-full rounded-full bg-primary"
           style={{ width: `${Math.max(pct, 2)}%` }}
         />
       </div>
 
       {/* Amount saved / target + deadline */}
       <div className="mt-2 flex items-baseline justify-between gap-2 text-xs">
-        <span className="font-data text-muted">
+        <span className="font-data text-muted-foreground">
           {formatMoney(goal.savedAmount, currency)}{" "}
-          <span className="text-muted/60">/</span>{" "}
+          <span className="text-muted-foreground/60">/</span>{" "}
           {formatMoney(goal.targetAmount, currency)}
         </span>
         {reached ? (
-          <span className="text-emerald">reached</span>
+          <span className="text-primary">reached</span>
         ) : deadline ? (
-          <span className={deadline.warn ? "text-amber" : "text-muted"}>
+          <span className={deadline.warn ? "text-warning" : "text-muted-foreground"}>
             {deadline.text}
           </span>
         ) : null}

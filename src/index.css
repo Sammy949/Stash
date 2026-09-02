@@ -26,6 +26,9 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
+  /* Freed by the consolidation pass: `muted` is now shadcn's SURFACE, and muted
+     text is muted-foreground, so the vendored components work unedited. */
+  --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
@@ -38,20 +41,6 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* Stash's current vocabulary, still live. The consolidation pass retires
-     these in favour of the semantic names above.
-
-     --color-muted stays Stash's muted TEXT so 81 `text-muted` call sites keep
-     working. That means shadcn's `muted` SURFACE has no utility yet, which is
-     harmless: nothing rendered reaches for bg-muted. It frees up in step 2. */
-  --color-bg: var(--background);
-  --color-ink: var(--foreground);
-  --color-line: var(--border);
-  --color-muted: var(--muted-foreground);
-  --color-emerald: var(--primary);
-  --color-amber: var(--warning);
-  --color-red: var(--destructive);
-  --color-slate: var(--secondary);
 
   /* Geist for everything; Geist Mono is reserved for money/data figures and
      system-status caps labels. */
@@ -84,8 +73,11 @@
   --destructive: oklch(0.577 0.222 27.2);
   --success: oklch(0.52 0.13 156);
   --success-foreground: oklch(0.99 0.005 156);
-  --warning: oklch(0.7 0.15 70);
-  --warning-foreground: oklch(0.28 0.06 70);
+  /* Darkened from 0.7: amber-on-white is the classic contrast failure and
+     text-warning measured 2.71:1 there. At 0.53 it reads 5.42:1 as text and
+     still takes near-white at 5.25:1 when used as a fill. */
+  --warning: oklch(0.53 0.15 70);
+  --warning-foreground: oklch(0.99 0.01 70);
   --border: oklch(0.918 0.008 263);
   --input: oklch(0.918 0.008 263);
   --ring: oklch(0.52 0.19 260);
@@ -143,8 +135,8 @@
        command bar, strip) out from under the camera housing on its side. */
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
-    background-color: var(--color-bg);
-    color: var(--color-ink);
+    background-color: var(--background);
+    color: var(--foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -165,14 +157,14 @@
   /* Thin, unobtrusive scrollbars to match the premium dark UI */
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-line) transparent;
+    scrollbar-color: var(--border) transparent;
   }
   *::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
   *::-webkit-scrollbar-thumb {
-    background-color: var(--color-line);
+    background-color: var(--border);
     border-radius: 9999px;
   }
 }
@@ -272,7 +264,7 @@
   /* Number/count change flash */
   @keyframes stash-flash {
     0% {
-      color: var(--color-emerald);
+      color: var(--primary);
     }
     100% {
       color: inherit;

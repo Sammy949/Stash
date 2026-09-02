@@ -38,8 +38,8 @@ export function TransactionList({
   const shown = expanded ? ordered : ordered.slice(0, PREVIEW);
 
   return (
-    <section className="rounded-2xl border border-line bg-card p-5">
-      <div className="flex items-center gap-2 text-muted">
+    <section className="rounded-2xl border border-border bg-card p-5">
+      <div className="flex items-center gap-2 text-muted-foreground">
         <ReceiptIcon className="h-3.5 w-3.5" />
         <h2 className="label-caps text-[11px]">Recent Activity</h2>
       </div>
@@ -64,17 +64,17 @@ export function TransactionList({
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{t.label}</p>
                 <div className="mt-1 flex items-center gap-2">
-                  <span className="rounded-md border border-line px-1.5 py-0.5 text-[10px] capitalize text-muted">
+                  <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] capitalize text-muted-foreground">
                     {chip}
                   </span>
-                  <span className="font-data text-xs text-muted">
+                  <span className="font-data text-xs text-muted-foreground">
                     {shortDate(t.createdAt)}
                   </span>
                 </div>
               </div>
               <span
                 className={`font-data shrink-0 text-sm font-semibold ${
-                  income ? "text-emerald" : "text-ink"
+                  income ? "text-primary" : "text-foreground"
                 }`}
               >
                 {income ? "+" : "−"}
@@ -89,7 +89,7 @@ export function TransactionList({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-3 w-full border-t border-line pt-3 text-xs text-muted transition-colors hover:text-ink"
+          className="mt-3 w-full border-t border-border pt-3 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
           {expanded ? "Show less" : `View all (${ordered.length}) →`}
         </button>

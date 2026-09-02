@@ -12,10 +12,10 @@ export function RowButton({
 }) {
   const color =
     tone === "emerald"
-      ? "text-emerald hover:bg-emerald/10"
+      ? "text-primary hover:bg-primary/10"
       : tone === "red"
-        ? "text-red hover:bg-red/10"
-        : "text-muted hover:bg-bg hover:text-ink";
+        ? "text-destructive hover:bg-destructive/10"
+        : "text-muted-foreground hover:bg-background hover:text-foreground";
   return (
     <button
       type="button"

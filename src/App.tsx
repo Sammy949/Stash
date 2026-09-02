@@ -262,14 +262,14 @@ export default function App() {
           : [];
 
   return (
-    <div className="h-dvh bg-bg text-ink">
+    <div className="h-dvh bg-background text-foreground">
       {/* Centered platform column — doesn't stretch on wide screens. */}
       <div className="mx-auto flex h-full max-w-2xl flex-col">
         {/* Top bar — only on the dashboard. In chat mode the balance strip +
             "Stash AI" header are the chrome (matches the Stitch reference), so
             we drop this third bar to give the transcript back its height. */}
         {!agentActive && (
-          <header className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <header className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <img src="/logo.svg" alt="Stash" className="h-7 w-7 rounded-lg" />
             <div>
               <h1 className="text-lg font-semibold leading-none">Stash</h1>

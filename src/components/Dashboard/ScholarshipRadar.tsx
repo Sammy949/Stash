@@ -17,8 +17,8 @@ export function ScholarshipRadar({
   const shown = overflow ? scholarships.slice(0, VISIBLE) : scholarships;
 
   return (
-    <section className="rounded-2xl border border-line bg-card p-5">
-      <div className="flex items-center gap-2 text-muted">
+    <section className="rounded-2xl border border-border bg-card p-5">
+      <div className="flex items-center gap-2 text-muted-foreground">
         <RadarIcon className="h-3.5 w-3.5" />
         <h2 className="label-caps text-[11px]">Scholarship Radar</h2>
       </div>
@@ -43,7 +43,7 @@ export function ScholarshipRadar({
         <button
           type="button"
           onClick={onManage}
-          className="mt-3 w-full border-t border-line pt-3 text-xs text-muted transition-colors hover:text-ink"
+          className="mt-3 w-full border-t border-border pt-3 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
           View all ({scholarships.length}) →
         </button>

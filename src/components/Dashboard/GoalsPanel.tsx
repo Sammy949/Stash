@@ -25,8 +25,8 @@ export function GoalsPanel({
   const shown = overflow ? goals.slice(0, VISIBLE) : goals;
 
   return (
-    <section className="rounded-2xl border border-line bg-card p-5">
-      <div className="flex items-center gap-2 text-muted">
+    <section className="rounded-2xl border border-border bg-card p-5">
+      <div className="flex items-center gap-2 text-muted-foreground">
         <TargetIcon className="h-3.5 w-3.5" />
         <h2 className="label-caps text-[11px]">Goals</h2>
       </div>
@@ -39,31 +39,31 @@ export function GoalsPanel({
             <li key={g.id}>
               <div className="flex items-baseline justify-between gap-3">
                 <p className="truncate text-sm font-medium">{g.name}</p>
-                <span className="font-data shrink-0 text-xs text-muted">
+                <span className="font-data shrink-0 text-xs text-muted-foreground">
                   {formatMoneyCompact(g.savedAmount, currency)} /{" "}
                   {formatMoneyCompact(g.targetAmount, currency)}
                 </span>
               </div>
 
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-bg/60">
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-background/60">
                 <div
-                  className="h-full rounded-full bg-emerald transition-[width] duration-500 motion-reduce:transition-none"
+                  className="h-full rounded-full bg-primary transition-[width] duration-500 motion-reduce:transition-none"
                   style={{ width: `${pct}%` }}
                 />
               </div>
 
               <div className="mt-1.5 flex items-center justify-between">
                 {done ? (
-                  <span className="flex items-center gap-1 text-[11px] font-medium text-emerald">
+                  <span className="flex items-center gap-1 text-[11px] font-medium text-primary">
                     <CheckIcon className="h-3 w-3" />
                     Target reached
                   </span>
                 ) : (
-                  <span className="text-[11px] text-muted">
+                  <span className="text-[11px] text-muted-foreground">
                     {formatMoney(goalRemaining(g), currency)} to go
                   </span>
                 )}
-                <span className="font-data text-[11px] text-muted">
+                <span className="font-data text-[11px] text-muted-foreground">
                   {Math.round(pct)}%
                 </span>
               </div>
@@ -76,7 +76,7 @@ export function GoalsPanel({
         <button
           type="button"
           onClick={onManage}
-          className="mt-4 w-full border-t border-line pt-3 text-xs text-muted transition-colors hover:text-ink"
+          className="mt-4 w-full border-t border-border pt-3 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
           View all ({goals.length}) →
         </button>

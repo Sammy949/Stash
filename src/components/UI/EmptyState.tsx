@@ -15,12 +15,12 @@ export function EmptyState({
   hint: string;
 }) {
   return (
-    <div className="mt-4 flex flex-col items-center rounded-xl border border-dashed border-line px-4 py-6 text-center">
-      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-bg/40 text-muted">
+    <div className="mt-4 flex flex-col items-center rounded-xl border border-dashed border-border px-4 py-6 text-center">
+      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background/40 text-muted-foreground">
         {icon}
       </div>
-      <p className="mt-3 text-sm font-medium text-ink">{title}</p>
-      <p className="mt-1 text-xs leading-relaxed text-muted">{hint}</p>
+      <p className="mt-3 text-sm font-medium text-foreground">{title}</p>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{hint}</p>
     </div>
   );
 }

@@ -39,7 +39,7 @@ export function QuickChips({
           key={c}
           onClick={() => onPick(c)}
           disabled={disabled}
-          className="inline-flex min-h-[44px] shrink-0 items-center whitespace-nowrap rounded-full border border-line bg-bg px-3.5 text-xs text-muted transition-colors hover:border-emerald/40 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald/60 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex min-h-[44px] shrink-0 items-center whitespace-nowrap rounded-full border border-border bg-background px-3.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {c}
         </button>

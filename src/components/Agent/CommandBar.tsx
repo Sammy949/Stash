@@ -45,7 +45,7 @@ export function CommandBar({
               onClick={onOpenPanel}
               aria-label="Open conversation"
               title="Open conversation"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-bg text-muted transition-colors hover:text-ink"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
             >
               <ChatIcon className="h-4 w-4" />
             </button>

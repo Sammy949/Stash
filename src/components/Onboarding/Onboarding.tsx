@@ -50,12 +50,12 @@ export function Onboarding({
   }
 
   return (
-    <div className="flex min-h-dvh overflow-y-auto bg-bg p-4 py-[max(1rem,env(safe-area-inset-top))] text-ink md:p-8">
+    <div className="flex min-h-dvh overflow-y-auto bg-background p-4 py-[max(1rem,env(safe-area-inset-top))] text-foreground md:p-8">
       {/* Floating card — split on desktop, form-only on mobile. `m-auto` centers
           when there's room but lets the card scroll into view (top and bottom)
           when a small screen + open keyboard make it taller than the viewport,
           so the primary CTA is never trapped behind the keyboard. */}
-      <div className="m-auto grid w-full max-w-4xl overflow-hidden rounded-3xl border border-line bg-card/20 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.85)] md:grid-cols-2">
+      <div className="m-auto grid w-full max-w-4xl overflow-hidden rounded-3xl border border-border bg-card/20 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.85)] md:grid-cols-2">
         {/* ── Form side ─────────────────────────────────────────── */}
         <div className="flex flex-col justify-center p-6 sm:p-10">
           <div className="mx-auto w-full max-w-sm">
@@ -63,9 +63,9 @@ export function Onboarding({
             <div className="mb-5 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <img src="/vault.svg" alt="" className="h-8 w-8" />
-                <span className="label-caps text-sm text-ink">Stash</span>
+                <span className="label-caps text-sm text-foreground">Stash</span>
               </div>
-              <span className="label-caps text-[10px] text-muted">
+              <span className="label-caps text-[10px] text-muted-foreground">
                 Step {step + 1} of {total}
               </span>
             </div>
@@ -80,10 +80,10 @@ export function Onboarding({
                   <span
                     className={`block h-1 rounded-full transition-colors ${
                       i <= step
-                        ? "bg-emerald"
+                        ? "bg-primary"
                         : reached
-                          ? "bg-line group-hover:bg-emerald/50"
-                          : "bg-line"
+                          ? "bg-border group-hover:bg-primary/50"
+                          : "bg-border"
                     }`}
                   />
                 );
@@ -111,10 +111,10 @@ export function Onboarding({
                 <h1 className="text-2xl font-semibold tracking-tight">
                   Welcome to Stash
                 </h1>
-                <p className="mt-3 text-base font-medium text-ink">
+                <p className="mt-3 text-base font-medium text-foreground">
                   Your financial memory.
                 </p>
-                <p className="mt-2 text-sm leading-relaxed text-muted">
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                   Track money, remember what matters, and get guidance that grows
                   with you.
                 </p>
@@ -133,7 +133,7 @@ export function Onboarding({
                 <h1 className="text-2xl font-semibold tracking-tight">
                   What should I call you?
                 </h1>
-                <p className="mt-2 text-sm text-muted">
+                <p className="mt-2 text-sm text-muted-foreground">
                   Just a name — no email, no password.
                 </p>
                 <input
@@ -142,7 +142,7 @@ export function Onboarding({
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your name"
                   aria-label="Your name"
-                  className="mt-5 w-full rounded-xl border border-line bg-card px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-muted focus:border-emerald/50"
+                  className="mt-5 w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/50"
                 />
                 <Primary type="submit" disabled={!name.trim()}>
                   Continue
@@ -155,7 +155,7 @@ export function Onboarding({
                 <h1 className="text-2xl font-semibold tracking-tight">
                   Which currency?
                 </h1>
-                <p className="mt-2 text-sm text-muted">
+                <p className="mt-2 text-sm text-muted-foreground">
                   The currency you earn and spend in.
                 </p>
                 <div className="mt-5 grid grid-cols-2 gap-2">
@@ -165,8 +165,8 @@ export function Onboarding({
                       onClick={() => setCurrency(c.code)}
                       className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
                         currency === c.code
-                          ? "border-emerald/60 bg-emerald/10 text-ink"
-                          : "border-line bg-card text-muted hover:text-ink"
+                          ? "border-primary/60 bg-primary/10 text-foreground"
+                          : "border-border bg-card text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       <span className="font-data w-7 shrink-0 text-base font-semibold">
@@ -174,7 +174,7 @@ export function Onboarding({
                       </span>
                       <span className="min-w-0">
                         <span className="block leading-none">{c.code}</span>
-                        <span className="block truncate text-[11px] text-muted">
+                        <span className="block truncate text-[11px] text-muted-foreground">
                           {c.name}
                         </span>
                       </span>
@@ -196,11 +196,11 @@ export function Onboarding({
                 <h1 className="text-2xl font-semibold tracking-tight">
                   How much do you have right now?
                 </h1>
-                <p className="mt-2 text-sm text-muted">
+                <p className="mt-2 text-sm text-muted-foreground">
                   Your current balance to start from. Skip it to start at zero.
                 </p>
-                <div className="mt-5 flex items-center rounded-xl border border-line bg-card px-3.5 focus-within:border-emerald/50">
-                  <span className="font-data mr-2 text-sm text-muted">
+                <div className="mt-5 flex items-center rounded-xl border border-border bg-card px-3.5 focus-within:border-primary/50">
+                  <span className="font-data mr-2 text-sm text-muted-foreground">
                     {currencySymbol(currency)}
                   </span>
                   <input
@@ -210,7 +210,7 @@ export function Onboarding({
                     onChange={(e) => setOpeningText(e.target.value)}
                     placeholder="0"
                     aria-label={`Opening balance in ${currency}`}
-                    className="font-data w-full bg-transparent py-2.5 text-sm outline-none placeholder:text-muted"
+                    className="font-data w-full bg-transparent py-2.5 text-sm outline-none placeholder:text-muted-foreground"
                   />
                 </div>
                 <Primary type="submit">Enter Stash</Primary>
@@ -242,7 +242,7 @@ function Primary({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className="mt-7 w-full rounded-xl bg-emerald px-4 py-2.5 text-sm font-medium text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+      className="mt-7 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
     >
       {children}
     </button>

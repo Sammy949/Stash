@@ -25,7 +25,7 @@ export function BuildBadge({ className = "" }: { className?: string }) {
 
   return (
     <span
-      className={`font-data shrink-0 text-[10px] leading-none text-muted ${className}`}
+      className={`font-data shrink-0 text-[10px] leading-none text-muted-foreground ${className}`}
       title={`build ${__BUILD_SHA__}`}
     >
       {__BUILD_SHA__}
