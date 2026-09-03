@@ -24,6 +24,7 @@ import { deriveObservation } from "@/lib/observations";
 import { deriveWelcomeBack } from "@/lib/welcomeBack";
 import type { WelcomeBack as WelcomeBackData } from "@/lib/welcomeBack";
 import { rememberedCount, rememberedName } from "@/lib/opener";
+import { memoryDisabled } from "@/lib/memory";
 import { analyzeSpending, isSpendingQuery } from "@/lib/analysis";
 import {
   goalProgressPct,
@@ -65,6 +66,8 @@ export default function App() {
   // Sibyl memory: hydrated once on mount and handed to the agent as a port, so
   // every turn recalls from it and any write refreshes it.
   const { recall, hydrating: recalling, port: memoryPort } = useMemory();
+  // Read once per mount: the flag is a session decision, not live state.
+  const [memoryOff] = useState(memoryDisabled);
   const {
     messages,
     isThinking,
@@ -314,11 +317,28 @@ export default function App() {
           </div>
         ) : (
           <main className="flex-1 overflow-y-auto px-4 py-6">
+            {/* The deletion test, stated on screen. Without this the absence of
+                memory looks like a bug rather than the point being demonstrated,
+                and a judge has only my word for which mode they are seeing. */}
+            {memoryOff && (
+              <div className="mx-auto mb-5 w-full max-w-2xl">
+                <Marker role="status" variant="border">
+                  <MarkerIcon>
+                    <MemoryIcon className="size-4" />
+                  </MarkerIcon>
+                  <MarkerContent>
+                    Memory is switched off for this session. Stash keeps the
+                    maths and forgets the person. Drop <code>?nomemory</code> from
+                    the URL to bring it back.
+                  </MarkerContent>
+                </Marker>
+              </div>
+            )}
             {recalling ? (
               <div className="mx-auto mb-5 w-full max-w-2xl">
                 <Marker role="status">
                   <MarkerIcon>
-                    <MemoryIcon className="h-4 w-4" />
+                    <MemoryIcon className="size-4" />
                   </MarkerIcon>
                   <MarkerContent className="shimmer">
                     Recalling what I know about you…
