@@ -46,6 +46,21 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  /* Radius: bind Tailwind's scale to the three-step rule declared in :root, so
+     `rounded-sm|md|lg` ARE the system rather than four arbitrary sizes. The
+     vendored components already use rounded-lg/md/sm and now inherit it for
+     free; app code picks a step by meaning, not by eye.
+       sm -> data, figures, chips, inner tiles, bars
+       md -> controls: buttons, inputs, menu items
+       lg -> containers: cards, sheets, panels
+     xl/2xl are pinned to the panel step too, so a stray `rounded-2xl` in
+     vendored code cannot reintroduce a fifth size. */
+  --radius-sm: var(--radius-tight);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius-panel);
+  --radius-xl: var(--radius-panel);
+  --radius-2xl: var(--radius-panel);
+
 
   /* Geist for everything; Geist Mono is reserved for money/data figures and
      system-status caps labels. */
@@ -55,67 +70,115 @@
     Menlo, Consolas, monospace;
 }
 
-/* Light. Authored, not lifted: same blue hue family as the dark palette, with
-   lightness inverted and the primary darkened so it holds contrast on white. */
+/* ── LIGHT ──────────────────────────────────────────────────────
+   Instrument, light. Same four tonal steps as dark, inverted. `primary` is a
+   DARK graphite here (it is emphasis, and emphasis on white means darker), so
+   the "interactive = lightness step, never a hue" rule holds in both modes.
+
+   Measured: node notes/qa/palette.mjs. 20 pairs per mode, all >= 4.5:1 for text
+   and >= 1.18:1 for edges, nothing outside sRGB.
+─────────────────────────────────────────────────────────────── */
 :root {
   color-scheme: light;
-  --radius: 0.625rem;
 
-  --background: oklch(0.994 0.002 263);
-  --foreground: oklch(0.205 0.032 264);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.205 0.032 264);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.205 0.032 264);
-  --primary: oklch(0.52 0.19 260);
-  --primary-foreground: oklch(0.99 0.002 260);
-  --secondary: oklch(0.968 0.006 263);
-  --secondary-foreground: oklch(0.3 0.032 264);
-  --muted: oklch(0.97 0.005 263);
-  --muted-foreground: oklch(0.52 0.026 264);
-  --accent: oklch(0.956 0.018 260);
-  --accent-foreground: oklch(0.4 0.11 260);
-  --destructive: oklch(0.577 0.222 27.2);
-  --success: oklch(0.52 0.13 156);
-  --success-foreground: oklch(0.99 0.005 156);
-  /* Darkened from 0.7: amber-on-white is the classic contrast failure and
-     text-warning measured 2.71:1 there. At 0.53 it reads 5.42:1 as text and
-     still takes near-white at 5.25:1 when used as a fill. */
-  --warning: oklch(0.53 0.15 70);
-  --warning-foreground: oklch(0.99 0.01 70);
-  --border: oklch(0.918 0.008 263);
-  --input: oklch(0.918 0.008 263);
-  --ring: oklch(0.52 0.19 260);
+  /* One radius rule, and the only place radius is decided.
+     --radius-tight  data, figures, chips, inner tiles, bars
+     --radius        controls: buttons, inputs, menu items
+     --radius-panel  containers: cards, sheets, panels
+     Nothing in app code hardcodes a rounded-* size; it picks one of these.
+     Tight-on-the-inside, softer-on-the-outside, which is the rule the audit
+     found missing (rounded-2xl x13 / xl x12 / lg x16 with no system). */
+  --radius-tight: 0.25rem;
+  --radius: 0.4rem;
+  --radius-panel: 0.625rem;
+
+  /* Surfaces: four tonal steps at ONE hue (75, the warm/amber direction). At
+     chroma <= 0.006 the hue is not seen as colour, it only stops the grey from
+     reading cold and blue. Depth is lightness, never a drawn line. */
+  --background: oklch(0.988 0.002 75);
+  --card: oklch(1 0 75);
+  --popover: oklch(1 0 75);
+  --secondary: oklch(0.962 0.004 75);
+  --muted: oklch(0.962 0.004 75);
+  --accent: oklch(0.945 0.005 75);
+
+  /* Ink */
+  --foreground: oklch(0.225 0.008 75);
+  --card-foreground: oklch(0.225 0.008 75);
+  --popover-foreground: oklch(0.225 0.008 75);
+  --secondary-foreground: oklch(0.3 0.008 75);
+  --accent-foreground: oklch(0.28 0.01 75);
+  --muted-foreground: oklch(0.505 0.008 75);
+
+  /* Interactive emphasis. Deliberately NOT a hue: the old #3B82F6 was a
+     saturated accent sprayed on 124 call-sites. Emphasis is now a tonal step. */
+  --primary: oklch(0.32 0.01 75);
+  --primary-foreground: oklch(0.99 0.002 75);
+
+  /* Money semantics: the ONLY colour in the interface. Nothing is coloured for
+     decoration, so when colour appears it means something about the money.
+       success     money in, and money secured (goal progress, contributions)
+       destructive OVERDRAWN / negative only. NOT every expense: a normal spend
+                   is neutral ink. Colouring routine outflow red cries wolf, and
+                   the standing rule is that alarm colours are for warnings.
+       warning     warnings only (a deadline closing, a pace that will miss) */
+  --success: oklch(0.47 0.11 158);
+  --success-foreground: oklch(0.99 0.005 158);
+  --destructive: oklch(0.505 0.15 32);
+  /* C is 0.10 not 0.11: measured, 0.11 escaped sRGB at this lightness and would
+     have clipped silently to a colour I did not author. */
+  --warning: oklch(0.505 0.1 82);
+  --warning-foreground: oklch(0.99 0.008 82);
+
+  /* Edges: one tonal step off the surface, so an edge reads as a lip catching
+     light rather than an outline drawn around a box. */
+  --border: oklch(0.9 0.005 75);
+  --input: oklch(0.9 0.005 75);
+  --ring: oklch(0.32 0.01 75);
 }
 
-/* Dark. These are the exact oklch of the hexes Stash already shipped
-   (#080c14, #0f172a, #1e293b, #f8fafc, #8a94a8, #3b82f6, #f59e0b, #ef4444),
-   so this commit changes nothing about how dark mode looks. */
+/* ── DARK ───────────────────────────────────────────────────────
+   Instrument, dark. Same structure, same single hue. This is a WARM graphite,
+   deliberately not the cool blue-charcoal (#080c14) it replaces: that base is
+   dark mode's blue-purple, the tell that nobody chose the palette.
+
+   Measured: node notes/qa/palette.mjs.
+─────────────────────────────────────────────────────────────── */
 .dark {
   color-scheme: dark;
 
-  --background: oklch(0.154 0.019 263.2);
-  --foreground: oklch(0.984 0.003 247.9);
-  --card: oklch(0.208 0.04 265.8);
-  --card-foreground: oklch(0.984 0.003 247.9);
-  --popover: oklch(0.208 0.04 265.8);
-  --popover-foreground: oklch(0.984 0.003 247.9);
-  --primary: oklch(0.623 0.188 259.8);
-  --primary-foreground: oklch(0.154 0.019 263.2);
-  --secondary: oklch(0.279 0.037 260);
-  --secondary-foreground: oklch(0.984 0.003 247.9);
-  --muted: oklch(0.279 0.037 260);
-  --muted-foreground: oklch(0.665 0.032 264.3);
-  --accent: oklch(0.245 0.038 263);
-  --accent-foreground: oklch(0.984 0.003 247.9);
-  --destructive: oklch(0.637 0.208 25.3);
-  --success: oklch(0.72 0.13 156);
-  --success-foreground: oklch(0.18 0.03 156);
-  --warning: oklch(0.769 0.165 70.1);
-  --warning-foreground: oklch(0.22 0.05 70);
-  --border: oklch(0.279 0.037 260);
-  --input: oklch(0.279 0.037 260);
-  --ring: oklch(0.623 0.188 259.8);
+  /* Surfaces: four tonal steps up from the base. */
+  --background: oklch(0.155 0.004 75);
+  --card: oklch(0.198 0.005 75);
+  --popover: oklch(0.198 0.005 75);
+  --secondary: oklch(0.255 0.005 75);
+  --muted: oklch(0.255 0.005 75);
+  --accent: oklch(0.235 0.005 75);
+
+  /* Ink */
+  --foreground: oklch(0.965 0.002 75);
+  --card-foreground: oklch(0.965 0.002 75);
+  --popover-foreground: oklch(0.965 0.002 75);
+  --secondary-foreground: oklch(0.965 0.002 75);
+  --accent-foreground: oklch(0.965 0.002 75);
+  --muted-foreground: oklch(0.715 0.008 75);
+
+  /* Interactive emphasis: a bright graphite step, no hue. */
+  --primary: oklch(0.86 0.008 75);
+  --primary-foreground: oklch(0.16 0.004 75);
+
+  /* Money semantics: the only colour that appears. See :root for what each one
+     is allowed to mean; destructive is overdrawn-only, not every expense. */
+  --success: oklch(0.72 0.105 158);
+  --success-foreground: oklch(0.16 0.02 158);
+  --destructive: oklch(0.685 0.125 32);
+  --warning: oklch(0.79 0.11 82);
+  --warning-foreground: oklch(0.2 0.03 82);
+
+  /* Edges: a self-coloured lip one step off the surface. */
+  --border: oklch(0.285 0.006 75);
+  --input: oklch(0.285 0.006 75);
+  --ring: oklch(0.86 0.008 75);
 }
 
 @layer base {
@@ -195,16 +258,17 @@
     letter-spacing: 0.08em;
   }
 
-  /* Blue accent pulse used on 0G sync confirmations */
+  /* Confirmation pulse. Tinted to the CURRENT accent rather than a hardcoded
+     blue, so it follows the palette in both modes and cannot drift from it. */
   @keyframes stash-pulse {
     0% {
-      box-shadow: 0 0 0 0 rgb(59 130 246 / 0.45);
+      box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 45%, transparent);
     }
     70% {
-      box-shadow: 0 0 0 10px rgb(59 130 246 / 0);
+      box-shadow: 0 0 0 10px transparent;
     }
     100% {
-      box-shadow: 0 0 0 0 rgb(59 130 246 / 0);
+      box-shadow: 0 0 0 0 transparent;
     }
   }
   .animate-stash-pulse {
@@ -340,16 +404,17 @@
     animation: stash-fade 0.2s ease-out;
   }
 
-  /* "Just updated" section emphasis — a one-shot accent ring that fades. */
+  /* "Just updated" section emphasis — a one-shot ring that fades. Tinted to the
+     live accent, not a hardcoded blue. */
   @keyframes stash-highlight {
     0% {
-      box-shadow: 0 0 0 0 rgb(59 130 246 / 0);
+      box-shadow: 0 0 0 0 transparent;
     }
     12% {
-      box-shadow: 0 0 0 2px rgb(59 130 246 / 0.55);
+      box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 55%, transparent);
     }
     100% {
-      box-shadow: 0 0 0 0 rgb(59 130 246 / 0);
+      box-shadow: 0 0 0 0 transparent;
     }
   }
   .animate-highlight {

@@ -48,15 +48,16 @@ export function GoalCard({ goal, currency }: { goal: Goal; currency: Currency })
           <span aria-hidden>{goalEmoji(goal.name)}</span>
           <span className="truncate">{goal.name}</span>
         </span>
-        <span className="font-data shrink-0 text-sm font-semibold text-primary">
+        <span className="font-data shrink-0 text-sm font-semibold text-success">
           {pct}%
         </span>
       </div>
 
-      {/* Progress bar: blue fill, capped at 100% by goalProgressPct */}
+      {/* Progress bar: money secured, so it carries the money-in colour. Capped
+          at 100% by goalProgressPct. */}
       <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-background">
         <div
-          className="h-full rounded-full bg-primary"
+          className="h-full rounded-full bg-success"
           style={{ width: `${Math.max(pct, 2)}%` }}
         />
       </div>
@@ -69,7 +70,7 @@ export function GoalCard({ goal, currency }: { goal: Goal; currency: Currency })
           {formatMoney(goal.targetAmount, currency)}
         </span>
         {reached ? (
-          <span className="text-primary">reached</span>
+          <span className="text-success">reached</span>
         ) : deadline ? (
           <span className={deadline.warn ? "text-warning" : "text-muted-foreground"}>
             {deadline.text}

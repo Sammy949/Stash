@@ -6,8 +6,8 @@ import { EmptyState } from "@/components/UI/EmptyState";
 
 /** Status → pill styling (literal class strings for Tailwind scanning). */
 const STATUS_PILL: Record<HustleStatus, string> = {
-  received: "border-primary/30 bg-primary/10 text-primary",
-  active: "border-primary/30 bg-primary/10 text-primary",
+  received: "border-success/30 bg-success/10 text-success",
+  active: "border-success/30 bg-success/10 text-success",
   pending: "border-warning/30 bg-warning/10 text-warning",
   building: "border-border bg-background/40 text-muted-foreground",
 };
@@ -79,7 +79,7 @@ export function HustleLedger({
       {hustles.length > 0 && (
         <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
           <span className="label-caps text-[11px] text-muted-foreground">Active income</span>
-          <span className="font-data text-sm font-semibold text-primary">
+          <span className="font-data text-sm font-semibold text-success">
             {formatMoney(activeIncome, currency)}/mo
           </span>
         </div>

@@ -23,7 +23,7 @@ export function WelcomeBack({
   onDismiss: () => void;
 }) {
   return (
-    <section className="animate-slide-up rounded-2xl border border-primary/25 bg-primary/[0.06] p-5">
+    <section className="animate-slide-up rounded-lg bg-card p-5 ring-1 ring-foreground/10">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">

@@ -74,7 +74,7 @@ export function TransactionList({
               </div>
               <span
                 className={`font-data shrink-0 text-sm font-semibold ${
-                  income ? "text-primary" : "text-foreground"
+                  income ? "text-success" : "text-foreground"
                 }`}
               >
                 {income ? "+" : "−"}

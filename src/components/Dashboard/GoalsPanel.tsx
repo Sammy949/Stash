@@ -47,14 +47,14 @@ export function GoalsPanel({
 
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-background/60">
                 <div
-                  className="h-full rounded-full bg-primary transition-[width] duration-500 motion-reduce:transition-none"
+                  className="h-full rounded-full bg-success transition-[width] duration-500 motion-reduce:transition-none"
                   style={{ width: `${pct}%` }}
                 />
               </div>
 
               <div className="mt-1.5 flex items-center justify-between">
                 {done ? (
-                  <span className="flex items-center gap-1 text-[11px] font-medium text-primary">
+                  <span className="flex items-center gap-1 text-[11px] font-medium text-success">
                     <CheckIcon className="h-3 w-3" />
                     Target reached
                   </span>

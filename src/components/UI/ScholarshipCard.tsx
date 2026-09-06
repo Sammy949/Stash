@@ -12,22 +12,23 @@ import { deriveUrgency, radarBadge } from "@/lib/ledger";
 
 /** Left-accent border per urgency band (kept whole for Tailwind scanning). */
 const BORDER: Record<UrgencyColor, string> = {
-  emerald: "border-l-primary",
+  emerald: "border-l-success",
   amber: "border-l-warning",
   red: "border-l-destructive",
   muted: "border-l-border",
 };
 
-/** Countdown/status pill colors per urgency band. */
+/** Countdown/status pill colors per urgency band. The `emerald` band means "on
+ *  track / secured", which is the money-in colour, not the emphasis colour. */
 const BADGE: Record<UrgencyColor, string> = {
-  emerald: "border-primary/30 bg-primary/10 text-primary",
+  emerald: "border-success/30 bg-success/10 text-success",
   amber: "border-warning/30 bg-warning/10 text-warning",
   red: "border-destructive/30 bg-destructive/10 text-destructive",
   muted: "border-border bg-background/40 text-muted-foreground",
 };
 
 const DOT: Record<UrgencyColor, string> = {
-  emerald: "bg-primary",
+  emerald: "bg-success",
   amber: "bg-warning",
   red: "bg-destructive",
   muted: "bg-muted-foreground",
