@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { IconContext } from "@phosphor-icons/react";
 // Geist — the "Financial Intelligence" type system. Geist Mono is reserved for
@@ -9,6 +9,16 @@ import "@fontsource-variable/geist-mono";
 import App from "./App.tsx";
 import { initTheme } from "./hooks/useTheme.ts";
 import "./index.css";
+
+/**
+ * Internal design review surface, at `?preview`. Lazy so it is a separate chunk
+ * the product never downloads. Same URL-param approach as the `?nomemory`
+ * deletion test, since no router is installed. Removed before merge.
+ */
+const Preview = lazy(() => import("./preview/Preview.tsx"));
+const isPreview =
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).has("preview");
 
 // Resolve the stored theme onto <html> BEFORE the first paint, so the page never
 // flashes the wrong mode and corrects itself a frame later.
@@ -29,7 +39,13 @@ const ICON_DEFAULTS = { weight: "fill", size: "1em" } as const;
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <IconContext.Provider value={ICON_DEFAULTS}>
-      <App />
+      {isPreview ? (
+        <Suspense fallback={null}>
+          <Preview />
+        </Suspense>
+      ) : (
+        <App />
+      )}
     </IconContext.Provider>
   </StrictMode>,
 );
