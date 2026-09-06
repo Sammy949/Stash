@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import type { Ledger, SyncPhase } from "@/types";
 import { getGoals } from "@/lib/ledger";
-import { VaultCard } from "./VaultCard";
+import { BalanceInstrument } from "./BalanceInstrument";
 import { ScholarshipRadar } from "./ScholarshipRadar";
 import { HustleLedger } from "./HustleLedger";
 import { GoalsPanel } from "./GoalsPanel";
@@ -68,7 +68,11 @@ export function Dashboard({
   return (
     <FadeIn className="mx-auto w-full max-w-2xl">
       <div className="space-y-5">
-        <VaultCard ledger={ledger} syncPhase={syncPhase} hydrating={hydrating} />
+        <BalanceInstrument
+          ledger={ledger}
+          syncPhase={syncPhase}
+          hydrating={hydrating}
+        />
 
         <Highlight on={highlight === "activity"}>
           <TransactionList

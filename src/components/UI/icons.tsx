@@ -9,8 +9,8 @@
  * Adding an icon means adding a line here. If phosphor has no suitable mark,
  * ask rather than drawing one.
  *
- * Not icons, so not here: the brand mark (see StashMark), the balance ring in
- * VaultCard, and the onboarding scene art.
+ * Not icons, so not here: the brand mark (see StashMark), the balance trace in
+ * BalanceInstrument (data visualisation), and the onboarding scene art.
  */
 export {
   ArrowDownIcon,

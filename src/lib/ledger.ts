@@ -79,6 +79,80 @@ export function outflowPct(ledger: Ledger): number {
   return Math.min(100, Math.max(0, (spent / denom) * 100));
 }
 
+/** ───────────────── Balance over time ───────────────── */
+
+export interface BalancePoint {
+  /** Start of the day, ms since epoch. */
+  t: number;
+  /** Spendable balance at the END of that day. */
+  balance: number;
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Running balance per day over the last `days` days, oldest first, one point per
+ * day inclusive of today (so `days = 30` yields 30 points).
+ *
+ * Walks transactions forward in `createdAt` order, exactly the way `balance()`
+ * derives the figure, so the series and the headline number can never disagree.
+ * Two invariants the instrument depends on:
+ *
+ *  - The LAST point always equals `balance(ledger)`. Transactions dated in the
+ *    future are still counted (the reducers allow them), so they land in the
+ *    final bucket rather than being silently dropped from the total.
+ *  - Days with no activity carry the previous day's balance forward, so the
+ *    trace is continuous and the x-axis is real time, not transaction index.
+ *
+ * Pure and deterministic: `now` is injectable for tests. Code owns this maths,
+ * per the load-bearing invariant — the model is never asked for it.
+ */
+export function balanceSeries(
+  ledger: Ledger,
+  days = 30,
+  now: Date = new Date(),
+): BalancePoint[] {
+  const span = Math.max(1, Math.floor(days));
+  // Local midnight today, so "day" means the user's day, not UTC's.
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const firstDay = today.getTime() - (span - 1) * DAY_MS;
+
+  // Opening balance plus everything that happened BEFORE the window: that is
+  // where the trace starts, otherwise the first point would ignore all history.
+  let running = ledger.openingBalance;
+  const inWindow: { day: number; delta: number }[] = [];
+
+  for (const t of ledger.transactions) {
+    const delta = t.type === "income" ? t.amount : -t.amount;
+    const ts = new Date(t.createdAt).getTime();
+    // A malformed date must not poison the series; treat it as pre-window so it
+    // still counts toward the total (keeping the last-point invariant true).
+    if (!Number.isFinite(ts) || ts < firstDay) {
+      running += delta;
+      continue;
+    }
+    const d = new Date(ts);
+    d.setHours(0, 0, 0, 0);
+    // Future-dated entries collapse into today, so they cannot fall off the end.
+    inWindow.push({ day: Math.min(d.getTime(), today.getTime()), delta });
+  }
+
+  // Sum per day once, so the walk below is a single pass over the window.
+  const byDay = new Map<number, number>();
+  for (const { day, delta } of inWindow) {
+    byDay.set(day, (byDay.get(day) ?? 0) + delta);
+  }
+
+  const points: BalancePoint[] = [];
+  for (let i = 0; i < span; i++) {
+    const t = firstDay + i * DAY_MS;
+    running += byDay.get(t) ?? 0;
+    points.push({ t, balance: running });
+  }
+  return points;
+}
+
 /**
  * "Decision context" — the facts a wise friend would notice, computed in
  * code (the accountant) so the agent never has to do arithmetic. Fields are
