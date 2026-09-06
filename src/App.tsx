@@ -8,6 +8,7 @@ import { CommandBar } from "@/components/Agent/CommandBar";
 import { SYNC_CHIP } from "@/components/Agent/QuickChips";
 import { Onboarding } from "@/components/Onboarding/Onboarding";
 import type { OnboardingProfile } from "@/components/Onboarding/Onboarding";
+import { INCOME_SHAPES } from "@/components/Onboarding/onboardingModel";
 import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
 import { useMemory } from "@/hooks/useMemory";
@@ -24,9 +25,10 @@ import { deriveObservation } from "@/lib/observations";
 import { deriveWelcomeBack } from "@/lib/welcomeBack";
 import type { WelcomeBack as WelcomeBackData } from "@/lib/welcomeBack";
 import { rememberedCount, rememberedName } from "@/lib/opener";
-import { memoryDisabled } from "@/lib/memory";
+import { memoryDisabled, rememberOnboarding } from "@/lib/memory";
 import { analyzeSpending, isSpendingQuery } from "@/lib/analysis";
 import {
+  addGoal,
   goalProgressPct,
   radarBadge,
   removeGoal,
@@ -118,8 +120,35 @@ export default function App() {
     // on the Sibyl read, since what Stash remembers IS the greeting.
   }, [onboarded, hydrating, recalling]);
 
+  /**
+   * Finish first run: seed the ledger, then seed MEMORY.
+   *
+   * The memory writes are the point. Onboarding used to set three ledger fields
+   * and tell Sibyl nothing, so a brand-new user's first session had nothing to
+   * recall. Now identity and income shape land as memories immediately, and a
+   * stated goal lands both as a real `Goal` (structured, code-owned) and as a
+   * goal memory (so the agent can speak about it).
+   *
+   * Fire-and-forget and individually guarded: a sidecar that is down must not
+   * block anyone from entering the app. Memory is additive here, never a gate.
+   */
   function completeOnboarding(profile: OnboardingProfile) {
-    initProfile(profile);
+    let next = initProfile(profile);
+
+    if (profile.goal) {
+      next = addGoal(next, profile.goal);
+      applyLedger(next);
+      void sync(next);
+    }
+
+    const shape = INCOME_SHAPES.find((s) => s.value === profile.incomeShape);
+    void rememberOnboarding({
+      owner: profile.owner,
+      currency: profile.currency,
+      incomeMemory: shape?.memory ?? null,
+      goal: profile.goal,
+    });
+
     localStorage.setItem(ONBOARDED_KEY, "1");
     setOnboarded(true);
   }

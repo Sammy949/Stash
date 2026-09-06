@@ -1,250 +1,461 @@
 import { useState } from "react";
 import type { Currency } from "@/types";
 import { CURRENCY_LIST, currencySymbol } from "@/lib/currency";
+import { Button } from "@/components/shadcn/button";
+import { Input } from "@/components/shadcn/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/shadcn/input-group";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/shadcn/native-select";
+import { RadioGroup, RadioGroupItem } from "@/components/shadcn/radio-group";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldLabel,
+  FieldTitle,
+} from "@/components/shadcn/field";
+import { StashMark } from "@/components/UI/StashMark";
 import { OnboardingVisual } from "./OnboardingVisual";
+import {
+  INCOME_SHAPES,
+  STEPS,
+  TOTAL_STEPS,
+  parseAmount,
+  type IncomeShape,
+  type OnboardingProfile,
+  type StepId,
+} from "./onboardingModel";
 
-export interface OnboardingProfile {
-  owner: string;
-  currency: Currency;
-  openingBalance: number;
-}
+export type { OnboardingProfile } from "./onboardingModel";
 
 /**
- * First-run onboarding: welcome → name → currency → opening balance.
- * Floating split-layout — form on the left, a "Stash Core" system visual on
- * the right (desktop only; mobile is form-only). Lightweight and intentional:
- * no auth (the wallet/0G identity owns the data).
+ * First run. Four steps, no auth, nothing leaves the device.
+ *
+ * What changed and why: the old flow spent a whole screen on a welcome message
+ * and then asked for currency and opening balance separately, collecting three
+ * facts in four steps and writing NOTHING to memory. This asks for four facts in
+ * the same four steps by collapsing currency into the amount field (they are one
+ * decision) and putting the welcome copy on step 1 where it costs nothing.
+ *
+ * The two new questions are the ones that make Stash *Stash*: how money reaches
+ * you, which is the entire premise of the product, and what you are working
+ * toward. Both are seeded into Sibyl memory by App on completion, so the very
+ * first session already has something to recall. The goal is skippable, because
+ * a required aspiration is a bad first impression.
+ *
+ * Deliberately still no login: the hackathon rules require none, and a wallet is
+ * only needed later, at the point of locking money into a vault.
  */
 export function Onboarding({
   onComplete,
 }: {
   onComplete: (profile: OnboardingProfile) => void;
 }) {
-  const [step, setStep] = useState(0);
-  // Furthest step the user has reached — they can jump back to any of these
-  // (entries are preserved in state), but not skip ahead past unvisited steps.
-  const [maxStep, setMaxStep] = useState(0);
+  const [index, setIndex] = useState(0);
+  const [maxIndex, setMaxIndex] = useState(0);
+
   const [name, setName] = useState("");
   const [currency, setCurrency] = useState<Currency>("NGN");
-  const [openingText, setOpeningText] = useState("");
+  const [amountText, setAmountText] = useState("");
+  const [incomeShape, setIncomeShape] = useState<IncomeShape | null>(null);
+  const [goalName, setGoalName] = useState("");
+  const [goalText, setGoalText] = useState("");
 
-  const total = 4;
+  const step: StepId = STEPS[index];
+  const openingBalance = parseAmount(amountText);
+  const goalTarget = parseAmount(goalText);
 
-  /** Advance forward (from a validated Continue), unlocking the new step. */
-  function go(n: number) {
-    setStep(n);
-    setMaxStep((m) => Math.max(m, n));
+  function go(next: number) {
+    setIndex(next);
+    setMaxIndex((m) => Math.max(m, next));
   }
 
   function finish() {
-    // Back-nav could leave the name blank — don't submit an empty owner.
-    if (!name.trim()) {
-      setStep(1);
-      return;
-    }
-    const opening = Math.max(
-      0,
-      Math.round(parseFloat(openingText.replace(/[^\d.]/g, "")) || 0),
-    );
-    onComplete({ owner: name.trim(), currency, openingBalance: opening });
+    const owner = name.trim();
+    // Back-navigation could have emptied a required field; return rather than
+    // submitting a half-built profile.
+    if (!owner) return go(0);
+    if (!incomeShape) return go(2);
+
+    onComplete({
+      owner,
+      currency,
+      openingBalance,
+      incomeShape,
+      goal:
+        goalName.trim() && goalTarget > 0
+          ? { name: goalName.trim(), targetAmount: goalTarget }
+          : null,
+    });
   }
 
   return (
     <div className="flex min-h-dvh overflow-y-auto bg-background p-4 py-[max(1rem,env(safe-area-inset-top))] text-foreground md:p-8">
-      {/* Floating card: split on desktop, form-only on mobile. `m-auto` centers
-          when there's room but lets the card scroll into view (top and bottom)
-          when a small screen + open keyboard make it taller than the viewport,
-          so the primary CTA is never trapped behind the keyboard. */}
-      <div className="m-auto grid w-full max-w-4xl overflow-hidden rounded-3xl border border-border bg-card/20 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.85)] md:grid-cols-2">
-        {/* ── Form side ─────────────────────────────────────────── */}
+      {/* m-auto centres when there is room but still lets the card scroll into
+          view when a small screen plus an open keyboard makes it taller than the
+          viewport, so the primary action is never trapped behind the keyboard. */}
+      <div className="m-auto grid w-full max-w-4xl overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10 md:grid-cols-2">
         <div className="flex flex-col justify-center p-6 sm:p-10">
           <div className="mx-auto w-full max-w-sm">
-            {/* Brand + step indicator */}
-            <div className="mb-5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <img src="/vault.svg" alt="" className="h-8 w-8" />
-                <span className="label-caps text-sm text-foreground">Stash</span>
-              </div>
-              <span className="label-caps text-[10px] text-muted-foreground">
-                Step {step + 1} of {total}
-              </span>
-            </div>
+            <Header index={index} maxIndex={maxIndex} onJump={setIndex} />
 
-            {/* Progress segments: click a reached one to jump back and edit.
-                Unreached steps are inert (plain spans): not clickable, and the
-                cursor stays normal: no disabled/blocked-cursor affordance. */}
-            <div className="mb-8 flex gap-1.5">
-              {Array.from({ length: total }).map((_, i) => {
-                const reached = i <= maxStep;
-                const bar = (
-                  <span
-                    className={`block h-1 rounded-full transition-colors ${
-                      i <= step
-                        ? "bg-primary"
-                        : reached
-                          ? "bg-border group-hover:bg-primary/50"
-                          : "bg-border"
-                    }`}
-                  />
-                );
-                return reached ? (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setStep(i)}
-                    aria-label={`Go to step ${i + 1}`}
-                    aria-current={i === step ? "step" : undefined}
-                    className="group -my-2 flex-1 cursor-pointer py-2"
-                  >
-                    {bar}
-                  </button>
-                ) : (
-                  <span key={i} aria-hidden className="-my-2 flex-1 py-2">
-                    {bar}
-                  </span>
-                );
-              })}
-            </div>
-
-            {step === 0 && (
-              <div className="animate-slide-up">
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  Welcome to Stash
-                </h1>
-                <p className="mt-3 text-base font-medium text-foreground">
-                  Your financial memory.
-                </p>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  Track money, remember what matters, and get guidance that grows
-                  with you.
-                </p>
-                <Primary onClick={() => go(1)}>Get started</Primary>
-              </div>
+            {step === "name" && (
+              <StepName
+                name={name}
+                onName={setName}
+                onNext={() => name.trim() && go(1)}
+              />
             )}
 
-            {step === 1 && (
-              <form
-                className="animate-slide-up"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (name.trim()) go(2);
+            {step === "balance" && (
+              <StepBalance
+                currency={currency}
+                onCurrency={setCurrency}
+                amountText={amountText}
+                onAmount={setAmountText}
+                onNext={() => go(2)}
+              />
+            )}
+
+            {step === "income" && (
+              <StepIncome
+                value={incomeShape}
+                onChange={(v) => {
+                  setIncomeShape(v);
+                  go(3);
                 }}
-              >
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  What should I call you?
-                </h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Just a name: no email, no password.
-                </p>
-                <input
-                  autoFocus
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name"
-                  aria-label="Your name"
-                  className="mt-5 w-full rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/50"
-                />
-                <Primary type="submit" disabled={!name.trim()}>
-                  Continue
-                </Primary>
-              </form>
+              />
             )}
 
-            {step === 2 && (
-              <div className="animate-slide-up">
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  Which currency?
-                </h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  The currency you earn and spend in.
-                </p>
-                <div className="mt-5 grid grid-cols-2 gap-2">
-                  {CURRENCY_LIST.map((c) => (
-                    <button
-                      key={c.code}
-                      onClick={() => setCurrency(c.code)}
-                      className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors ${
-                        currency === c.code
-                          ? "border-primary/60 bg-primary/10 text-foreground"
-                          : "border-border bg-card text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      <span className="font-data w-7 shrink-0 text-base font-semibold">
-                        {c.symbol}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block leading-none">{c.code}</span>
-                        <span className="block truncate text-[11px] text-muted-foreground">
-                          {c.name}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                <Primary onClick={() => go(3)}>Continue</Primary>
-              </div>
-            )}
-
-            {step === 3 && (
-              <form
-                className="animate-slide-up"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  finish();
-                }}
-              >
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  How much do you have right now?
-                </h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Your current balance to start from. Skip it to start at zero.
-                </p>
-                <div className="mt-5 flex items-center rounded-xl border border-border bg-card px-3.5 focus-within:border-primary/50">
-                  <span className="font-data mr-2 text-sm text-muted-foreground">
-                    {currencySymbol(currency)}
-                  </span>
-                  <input
-                    autoFocus
-                    inputMode="decimal"
-                    value={openingText}
-                    onChange={(e) => setOpeningText(e.target.value)}
-                    placeholder="0"
-                    aria-label={`Opening balance in ${currency}`}
-                    className="font-data w-full bg-transparent py-2.5 text-sm outline-none placeholder:text-muted-foreground"
-                  />
-                </div>
-                <Primary type="submit">Enter Stash</Primary>
-              </form>
+            {step === "goal" && (
+              <StepGoal
+                currency={currency}
+                goalName={goalName}
+                onGoalName={setGoalName}
+                goalText={goalText}
+                onGoalText={setGoalText}
+                onFinish={finish}
+              />
             )}
           </div>
         </div>
 
-        {/* ── Visual side (desktop only) ────────────────────────── */}
-        <OnboardingVisual step={step} currency={currency} />
+        <OnboardingVisual
+          step={step}
+          owner={name}
+          currency={currency}
+          openingBalance={openingBalance}
+          incomeShape={incomeShape}
+          goalName={goalName}
+          goalTarget={goalTarget}
+        />
       </div>
     </div>
   );
 }
 
-function Primary({
-  children,
-  onClick,
-  type = "button",
-  disabled = false,
+/** Brand, progress, and back-navigation to any step already reached. */
+function Header({
+  index,
+  maxIndex,
+  onJump,
 }: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  type?: "button" | "submit";
-  disabled?: boolean;
+  index: number;
+  maxIndex: number;
+  onJump: (n: number) => void;
 }) {
   return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className="mt-7 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+    <div className="mb-8">
+      <div className="mb-5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <StashMark className="h-7 w-7" />
+          <span className="text-sm font-semibold">Stash</span>
+        </div>
+        <span className="font-data text-[11px] text-muted-foreground">
+          {index + 1}/{TOTAL_STEPS}
+        </span>
+      </div>
+
+      {/* Reached steps are real buttons back to an answer; unreached ones are
+          inert spans, so there is no disabled affordance to fight with. */}
+      <div className="flex gap-1.5">
+        {STEPS.map((id, i) => {
+          const reached = i <= maxIndex;
+          const cls = `h-0.5 flex-1 rounded-sm transition-colors ${
+            i <= index ? "bg-foreground" : "bg-border"
+          }`;
+          return reached ? (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onJump(i)}
+              aria-label={`Back to step ${i + 1}`}
+              className={`${cls} cursor-pointer`}
+            />
+          ) : (
+            <span key={id} className={cls} />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function StepName({
+  name,
+  onName,
+  onNext,
+}: {
+  name: string;
+  onName: (v: string) => void;
+  onNext: () => void;
+}) {
+  return (
+    <form
+      className="animate-slide-up"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onNext();
+      }}
     >
-      {children}
-    </button>
+      <h1 className="text-2xl font-semibold tracking-tight">
+        What should Stash call you?
+      </h1>
+      <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
+        Stash is a financial memory: it keeps track of your money and what you
+        are working toward. No email, no password, and nothing leaves this
+        device unless you ask it to.
+      </p>
+      <Input
+        autoFocus
+        value={name}
+        onChange={(e) => onName(e.target.value)}
+        placeholder="Your name"
+        aria-label="Your name"
+        className="mt-6"
+      />
+      <Button type="submit" size="lg" disabled={!name.trim()} className="mt-6 w-full">
+        Continue
+      </Button>
+    </form>
+  );
+}
+
+/**
+ * Currency and opening balance as ONE decision, which is what they are: the
+ * currency lives inside the amount field as an addon, so you read it as
+ * "£ ___" rather than answering two questions about the same number.
+ */
+function StepBalance({
+  currency,
+  onCurrency,
+  amountText,
+  onAmount,
+  onNext,
+}: {
+  currency: Currency;
+  onCurrency: (c: Currency) => void;
+  amountText: string;
+  onAmount: (v: string) => void;
+  onNext: () => void;
+}) {
+  return (
+    <form
+      className="animate-slide-up"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onNext();
+      }}
+    >
+      <h1 className="text-2xl font-semibold tracking-tight">
+        How much do you have right now?
+      </h1>
+      <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
+        Everything Stash tracks starts from here. A rough figure is fine, and you
+        can correct it any time by telling Stash.
+      </p>
+
+      <InputGroup className="mt-6">
+        <InputGroupAddon className="p-0">
+          {/* A real <select>: it opens as the platform's own picker, which beats
+              a custom listbox on a phone, and it needs no popup styling. */}
+          <NativeSelect
+            value={currency}
+            onChange={(e) => onCurrency(e.target.value as Currency)}
+            aria-label="Currency"
+            className="font-data w-auto border-0 bg-transparent pl-3 shadow-none focus-visible:ring-0"
+          >
+            {CURRENCY_LIST.map((c) => (
+              <NativeSelectOption key={c.code} value={c.code}>
+                {c.symbol} {c.code}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </InputGroupAddon>
+        <InputGroupInput
+          autoFocus
+          value={amountText}
+          onChange={(e) => onAmount(e.target.value)}
+          // Not type="number": that rejects "1,200" and "12k", and shows spinners
+          // nobody wants on money. decimal keeps the numeric keypad on mobile.
+          inputMode="decimal"
+          placeholder="0.00"
+          aria-label={`Amount in ${currency}`}
+          className="font-data"
+        />
+      </InputGroup>
+
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        Starting from nothing is fine. Leave it at zero.
+      </p>
+
+      <Button type="submit" size="lg" className="mt-6 w-full">
+        Continue
+      </Button>
+    </form>
+  );
+}
+
+/**
+ * The question the whole product rests on. Answering it is what lets Stash read
+ * a quiet week correctly: normal for a freelancer, a warning for a salary.
+ *
+ * Picking an option advances immediately: it is a choice, not a form, and making
+ * someone select then press Continue is a wasted tap.
+ */
+function StepIncome({
+  value,
+  onChange,
+}: {
+  value: IncomeShape | null;
+  onChange: (v: IncomeShape) => void;
+}) {
+  return (
+    <div className="animate-slide-up">
+      <h1 className="text-2xl font-semibold tracking-tight">
+        How does money reach you?
+      </h1>
+      <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
+        This is the one thing most money apps assume wrongly. Stash uses it to
+        judge whether a quiet week is normal for you or worth mentioning.
+      </p>
+
+      <RadioGroup
+        value={value ?? ""}
+        onValueChange={(v) => onChange(v as IncomeShape)}
+        className="mt-6 flex flex-col gap-2.5"
+      >
+        {INCOME_SHAPES.map((opt) => (
+          // FieldLabel ships the selectable-card pattern, including its checked
+          // state, and it is a real <label> wrapping a real radio, so the whole
+          // card is clickable and keyboard-navigable without any hand-rolling.
+          <FieldLabel key={opt.value} htmlFor={`income-${opt.value}`}>
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldTitle>{opt.label}</FieldTitle>
+                <FieldDescription>{opt.detail}</FieldDescription>
+              </FieldContent>
+              <RadioGroupItem value={opt.value} id={`income-${opt.value}`} />
+            </Field>
+          </FieldLabel>
+        ))}
+      </RadioGroup>
+    </div>
+  );
+}
+
+/**
+ * Optional by design. A required aspiration is a bad first impression, and the
+ * agent can create goals conversationally later, which is the intended route
+ * anyway.
+ */
+function StepGoal({
+  currency,
+  goalName,
+  onGoalName,
+  goalText,
+  onGoalText,
+  onFinish,
+}: {
+  currency: Currency;
+  goalName: string;
+  onGoalName: (v: string) => void;
+  goalText: string;
+  onGoalText: (v: string) => void;
+  onFinish: () => void;
+}) {
+  const partial =
+    (goalName.trim().length > 0) !== (parseAmount(goalText) > 0);
+
+  return (
+    <form
+      className="animate-slide-up"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onFinish();
+      }}
+    >
+      <h1 className="text-2xl font-semibold tracking-tight">
+        Anything you are working toward?
+      </h1>
+      <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
+        One thing you are saving for. Stash will hold it, track what you set
+        aside, and tell you when a purchase pushes it further away.
+      </p>
+
+      <Input
+        autoFocus
+        value={goalName}
+        onChange={(e) => onGoalName(e.target.value)}
+        placeholder="A laptop, next term's fees, a trip"
+        aria-label="What you are saving for"
+        className="mt-6"
+      />
+
+      <InputGroup className="mt-2.5">
+        <InputGroupAddon>
+          <span className="font-data text-muted-foreground">
+            {currencySymbol(currency)}
+          </span>
+        </InputGroupAddon>
+        <InputGroupInput
+          value={goalText}
+          onChange={(e) => onGoalText(e.target.value)}
+          inputMode="decimal"
+          placeholder="How much it costs"
+          aria-label={`Target amount in ${currency}`}
+          className="font-data"
+        />
+      </InputGroup>
+
+      {/* Only nudge when one half is filled: silence is not an error here. */}
+      <p className="mt-2 min-h-4 text-[11px] text-warning">
+        {partial ? "Add both a name and an amount, or skip for now." : ""}
+      </p>
+
+      <Button type="submit" size="lg" className="mt-4 w-full">
+        {goalName.trim() && parseAmount(goalText) > 0
+          ? "Start with this goal"
+          : "Enter Stash"}
+      </Button>
+      {/* Only offered while the goal is empty or half-filled. Once both fields
+          are valid the primary button already says what happens, and a "skip"
+          next to a completed answer just invites you to discard your own work. */}
+      {!(goalName.trim() && parseAmount(goalText) > 0) && (
+        <button
+          type="button"
+          onClick={onFinish}
+          className="mt-3 w-full text-center text-xs text-muted-foreground transition-colors hover:text-foreground"
+        >
+          Skip, I will tell Stash later
+        </button>
+      )}
+    </form>
   );
 }

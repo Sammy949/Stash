@@ -5,6 +5,11 @@ import { BalanceInstrument } from "@/components/Dashboard/BalanceInstrument";
 import { formatMoney } from "@/lib/currency";
 import { Card, CardContent } from "@/components/shadcn/card";
 import { useTheme } from "@/hooks/useTheme";
+import { Onboarding } from "@/components/Onboarding/Onboarding";
+import {
+  INCOME_SHAPES,
+  type OnboardingProfile,
+} from "@/components/Onboarding/onboardingModel";
 
 /**
  * Internal design review surface, reached with `?preview`.
@@ -169,6 +174,13 @@ export default function Preview() {
           note="Geist for prose, Geist Mono for every figure. The mono is load-bearing here rather than decorative."
         >
           <TypeScale />
+        </Section>
+
+        <Section
+          title="6 · Onboarding"
+          note="Four steps, no auth. Currency and amount are collapsed into one field. The right panel is the real instrument calibrating from your answers, replacing four decorative scenes. Fully interactive: complete it and it logs the profile it would have created rather than entering the app."
+        >
+          <OnboardingFrame />
         </Section>
       </div>
     </div>
@@ -393,5 +405,86 @@ function SeriesTable({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * The real Onboarding component, live.
+ *
+ * Completing it reports the profile it would have created instead of entering the
+ * app, so the whole flow (including the memory it would seed) can be exercised
+ * repeatedly without wiping localStorage between runs.
+ */
+function OnboardingFrame() {
+  const [result, setResult] = useState<OnboardingProfile | null>(null);
+  const [run, setRun] = useState(0);
+
+  if (result) {
+    return (
+      <Card>
+        <CardContent className="space-y-3">
+          <div className="label-caps text-[10px] text-muted-foreground">
+            Profile collected
+          </div>
+          <dl className="font-data space-y-1.5 text-xs">
+            <Row k="owner" v={result.owner} />
+            <Row k="currency" v={result.currency} />
+            <Row
+              k="openingBalance"
+              v={`${result.openingBalance} (${formatMoney(result.openingBalance, result.currency)})`}
+            />
+            <Row k="incomeShape" v={result.incomeShape} />
+            <Row
+              k="goal"
+              v={
+                result.goal
+                  ? `${result.goal.name} @ ${formatMoney(result.goal.targetAmount, result.currency)}`
+                  : "skipped"
+              }
+            />
+          </dl>
+          <div className="label-caps pt-2 text-[10px] text-muted-foreground">
+            Memory it would seed
+          </div>
+          <ul className="space-y-1 text-xs text-muted-foreground">
+            <li>identity/owner — goes by {result.owner}, tracks in {result.currency}</li>
+            <li>
+              habit/income-shape —{" "}
+              {INCOME_SHAPES.find((s) => s.value === result.incomeShape)?.memory}
+            </li>
+            {result.goal && <li>goal/{result.goal.name} — saving for it</li>}
+          </ul>
+          <button
+            type="button"
+            onClick={() => {
+              setResult(null);
+              setRun((r) => r + 1);
+            }}
+            className="mt-2 rounded-md bg-foreground px-3 py-1.5 text-xs text-background"
+          >
+            Run it again
+          </button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    // Scaled into a framed viewport so the full-screen layout can be judged
+    // without leaving the review page.
+    <div className="overflow-hidden rounded-lg ring-1 ring-foreground/10">
+      <div className="h-[42rem] overflow-y-auto">
+        <Onboarding key={run} onComplete={setResult} />
+      </div>
+    </div>
+  );
+}
+
+function Row({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex justify-between gap-4 border-t border-border/50 pt-1.5">
+      <dt className="text-muted-foreground">{k}</dt>
+      <dd className="truncate text-right">{v}</dd>
+    </div>
   );
 }

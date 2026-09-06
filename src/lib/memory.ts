@@ -303,3 +303,66 @@ export async function applyMemoryOps(
   return { applied, failures };
 }
 
+/**
+ * Seed memory from first-run onboarding.
+ *
+ * Why this exists: onboarding used to write nothing, so a brand-new user's very
+ * first session had nothing to recall and the cold-start opener had to fall back
+ * to a generic greeting. These are the facts the user just volunteered, so
+ * storing them needs no inference and cannot be wrong.
+ *
+ * Subject slugs are stable and deliberately generic ("owner", "income-shape"),
+ * so re-running onboarding CONSOLIDATES those rows rather than forking a second
+ * copy: Sibyl's UNIQUE(tenant, category, name) does the work.
+ *
+ * Never throws and never blocks: `applyMemoryOps` collects failures, and an
+ * unreachable sidecar just means memory stays empty, exactly as `?nomemory`
+ * simulates. Entering the app must not depend on it.
+ */
+export async function rememberOnboarding(profile: {
+  owner: string;
+  currency: string;
+  incomeMemory: string | null;
+  goal: { name: string; targetAmount: number } | null;
+}): Promise<MemoryOpOutcome> {
+  const tenant = resolveTenant();
+  if (!tenant) return { applied: 0, failures: [] };
+
+  const ops: MemoryOp[] = [
+    {
+      op: "write",
+      category: "identity",
+      name: "owner",
+      body: {
+        content: `Goes by ${profile.owner}. Tracks money in ${profile.currency}.`,
+        name: profile.owner,
+        currency: profile.currency,
+      },
+    },
+  ];
+
+  if (profile.incomeMemory) {
+    ops.push({
+      op: "write",
+      category: "habit",
+      name: "income-shape",
+      body: { content: profile.incomeMemory },
+    });
+  }
+
+  if (profile.goal) {
+    ops.push({
+      op: "write",
+      category: "goal",
+      name: memorySubject(profile.goal.name),
+      body: {
+        content: `Saving for ${profile.goal.name} (target ${profile.goal.targetAmount} ${profile.currency})`,
+        target: profile.goal.targetAmount,
+        currency: profile.currency,
+      },
+    });
+  }
+
+  return applyMemoryOps(tenant, ops);
+}
+
