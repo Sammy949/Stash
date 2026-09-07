@@ -2,14 +2,13 @@ import { useState } from "react";
 import type { Currency } from "@/types";
 import { CURRENCY_LIST, currencySymbol } from "@/lib/currency";
 import { Button } from "@/components/shadcn/button";
+import { ButtonGroup } from "@/components/shadcn/button-group";
 import { Input } from "@/components/shadcn/input";
 import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/shadcn/input-group";
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/shadcn/native-select";
 import { RadioGroup, RadioGroupItem } from "@/components/shadcn/radio-group";
-import { CaretDownIcon } from "@phosphor-icons/react";
 import {
   Field,
   FieldContent,
@@ -278,44 +277,30 @@ function StepBalance({
         can correct it any time by telling Stash.
       </p>
 
-      <InputGroup className="mt-6 h-11">
-        {/* A bare native <select>, not the NativeSelect wrapper: inside an addon
-            the wrapper's own h-8 box and its chevron would fight the group's
-            alignment and paint a second arrow. This is one flush control that
-            opens the platform's own picker (best on a phone) with a single
-            chevron we place ourselves, and a divider hairline against the field. */}
-        <InputGroupAddon className="border-r border-input py-0 pr-0 pl-3">
-          <div className="relative flex items-center">
-            <select
-              value={currency}
-              onChange={(e) => onCurrency(e.target.value as Currency)}
-              aria-label="Currency"
-              className="font-data cursor-pointer appearance-none bg-transparent py-2.5 pr-7 text-sm text-foreground outline-none"
-            >
-              {CURRENCY_LIST.map((c) => (
-                <option key={c.code} value={c.code} className="bg-popover text-popover-foreground">
-                  {c.symbol} {c.code}
-                </option>
-              ))}
-            </select>
-            <CaretDownIcon
-              className="pointer-events-none absolute right-2 size-3.5 text-muted-foreground"
-              aria-hidden
-            />
-          </div>
-        </InputGroupAddon>
-        <InputGroupInput
+      <ButtonGroup className="mt-6">
+        <NativeSelect
+          value={currency}
+          onChange={(e) => onCurrency(e.target.value as Currency)}
+          aria-label="Currency"
+          className="font-data h-11 w-auto [&_select]:h-full"
+          size="default"
+        >
+          {CURRENCY_LIST.map((c) => (
+            <NativeSelectOption key={c.code} value={c.code}>
+              {c.symbol} {c.code}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+        <Input
           autoFocus
           value={amountText}
           onChange={(e) => onAmount(e.target.value)}
-          // Not type="number": that rejects "1,200" and "12k", and shows spinners
-          // nobody wants on money. decimal keeps the numeric keypad on mobile.
           inputMode="decimal"
           placeholder="0.00"
           aria-label={`Amount in ${currency}`}
-          className="font-data pl-3 text-base"
+          className="font-data h-11 flex-1 text-base"
         />
-      </InputGroup>
+      </ButtonGroup>
 
       <p className="mt-2 text-[11px] text-muted-foreground">
         Starting from nothing is fine. Leave it at zero.
@@ -424,21 +409,24 @@ function StepGoal({
         className="mt-6 h-11 text-base"
       />
 
-      <InputGroup className="mt-2.5 h-11">
-        <InputGroupAddon className="pl-3">
+      <ButtonGroup className="mt-2.5">
+        <div
+          data-slot="button-group-text"
+          className="flex h-11 items-center rounded-lg border border-input bg-transparent px-3 text-sm"
+        >
           <span className="font-data text-muted-foreground">
             {currencySymbol(currency)}
           </span>
-        </InputGroupAddon>
-        <InputGroupInput
+        </div>
+        <Input
           value={goalText}
           onChange={(e) => onGoalText(e.target.value)}
           inputMode="decimal"
           placeholder="How much it costs"
           aria-label={`Target amount in ${currency}`}
-          className="font-data text-base"
+          className="font-data h-11 flex-1 text-base"
         />
-      </InputGroup>
+      </ButtonGroup>
 
       {/* Only nudge when one half is filled: silence is not an error here. */}
       <p className="mt-2 min-h-4 text-[11px] text-warning">
