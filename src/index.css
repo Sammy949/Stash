@@ -131,9 +131,12 @@
   --warning-foreground: oklch(0.99 0.008 82);
 
   /* Edges: one tonal step off the surface, so an edge reads as a lip catching
-     light rather than an outline drawn around a box. */
+     light rather than an outline drawn around a box. `input` is a touch quieter
+     than `border`: a form control draws a full continuous rectangle, which
+     catches the eye far more than a card's thin ring at the same value, so it is
+     pulled closer to the ring's weight to sit calmly among the surfaces. */
   --border: oklch(0.9 0.005 75);
-  --input: oklch(0.9 0.005 75);
+  --input: oklch(0.925 0.005 75);
   --ring: oklch(0.32 0.01 75);
 }
 
@@ -177,7 +180,9 @@
 
   /* Edges: a self-coloured lip one step off the surface. */
   --border: oklch(0.285 0.006 75);
-  --input: oklch(0.285 0.006 75);
+  /* Quieter than border, for the same reason as light mode: a full input
+     rectangle reads louder than a card's ring at equal value. */
+  --input: oklch(0.25 0.006 75);
   --ring: oklch(0.86 0.008 75);
 }
 
