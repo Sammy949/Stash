@@ -5,9 +5,12 @@ import { Button } from "@/components/shadcn/button";
 import { ButtonGroup } from "@/components/shadcn/button-group";
 import { Input } from "@/components/shadcn/input";
 import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/shadcn/native-select";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/shadcn/select";
 import { RadioGroup, RadioGroupItem } from "@/components/shadcn/radio-group";
 import {
   Field,
@@ -234,7 +237,7 @@ function StepName({
         onChange={(e) => onName(e.target.value)}
         placeholder="Your name"
         aria-label="Your name"
-        className="mt-6 h-11 text-base"
+        className="mt-6 h-11 text-base focus-visible:ring-0"
       />
       <Button type="submit" size="lg" disabled={!name.trim()} className="mt-6 w-full">
         Continue
@@ -278,19 +281,21 @@ function StepBalance({
       </p>
 
       <ButtonGroup className="mt-6">
-        <NativeSelect
-          value={currency}
-          onChange={(e) => onCurrency(e.target.value as Currency)}
-          aria-label="Currency"
-          className="font-data h-11 w-auto [&_select]:h-full"
-          size="default"
-        >
-          {CURRENCY_LIST.map((c) => (
-            <NativeSelectOption key={c.code} value={c.code}>
-              {c.symbol} {c.code}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+        <Select value={currency} onValueChange={(v) => onCurrency(v as Currency)}>
+          <SelectTrigger
+            aria-label="Currency"
+            className="font-data h-11 w-auto focus-visible:ring-0"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CURRENCY_LIST.map((c) => (
+              <SelectItem key={c.code} value={c.code} className="font-data">
+                {c.symbol} {c.code}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Input
           autoFocus
           value={amountText}
@@ -298,7 +303,7 @@ function StepBalance({
           inputMode="decimal"
           placeholder="0.00"
           aria-label={`Amount in ${currency}`}
-          className="font-data h-11 flex-1 text-base"
+          className="font-data h-11 flex-1 text-base focus-visible:ring-0"
         />
       </ButtonGroup>
 
@@ -406,7 +411,7 @@ function StepGoal({
         onChange={(e) => onGoalName(e.target.value)}
         placeholder="A laptop, next term's fees, a trip"
         aria-label="What you are saving for"
-        className="mt-6 h-11 text-base"
+        className="mt-6 h-11 text-base focus-visible:ring-0"
       />
 
       <ButtonGroup className="mt-2.5">
@@ -424,7 +429,7 @@ function StepGoal({
           inputMode="decimal"
           placeholder="How much it costs"
           aria-label={`Target amount in ${currency}`}
-          className="font-data h-11 flex-1 text-base"
+          className="font-data h-11 flex-1 text-base focus-visible:ring-0"
         />
       </ButtonGroup>
 
