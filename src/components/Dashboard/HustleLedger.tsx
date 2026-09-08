@@ -3,13 +3,30 @@ import { totalActiveIncome } from "@/lib/ledger";
 import { formatMoney } from "@/lib/currency";
 import { BoltIcon } from "@/components/UI/icons";
 import { EmptyState } from "@/components/UI/EmptyState";
+import { Section, SectionAction } from "./Section";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
+} from "@/components/shadcn/item";
 
-/** Status → pill styling (literal class strings for Tailwind scanning). */
-const STATUS_PILL: Record<HustleStatus, string> = {
-  received: "border-success/30 bg-success/10 text-success",
-  active: "border-success/30 bg-success/10 text-success",
-  pending: "border-warning/30 bg-warning/10 text-warning",
-  building: "border-border bg-background/40 text-muted-foreground",
+/**
+ * Status → ink.
+ *
+ * This used to be four tinted pills. Colour in Stash is only ever allowed to
+ * mean something about the money, so only the two states that mean income is
+ * actually arriving carry the money-in colour; "pending" and "building" are
+ * expectations, not money, and read as quiet ink. The words still distinguish
+ * all four. (Literal class strings, for Tailwind's scanner.)
+ */
+const STATUS_TONE: Record<HustleStatus, string> = {
+  received: "text-success",
+  active: "text-success",
+  pending: "text-muted-foreground",
+  building: "text-muted-foreground",
 };
 
 const STATUS_LABEL: Record<HustleStatus, string> = {
@@ -25,75 +42,88 @@ export function HustleLedger({
   hustles,
   currency,
   onManage,
+  onAdd,
 }: {
   hustles: Hustle[];
   currency: Currency;
   /** Open the Manage sheet (shown as "View all" once past VISIBLE). */
   onManage?: () => void;
+  /** Prime the agent to add the first stream, from the empty state. */
+  onAdd?: () => void;
 }) {
   const activeIncome = totalActiveIncome(hustles);
   const overflow = onManage && hustles.length > VISIBLE;
   const shown = overflow ? hustles.slice(0, VISIBLE) : hustles;
+  const empty = hustles.length === 0;
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <BoltIcon className="h-3.5 w-3.5" />
-        <h2 className="label-caps text-[11px]">Hustle Ledger</h2>
-      </div>
-
-      {hustles.length === 0 && (
-        <EmptyState
-          icon={<BoltIcon className="h-4 w-4" />}
-          title="Track your side income"
-          hint="Tell Stash: “I make ₦40,000 a month tutoring.”"
-        />
-      )}
-
-      <ul className="mt-4 space-y-1">
-        {shown.map((h) => (
-          <li
-            key={h.id}
-            className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-background/40"
-          >
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{h.name}</p>
-              <div className="mt-1 flex items-center gap-2">
-                <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                  {h.tag}
-                </span>
-                <span className="font-data text-xs text-muted-foreground">
-                  {h.amountLabel}
-                </span>
-              </div>
-            </div>
-            <span
-              className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${STATUS_PILL[h.status]}`}
-            >
-              {STATUS_LABEL[h.status]}
+    <Section
+      icon={<BoltIcon className="size-3.5" />}
+      title="Hustle Ledger"
+      action={
+        overflow ? (
+          <SectionAction
+            kind="open"
+            onClick={onManage!}
+            label={`View all ${hustles.length}`}
+          />
+        ) : undefined
+      }
+      summary={
+        empty ? undefined : (
+          <>
+            <span className="label-caps text-[10px] text-muted-foreground">
+              Active income
             </span>
-          </li>
-        ))}
-      </ul>
+            <span className="font-data text-sm font-semibold text-success">
+              {formatMoney(activeIncome, currency)}/mo
+            </span>
+          </>
+        )
+      }
+    >
+      {empty ? (
+        <EmptyState
+          title="Track your side income"
+          hint={
+            <>
+              Tell Stash{" "}
+              <span className="text-foreground">
+                &ldquo;I make 40,000 a month tutoring&rdquo;
+              </span>{" "}
+              and it lands here.
+            </>
+          }
+          action={
+            onAdd ? { label: "Add a stream", onClick: onAdd } : undefined
+          }
+        />
+      ) : (
+        <ItemGroup>
+          {shown.map((h) => (
+            <Item key={h.id} role="listitem" size="sm" className="px-0">
+              <ItemContent className="min-w-0 gap-0.5">
+                <ItemTitle className="block w-full truncate" title={h.name}>
+                  {h.name}
+                </ItemTitle>
+                <ItemDescription className="text-xs">
+                  <span>{h.tag}</span>
+                  <span className="px-1.5 text-muted-foreground/50">·</span>
+                  <span className="font-data">{h.amountLabel}</span>
+                </ItemDescription>
+              </ItemContent>
 
-      {hustles.length > 0 && (
-        <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-          <span className="label-caps text-[11px] text-muted-foreground">Active income</span>
-          <span className="font-data text-sm font-semibold text-success">
-            {formatMoney(activeIncome, currency)}/mo
-          </span>
-        </div>
+              <ItemActions>
+                <span
+                  className={`label-caps text-[10px] ${STATUS_TONE[h.status]}`}
+                >
+                  {STATUS_LABEL[h.status]}
+                </span>
+              </ItemActions>
+            </Item>
+          ))}
+        </ItemGroup>
       )}
-
-      {overflow && (
-        <button
-          type="button"
-          onClick={onManage}
-          className="mt-3 w-full text-xs text-muted-foreground transition-colors hover:text-foreground"
-        >
-          View all ({hustles.length}) →
-        </button>
-      )}
-    </section>
+    </Section>
   );
 }

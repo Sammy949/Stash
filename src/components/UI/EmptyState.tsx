@@ -1,26 +1,60 @@
 import type { ReactNode } from "react";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/components/shadcn/empty";
+import { Button } from "@/components/shadcn/button";
+import { PlusIcon } from "@/components/UI/icons";
 
 /**
- * Per-section empty state — icon + title + a hint that teaches the
- * conversational gesture (Stash is agent-first; there's no manual "add" form,
- * so the CTA shows what to *say* rather than a button to click).
+ * Per-section empty state.
+ *
+ * Left-aligned, no icon, no dashed box. That is a deliberate reversal of what
+ * was here before (a centred mark inside a tinted circle inside a dashed
+ * rectangle): an icon parked in a box is the component-kit default, and a
+ * dashed outline inside a card is a second container drawn around nothing.
+ * The balance instrument already establishes how Stash says "nothing measured
+ * yet" — plain ink, left aligned, naming the gesture — and every section now
+ * says it the same way.
+ *
+ * The hint teaches what to SAY, because Stash is agent-first and there is no
+ * manual add form. `action` primes that sentence into the composer for anyone
+ * who would rather press something than type it.
  */
 export function EmptyState({
-  icon,
   title,
   hint,
+  action,
 }: {
-  icon: ReactNode;
   title: string;
-  hint: string;
+  hint: ReactNode;
+  action?: { label: string; onClick: () => void };
 }) {
   return (
-    <div className="mt-4 flex flex-col items-center rounded-xl border border-dashed border-border px-4 py-6 text-center">
-      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background/40 text-muted-foreground">
-        {icon}
-      </div>
-      <p className="mt-3 text-sm font-medium text-foreground">{title}</p>
-      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{hint}</p>
-    </div>
+    <Empty className="items-start gap-3 p-0 text-left">
+      <EmptyHeader className="items-start gap-1 text-left">
+        <EmptyTitle>{title}</EmptyTitle>
+        <EmptyDescription className="text-xs leading-relaxed">
+          {hint}
+        </EmptyDescription>
+      </EmptyHeader>
+
+      {action && (
+        <EmptyContent className="items-start">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={action.onClick}
+          >
+            <PlusIcon />
+            {action.label}
+          </Button>
+        </EmptyContent>
+      )}
+    </Empty>
   );
 }

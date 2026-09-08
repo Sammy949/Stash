@@ -1,6 +1,7 @@
 import type { Currency, Goal } from "@/types";
 import { daysUntil, goalProgressPct, goalRemaining } from "@/lib/ledger";
 import { formatMoney } from "@/lib/currency";
+import { GoalBar } from "@/components/UI/GoalBar";
 
 /**
  * Inline goal card — visible proof of a savings goal's state, rendered inside
@@ -53,13 +54,11 @@ export function GoalCard({ goal, currency }: { goal: Goal; currency: Currency })
         </span>
       </div>
 
-      {/* Progress bar: money secured, so it carries the money-in colour. Capped
-          at 100% by goalProgressPct. */}
-      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-background">
-        <div
-          className="h-full rounded-full bg-success"
-          style={{ width: `${Math.max(pct, 2)}%` }}
-        />
+      {/* The same earmark bar the dashboard panel uses, so a goal looks
+          identical whether the agent shows it or the dashboard does. Capped at
+          100% by goalProgressPct. */}
+      <div className="mt-2.5">
+        <GoalBar name={goal.name} pct={pct} />
       </div>
 
       {/* Amount saved / target + deadline */}

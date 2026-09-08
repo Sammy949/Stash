@@ -2,6 +2,17 @@ import type { Currency, Goal } from "@/types";
 import { goalProgressPct, goalRemaining, isGoalComplete } from "@/lib/ledger";
 import { formatMoneyCompact, formatMoney } from "@/lib/currency";
 import { TargetIcon, CheckIcon } from "@/components/UI/icons";
+import { EmptyState } from "@/components/UI/EmptyState";
+import { Section, SectionAction } from "./Section";
+import { GoalBar } from "@/components/UI/GoalBar";
+import {
+  Item,
+  ItemContent,
+  ItemFooter,
+  ItemGroup,
+  ItemHeader,
+  ItemTitle,
+} from "@/components/shadcn/item";
 
 const VISIBLE = 4;
 
@@ -15,72 +26,98 @@ export function GoalsPanel({
   goals,
   currency,
   onManage,
+  onAdd,
 }: {
   goals: Goal[];
   currency: Currency;
   /** Open the Manage sheet (shown as "View all" once past VISIBLE). */
   onManage?: () => void;
+  /** Prime the agent to set the first target, from the empty state. */
+  onAdd?: () => void;
 }) {
   const overflow = onManage && goals.length > VISIBLE;
   const shown = overflow ? goals.slice(0, VISIBLE) : goals;
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <TargetIcon className="h-3.5 w-3.5" />
-        <h2 className="label-caps text-[11px]">Goals</h2>
-      </div>
+    <Section
+      icon={<TargetIcon className="size-3.5" />}
+      title="Goals"
+      action={
+        overflow ? (
+          <SectionAction
+            kind="open"
+            onClick={onManage!}
+            label={`View all ${goals.length}`}
+          />
+        ) : undefined
+      }
+    >
+      {goals.length === 0 ? (
+        <EmptyState
+          title="No savings targets yet"
+          hint={
+            <>
+              Name one and Stash will earmark toward it: say{" "}
+              <span className="text-foreground">
+                &ldquo;I want to save 200,000 for a laptop&rdquo;
+              </span>
+              .
+            </>
+          }
+          action={onAdd ? { label: "Set a goal", onClick: onAdd } : undefined}
+        />
+      ) : (
+        <ItemGroup>
+          {shown.map((g) => {
+            const pct = goalProgressPct(g);
+            const done = isGoalComplete(g);
+            return (
+              <Item
+                key={g.id}
+                role="listitem"
+                size="sm"
+                className="flex-col items-stretch gap-2 px-0"
+              >
+                <ItemContent className="gap-2">
+                  <ItemHeader>
+                    {/* flex-1 + min-w-0, because this title shares a flex row
+                        with the figure; without min-w-0 a long name refuses to
+                        shrink and pushes the amount out of the card. */}
+                    <ItemTitle
+                      className="block min-w-0 flex-1 truncate"
+                      title={g.name}
+                    >
+                      {g.name}
+                    </ItemTitle>
+                    <span className="font-data shrink-0 text-xs text-muted-foreground">
+                      {formatMoneyCompact(g.savedAmount, currency)} /{" "}
+                      {formatMoneyCompact(g.targetAmount, currency)}
+                    </span>
+                  </ItemHeader>
 
-      <ul className="mt-4 space-y-4">
-        {shown.map((g) => {
-          const pct = goalProgressPct(g);
-          const done = isGoalComplete(g);
-          return (
-            <li key={g.id}>
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="truncate text-sm font-medium">{g.name}</p>
-                <span className="font-data shrink-0 text-xs text-muted-foreground">
-                  {formatMoneyCompact(g.savedAmount, currency)} /{" "}
-                  {formatMoneyCompact(g.targetAmount, currency)}
-                </span>
-              </div>
+                  <GoalBar name={g.name} pct={pct} />
 
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-background/60">
-                <div
-                  className="h-full rounded-full bg-success transition-[width] duration-500 motion-reduce:transition-none"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-
-              <div className="mt-1.5 flex items-center justify-between">
-                {done ? (
-                  <span className="flex items-center gap-1 text-[11px] font-medium text-success">
-                    <CheckIcon className="h-3 w-3" />
-                    Target reached
-                  </span>
-                ) : (
-                  <span className="text-[11px] text-muted-foreground">
-                    {formatMoney(goalRemaining(g), currency)} to go
-                  </span>
-                )}
-                <span className="font-data text-[11px] text-muted-foreground">
-                  {Math.round(pct)}%
-                </span>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-
-      {overflow && (
-        <button
-          type="button"
-          onClick={onManage}
-          className="mt-4 w-full border-t border-border pt-3 text-xs text-muted-foreground transition-colors hover:text-foreground"
-        >
-          View all ({goals.length}) →
-        </button>
+                  <ItemFooter>
+                    {done ? (
+                      <span className="flex items-center gap-1 text-[11px] font-medium text-success">
+                        <CheckIcon className="size-3" />
+                        Target reached
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground">
+                        {formatMoney(goalRemaining(g), currency)} to go
+                      </span>
+                    )}
+                    <span className="font-data text-[11px] text-muted-foreground">
+                      {Math.round(pct)}%
+                    </span>
+                  </ItemFooter>
+                </ItemContent>
+              </Item>
+            );
+          })}
+        </ItemGroup>
       )}
-    </section>
+    </Section>
   );
 }

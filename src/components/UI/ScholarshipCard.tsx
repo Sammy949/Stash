@@ -1,5 +1,12 @@
 import type { Scholarship, UrgencyColor } from "@/types";
 import { deriveUrgency, radarBadge } from "@/lib/ledger";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemTitle,
+} from "@/components/shadcn/item";
 
 /**
  * Inline scholarship card — visible proof of a tracked scholarship's state,
@@ -8,30 +15,21 @@ import { deriveUrgency, radarBadge } from "@/lib/ledger";
  *
  * DISPLAY-ONLY: urgency band and countdown come from the pure helpers in
  * ledger.ts (deriveUrgency / radarBadge) — this component computes nothing.
+ *
+ * The urgency used to be said three times at once: a coloured left bar, a
+ * coloured dot, and a tinted pill. The bar was the accent-bar-card preset and
+ * the pill was a chip around a number. It is said once now, in the colour of
+ * the countdown figure itself, which is the only place the information is
+ * actually load-bearing.
  */
 
-/** Left-accent border per urgency band (kept whole for Tailwind scanning). */
-const BORDER: Record<UrgencyColor, string> = {
-  emerald: "border-l-success",
-  amber: "border-l-warning",
-  red: "border-l-destructive",
-  muted: "border-l-border",
-};
-
-/** Countdown/status pill colors per urgency band. The `emerald` band means "on
- *  track / secured", which is the money-in colour, not the emphasis colour. */
-const BADGE: Record<UrgencyColor, string> = {
-  emerald: "border-success/30 bg-success/10 text-success",
-  amber: "border-warning/30 bg-warning/10 text-warning",
-  red: "border-destructive/30 bg-destructive/10 text-destructive",
-  muted: "border-border bg-background/40 text-muted-foreground",
-};
-
-const DOT: Record<UrgencyColor, string> = {
-  emerald: "bg-success",
-  amber: "bg-warning",
-  red: "bg-destructive",
-  muted: "bg-muted-foreground",
+/** Countdown ink per urgency band. `emerald` means secured / on track, which is
+ *  the money-in colour; `amber` and `red` are the deadline closing. */
+const TONE: Record<UrgencyColor, string> = {
+  emerald: "text-success",
+  amber: "text-warning",
+  red: "text-destructive",
+  muted: "text-muted-foreground",
 };
 
 const MONTHS = [
@@ -49,41 +47,54 @@ function formatDeadline(iso: string): string {
 export function ScholarshipCard({
   scholarship,
   now,
-  className = "w-full max-w-[18rem]",
+  className = "max-w-[18rem]",
+  role,
+  variant = "outline",
 }: {
   scholarship: Scholarship;
   now?: Date;
   /** Width container — radar passes "w-full"; chat uses the bounded default. */
   className?: string;
+  /** "listitem" when rendered inside the radar's ItemGroup; absent in chat,
+   *  where the card stands alone and a listitem role would be a lie. */
+  role?: string;
+  /** In chat the card stands alone on the bubble and needs its own edge. On
+   *  the radar it is one row of a list inside a Card, and an outline there
+   *  draws a second container around nothing — and made the radar speak a
+   *  different language from the hustle list sitting right beside it. */
+  variant?: "outline" | "default";
 }) {
   const urgency = deriveUrgency(scholarship, now);
 
   return (
-    <div
-      className={`rounded-2xl border border-border border-l-2 ${BORDER[urgency]} bg-card/80 p-3.5 ${className}`}
-    >
-      {/* Name + countdown/status badge */}
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-foreground">
-          <span className={`h-2 w-2 shrink-0 rounded-full ${DOT[urgency]}`} />
-          <span className="truncate">{scholarship.name}</span>
-        </span>
-        <span
-          className={`font-data shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${BADGE[urgency]}`}
-        >
+    <Item variant={variant} size="sm" className={className} role={role}>
+      <ItemContent className="min-w-0 gap-0.5">
+        {/* block+truncate, not ItemTitle's own line-clamp-1: that class sets
+            display:-webkit-box and is then overridden by the same element's
+            `flex`, which Tailwind emits later, so it silently does nothing.
+            Verified by offset in the compiled CSS. `block` is in the same
+            tailwind-merge group as `flex`, so it actually replaces it. */}
+        <ItemTitle className="block w-full truncate" title={scholarship.name}>
+          {scholarship.name}
+        </ItemTitle>
+        <ItemDescription className="truncate text-xs">
+          <span>{scholarship.statusLabel}</span>
+          {scholarship.deadline && (
+            <>
+              <span className="px-1.5 text-muted-foreground/50">·</span>
+              <span className="font-data">
+                {formatDeadline(scholarship.deadline)}
+              </span>
+            </>
+          )}
+        </ItemDescription>
+      </ItemContent>
+
+      <ItemActions>
+        <span className={`font-data text-xs font-medium ${TONE[urgency]}`}>
           {radarBadge(scholarship, now)}
         </span>
-      </div>
-
-      {/* Status label + deadline date */}
-      <div className="mt-2 flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
-        <span className="truncate">{scholarship.statusLabel}</span>
-        {scholarship.deadline && (
-          <span className="font-data shrink-0">
-            {formatDeadline(scholarship.deadline)}
-          </span>
-        )}
-      </div>
-    </div>
+      </ItemActions>
+    </Item>
   );
 }

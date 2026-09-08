@@ -7,25 +7,36 @@ import { ScholarshipRadar } from "./ScholarshipRadar";
 import { HustleLedger } from "./HustleLedger";
 import { GoalsPanel } from "./GoalsPanel";
 import { TransactionList } from "./TransactionList";
-import { TrackerTile } from "./TrackerTile";
 import { FadeIn } from "@/components/UI/FadeIn";
-import { BoltIcon, RadarIcon, TargetIcon } from "@/components/UI/icons";
 
 type SectionKey = "activity" | "scholarships" | "hustles" | "goals";
 
 /** One-shot accent-ring emphasis when this section just changed. */
 function Highlight({ on, children }: { on: boolean; children: ReactNode }) {
-  return <div className={on ? "animate-highlight rounded-2xl" : ""}>{children}</div>;
+  // h-full so a grid-stretched wrapper passes its height down to the Card.
+  // rounded-xl matches Card's own radius, so the one-shot ring traces the
+  // card's edge instead of sitting slightly proud of its corners.
+  return (
+    <div className={on ? "animate-highlight h-full rounded-xl" : "h-full"}>
+      {children}
+    </div>
+  );
 }
 
 /**
  * Full dashboard — the default, front-facing view.
  *
- * Order: Vault → Recent Activity (the pulse) → the two trackers as a paired
- * row (stacked on mobile, side-by-side on ≥sm). Empty trackers show a `+`
- * tile; populated ones show their list. The whole view fades in as one unit
- * (no stagger — keeps it stable); the section a turn changed gets a one-shot
- * highlight, played when the user returns here.
+ * Order: the balance instrument → Recent Activity (the pulse) → the two
+ * trackers as a paired row (stacked on mobile, side-by-side on ≥sm) → Goals.
+ * The whole view fades in as one unit (no stagger — keeps it stable); the
+ * section a turn changed gets a one-shot highlight, played when the user
+ * returns here.
+ *
+ * Every section renders in every state, empty included. There used to be a
+ * second surface for empty trackers (a dashed `+` tile that replaced the
+ * section outright), which meant a tracker changed shape the moment it held
+ * data and the dashboard's row heights jumped with it. The instrument already
+ * settled the principle: empty is the same object, calibrated and waiting.
  */
 export function Dashboard({
   ledger,
@@ -51,9 +62,6 @@ export function Dashboard({
   // Use the getGoals accessor — pre-v4 cached ledgers have no `goals` field,
   // and reading `.length` off undefined crashes the whole dashboard render.
   const goals = getGoals(ledger);
-  const noScholarships = ledger.scholarships.length === 0;
-  const noHustles = ledger.hustles.length === 0;
-  const noGoals = goals.length === 0;
 
   // Consume the highlight after it has had time to play (the dashboard remounts
   // when the user returns to it, so this runs each time there's one pending).
@@ -78,61 +86,42 @@ export function Dashboard({
           <TransactionList
             transactions={ledger.transactions}
             currency={ledger.currency}
+            hydrating={hydrating}
           />
         </Highlight>
 
-        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+        {/* Deliberately NOT items-start: the two trackers are a parallel pair,
+            so they share a height and their controls share a baseline. Letting
+            each size to its own content is what makes a comparison row read as
+            ragged. */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Highlight on={highlight === "scholarships"}>
-            {noScholarships ? (
-              <TrackerTile
-                icon={<RadarIcon className="h-5 w-5" />}
-                title="Scholarship Radar"
-                subtitle="No active deadlines"
-                onAdd={() =>
-                  onPrompt("I want to track a new scholarship deadline.")
-                }
-              />
-            ) : (
-              <ScholarshipRadar
-                scholarships={ledger.scholarships}
-                onManage={() => onManage("scholarships")}
-              />
-            )}
+            <ScholarshipRadar
+              scholarships={ledger.scholarships}
+              onManage={() => onManage("scholarships")}
+              onAdd={() =>
+                onPrompt("I want to track a new scholarship deadline.")
+              }
+            />
           </Highlight>
 
           <Highlight on={highlight === "hustles"}>
-            {noHustles ? (
-              <TrackerTile
-                icon={<BoltIcon className="h-5 w-5" />}
-                title="Hustle Ledger"
-                subtitle="No active income"
-                onAdd={() => onPrompt("I want to add a side income stream.")}
-              />
-            ) : (
-              <HustleLedger
-                hustles={ledger.hustles}
-                currency={ledger.currency}
-                onManage={() => onManage("hustles")}
-              />
-            )}
+            <HustleLedger
+              hustles={ledger.hustles}
+              currency={ledger.currency}
+              onManage={() => onManage("hustles")}
+              onAdd={() => onPrompt("I want to add a side income stream.")}
+            />
           </Highlight>
         </div>
 
         <Highlight on={highlight === "goals"}>
-          {noGoals ? (
-            <TrackerTile
-              icon={<TargetIcon className="h-5 w-5" />}
-              title="Goals"
-              subtitle="No savings targets yet"
-              onAdd={() => onPrompt("I want to set a savings goal.")}
-            />
-          ) : (
-            <GoalsPanel
-              goals={goals}
-              currency={ledger.currency}
-              onManage={() => onManage("goals")}
-            />
-          )}
+          <GoalsPanel
+            goals={goals}
+            currency={ledger.currency}
+            onManage={() => onManage("goals")}
+            onAdd={() => onPrompt("I want to set a savings goal.")}
+          />
         </Highlight>
       </div>
     </FadeIn>
