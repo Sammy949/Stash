@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
 import { CloseIcon, PlusIcon, TrashIcon } from "@/components/UI/icons";
+import { Button } from "@/components/shadcn/button";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
+} from "@/components/shadcn/item";
 
 export interface ManageItem {
   id: string;
@@ -57,22 +66,23 @@ export function ManageSheet({
         </div>
 
         {/* List */}
-        <ul className="flex-1 divide-y divide-border overflow-y-auto px-2 py-1">
+        <ItemGroup className="flex-1 gap-1 overflow-y-auto p-2">
           {items.map((it) => (
             <ManageRow key={it.id} item={it} onRemove={() => onRemove(it.id)} />
           ))}
-        </ul>
+        </ItemGroup>
 
         {/* Add via agent */}
         <div className="border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={onAdd}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background/40 py-2.5 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+            className="h-11 w-full text-muted-foreground hover:text-foreground"
           >
-            <PlusIcon className="h-4 w-4" />
+            <PlusIcon />
             {addLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -90,43 +100,60 @@ function ManageRow({
   const [confirming, setConfirming] = useState(false);
 
   return (
-    <li className="flex items-center gap-3 px-3 py-3">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{item.primary}</p>
-        <p className="truncate text-xs text-muted-foreground">{item.secondary}</p>
-      </div>
+    <Item role="listitem" size="sm">
+      <ItemContent className="min-w-0 gap-0.5">
+        <ItemTitle className="block w-full truncate" title={item.primary}>
+          {item.primary}
+        </ItemTitle>
+        <ItemDescription className="truncate text-xs">
+          {item.secondary}
+        </ItemDescription>
+      </ItemContent>
 
-      {item.badge && !confirming && (
-        <span className="font-data shrink-0 text-xs text-muted-foreground">{item.badge}</span>
-      )}
+      <ItemActions>
+        {item.badge && !confirming && (
+          <span className="font-data text-xs text-muted-foreground">
+            {item.badge}
+          </span>
+        )}
 
-      {confirming ? (
-        <div className="flex shrink-0 items-center gap-1.5">
-          <button
+        {confirming ? (
+          <>
+            {/* Both confirm buttons keep the 44px touch target the icon button
+                has, so the row does not shrink its hit area at the exact moment
+                it is asking for a destructive decision. */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setConfirming(false)}
+              className="h-11 text-muted-foreground hover:text-foreground"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={onRemove}
+              className="h-11"
+            >
+              Remove
+            </Button>
+          </>
+        ) : (
+          <Button
             type="button"
-            onClick={() => setConfirming(false)}
-            className="rounded-lg px-3 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            variant="ghost"
+            size="icon"
+            onClick={() => setConfirming(true)}
+            aria-label={`Remove ${item.primary}`}
+            className="size-11 text-muted-foreground hover:text-destructive"
           >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onRemove}
-            className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive transition-colors hover:bg-destructive/20"
-          >
-            Remove
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          aria-label={`Remove ${item.primary}`}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-background hover:text-destructive"
-        >
-          <TrashIcon className="h-3.5 w-3.5" />
-        </button>
-      )}
-    </li>
+            <TrashIcon className="size-3.5" />
+          </Button>
+        )}
+      </ItemActions>
+    </Item>
   );
 }
