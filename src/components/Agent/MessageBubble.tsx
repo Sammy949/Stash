@@ -182,7 +182,7 @@ function MessageRow({
       : 0;
 
   return (
-    <Message align={mine ? "end" : "start"} className="group/row">
+    <Message align={mine ? "end" : "start"}>
       {/* The mark lands with the reply, not before it. While the turn is in
           flight the row is a status line, and an avatar sitting beside
           "Thinking…" reads as Stash having already spoken. */}
@@ -234,7 +234,31 @@ function MessageRow({
               </p>
             )}
             {message.content && (
-              <MessageFooter className="gap-0.5 px-0 opacity-100 transition-opacity md:opacity-0 md:group-hover/row:opacity-100">
+              /*
+                 The action row. Four things were wrong with it:
+
+                 - it hung off a hand-rolled `group/row` when Message already
+                   exposes `group/message` for exactly this;
+                 - `px-0` dropped the primitive's own inset, so the icons sat
+                   outside the bubble's text edge. px-1.5 puts the glyph on the
+                   same line the bubble text starts on, and MessageFooter
+                   mirrors it for a user message via its own justify-end;
+                 - hiding with opacity ALONE left invisible buttons live: a
+                   click near the bubble hit Copy, and a keyboard tab landed on
+                   a control nobody could see. pointer-events now follows
+                   visibility, and focus-within brings the row back so it is
+                   still reachable without a mouse;
+                 - the reveal was gated on `md:`, a WIDTH. Hover is not a
+                   width — a touch tablet is wide and has no hover, so the
+                   actions were permanently invisible there. Gating on
+                   (hover: hover) hides them only where a pointer can bring
+                   them back, and leaves them always visible on touch.
+
+                 group-hover and focus-within both land at (0,2,0), which
+                 outranks the (0,1,0) media-query base, so the reveal wins
+                 without !important.
+              */
+              <MessageFooter className="gap-0.5 px-1.5 transition-opacity [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 motion-reduce:transition-none">
                 <CopyButton text={message.content} />
                 {mine && editable && onEdit && (
                   <Button
