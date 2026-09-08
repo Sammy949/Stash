@@ -61,11 +61,14 @@ export const STASH_MODEL = import.meta.env.VITE_AI_MODEL || ROUTER_MODEL;
  * Optional SAME-PROVIDER fallback model. Groq rate-limits PER MODEL, so when
  * the primary (e.g. gpt-oss-120b, 8k TPM) is exhausted even after backoff,
  * retrying the identical request on a different model (e.g.
- * llama-3.3-70b-versatile, a separate 12k-TPM bucket) gets a fresh budget —
+ * openai/gpt-oss-20b, a separate bucket) gets a fresh budget —
  * same key, same endpoint, no new credentials. Empty = no fallback (we throw
  * the calm limit message as before). Leave unset on the 0G Router, whose model
  * catalog differs. The fallback model must be tool-call capable (the agent loop
- * depends on it) — llama-3.3-70b-versatile, Stash's original demo model, is.
+ * depends on it) and it must still EXIST: the previous value here,
+ * llama-3.3-70b-versatile, was decommissioned by the provider, so every
+ * fallback attempt 404'd and the rate-limit path was dead in the water.
+ * openai/gpt-oss-20b is verified: HTTP 200, correct tool call, ~1.3s.
  */
 export const FALLBACK_MODEL = import.meta.env.VITE_AI_FALLBACK_MODEL || "";
 

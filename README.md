@@ -8,7 +8,6 @@
 
 ### 🔗 [Live demo → heystash.app](https://heystash.app)
 
-Built for [Zero Cup 2026](https://0g.ai) · 0G Labs
 by [Samuel Yahaya](https://twitter.com/I_am_SamY01) · [@Sammy949](https://github.com/Sammy949)
 
 </div>
@@ -23,15 +22,13 @@ Money moves in unpredictable bursts — allowances drop late, clients pay in chu
 
 **Stash exists so you don't have to wing it.**
 
-It tracks where your money actually goes, keeps you ahead of scholarship deadlines, holds the things you're saving toward, and gives you an AI agent that knows your real numbers — your balance, your income streams, your next deadline — and talks to you about them specifically. It even remembers the durable things about you: your goals, your habits, what you're trying to become. And it remembers all of it across sessions, because your financial memory lives on **0G decentralized storage**: encrypted, decentralized, and yours.
+It tracks where your money actually goes, keeps you ahead of scholarship deadlines, holds the things you're saving toward, and gives you an AI agent that knows your real numbers — your balance, your income streams, your next deadline — and talks to you about them specifically. It even remembers the durable things about you: your goals, your habits, what you're trying to become — and it keeps all of it across sessions, encrypted and yours.
 
 ---
 
-## What makes Stash real (not a demo wrapper)
+## Persistence & inference
 
-0G does genuine work here. It is the substrate, not decoration.
-
-### 🔐 0G Storage — the core differentiator
+### 🔐 Encrypted backup (0G Storage)
 
 Your financial ledger is stored as an **encrypted JSON file on the 0G decentralized storage network** as its durable backup — not a database we own. The app is local-first (`localStorage` is the working copy), and 0G is where your state is encrypted, finalized on-chain, and made portable.
 
@@ -47,13 +44,13 @@ Your financial ledger is stored as an **encrypted JSON file on the 0G decentrali
 
 > **Honest scope.** This demo signs with a single testnet/throwaway wallet, so the encryption is real but not yet per-user. A production multi-user build derives a per-user key and moves all signing behind the proxy — the architecture is already shaped for it.
 
-### 🤖 0G Compute — wired and ready
+### 🤖 Inference
 
-The Stash AI agent is built for the **0G Compute Router** (`router-api.0g.ai`, model `glm-5`), via an OpenAI-compatible interface.
+The agent talks to any **OpenAI-compatible** chat-completions endpoint.
 
-- **Provider-agnostic by design** — the endpoint, key, and model are environment variables. Point them at the 0G Router to run inference natively on 0G; no code change.
+- **Provider-agnostic by design** — the endpoint, key, and model are environment variables. Repointing them at another provider needs no code change.
 - The **live ledger is injected into the system prompt on every call**, so the agent knows your exact balance, deadlines, and income streams and answers specifically — never with generic advice.
-- The 0G Compute Router is billed against a **mainnet** 0G balance. For this testnet build, the live demo runs inference on **Groq** as an OpenAI-compatible provider (`openai/gpt-oss-120b`, with `llama-3.3-70b-versatile` as a separate-bucket fallback; swappable via env) — verified working (HTTP 200, sub-second responses, open CORS). The 0G Compute integration is complete and activates the instant a funded Router balance is supplied.
+- The deployed build runs on **Groq** (`openai/gpt-oss-120b`, with `openai/gpt-oss-20b` as a separate-rate-limit-bucket fallback; both swappable via env).
 - **Resilient by default** — rate-limit backoff (Retry-After-aware), a same-key fallback model for when a provider's per-minute cap is hit, robust tool-call parsing, and a deterministic fallback reply mean a completed action is never lost to a flaky provider mid-demo.
 
 ---
@@ -61,7 +58,7 @@ The Stash AI agent is built for the **0G Compute Router** (`router-api.0g.ai`, m
 ## Core features
 
 ### 💸 Expense & income tracking
-Just talk to it. Type *"Spent ₦2,000 on transport"* or *"Got ₦12k from a client"* → the agent emits a **structured tool call** (`log_expense` / `log_income`), the ledger reducer applies it, the Vault card's progress ring and numbers **animate live**, and the state syncs to 0G Storage with a real root-hash toast. No brittle regex — all natural language goes through the agent, and the **code owns the math** so the dashboard and the agent's words never disagree. Ask *"analyze my spending"* and you get a **code-computed** category breakdown card — exact percentages, never model arithmetic.
+Just talk to it. Type *"Spent ₦2,000 on transport"* or *"Got ₦12k from a client"* → the agent emits a **structured tool call** (`log_expense` / `log_income`), the ledger reducer applies it, the balance instrument and the numbers **update live**, and the state is backed up with a real root-hash toast. No brittle regex — all natural language goes through the agent, and the **code owns the math** so the dashboard and the agent's words never disagree. Ask *"analyze my spending"* and you get a **code-computed** category breakdown card — exact percentages, never model arithmetic.
 
 ### 🎯 Living savings goals
 Set a target by talking — *"I want to save ₦200k for a laptop"* (`add_goal`) — and earmark money toward it whenever you set funds aside (`contribute_to_goal`). Goals track progress **independently of your spendable balance** (an earmark model, never a transaction), so saving toward something never distorts what you can actually spend. When income lands, Stash offers to set some aside; before a big purchase, it tells you honestly what the buy costs you in goal progress.
@@ -89,11 +86,11 @@ A conversational agent with full ledger context — your balance, deadlines, inc
 ## Tech Stack
 
 - React 18 + TypeScript + Vite 6
-- 0G Storage (AES-256 encrypted ledger persistence)
-- 0G Compute Router (OpenAI-compatible inference)
-- Groq `openai/gpt-oss-120b` (demo inference provider; `llama-3.3-70b-versatile` fallback, swappable via env)
-- Tailwind CSS v4, ethers.js
-- Vercel Serverless Functions (the `/api/og-sync` 0G proxy)
+- 0G Storage (AES-256 encrypted ledger backup)
+- Groq `openai/gpt-oss-120b` over an OpenAI-compatible interface (`openai/gpt-oss-20b` fallback, swappable via env)
+- Tailwind CSS v4 (light + dark), ethers.js
+- Sibyl (`sibyl-svc`) for durable agent memory
+- Vercel Serverless Functions (`/api/og-sync`, `/api/memory`)
 
 ---
 
@@ -102,7 +99,7 @@ A conversational agent with full ledger context — your balance, deadlines, inc
 ### Prerequisites
 - Node.js 18+
 - A funded [0G Galileo testnet](https://faucet.0g.ai) wallet (throwaway — see the security note)
-- A [Groq API key](https://console.groq.com) (free) **or** a [0G Compute Router key](https://pc.0g.ai)
+- A [Groq API key](https://console.groq.com) (free), or any OpenAI-compatible endpoint
 
 ### Installation
 
@@ -125,7 +122,7 @@ Fill in `.env` for **local dev** (on `localhost` the browser runs the SDK direct
 VITE_AI_BASE_URL=https://api.groq.com/openai/v1
 VITE_AI_API_KEY=gsk_your_groq_key
 VITE_AI_MODEL=openai/gpt-oss-120b
-VITE_AI_FALLBACK_MODEL=llama-3.3-70b-versatile   # separate rate-limit bucket; used when the primary hits its TPM cap
+VITE_AI_FALLBACK_MODEL=openai/gpt-oss-20b        # separate rate-limit bucket; used when the primary hits its cap
 
 # 0G Storage — funded Galileo testnet wallet (throwaway only)
 VITE_OG_PRIVATE_KEY=0x_your_testnet_wallet_key
@@ -141,13 +138,9 @@ OG_RPC_URL=https://evmrpc-testnet.0g.ai
 OG_INDEXER_URL=https://indexer-storage-testnet-turbo.0g.ai
 ```
 
-To run inference **natively on 0G Compute** instead of Groq, swap the three `VITE_AI_*` values:
+To use a different provider, point the three `VITE_AI_*` values at any OpenAI-compatible endpoint — no code change.
 
-```bash
-VITE_AI_BASE_URL=https://router-api.0g.ai/v1
-VITE_AI_API_KEY=sk_your_router_key   # requires a funded mainnet Router balance
-VITE_AI_MODEL=glm-5
-```
+Agent memory runs against the `sibyl-svc` sidecar; see the `SIBYL_SVC_*` block in `.env.example` (server-side only, deliberately no `VITE_` prefix).
 
 > **Security note.** In the deployed build, 0G signing already runs **server-side** in the `/api/og-sync` proxy (`OG_PRIVATE_KEY` is never in the client bundle); the AI key and the local-dev `VITE_OG_PRIVATE_KEY` are still client-side. Use a **throwaway, testnet-only wallet with minimal funds** either way — a full production build moves inference behind the proxy too and derives per-user keys. `.env` is gitignored.
 
@@ -160,17 +153,16 @@ npm run build    # tsc -b && vite build
 
 ---
 
-## The live demo — judge flows
+## Walkthrough
 
-### Flow 1 — Expense logging + 0G sync
-Type **"Spent ₦2,000 on transport"**. The Vault ring animates, the numbers update live, and a toast appears carrying the **real 0G Storage root hash**.
+### Flow 1 — Expense logging + backup
+Type **"Spent ₦2,000 on transport"**. The balance instrument and the numbers update live, and a toast confirms the backup with its **real storage root hash**.
 
-### Flow 2 — Persistence (the real 0G proof)
-**Hard-refresh** the page (`Ctrl/Cmd + Shift + R`). You'll see *"Restoring from 0G Storage…"*, and your logged expense is still there.
-This is **not** localStorage — the state is reconstructed from decentralized storage by its root hash.
+### Flow 2 — Persistence
+**Hard-refresh** the page (`Ctrl/Cmd + Shift + R`). You'll see *"Restoring your ledger…"*, and your logged expense is still there — reconstructed from the encrypted remote backup by its root hash, not just localStorage.
 
 ### Flow 3 — Agent with live context
-Click **"🎓 Scholarship deadlines"**. The agent responds with *your* specific deadlines, the exact days remaining, and concrete next steps — because the live ledger is in its prompt.
+Click **"Scholarship deadlines"**. The agent responds with *your* specific deadlines, the exact days remaining, and concrete next steps — because the live ledger is in its prompt.
 
 ### Flow 4 — Edit a message, watch reality re-derive
 Hover a message you sent, edit the amount, and save. Stash rewinds to the state it held before that turn and re-runs — the balance and everything downstream update from the **restored snapshot, not a model guess**. The clearest proof of *intelligent agent, deterministic money*.
@@ -185,10 +177,10 @@ A single `Ledger` object — transactions, goals, scholarships, hustles, and sof
 1. **Empty on first load** — no seed data; your ledger grows from your own entries (onboarding sets name, currency, and opening balance).
 2. **Local-first** — `localStorage` is the canonical working copy, written synchronously on every change so the UI never waits on the network.
 3. **Updated** on every agent tool call via a pure reducer (the code computes the new balance; the model never invents math).
-4. **Re-encrypted and backed up** to 0G Storage on sync — through a Vercel serverless proxy — and the new root hash is persisted.
-5. **Hydrated** from 0G on boot if a root hash exists, and **injected** into the agent's system prompt on every call.
+4. **Re-encrypted and backed up** on sync — through a Vercel serverless proxy — and the new root hash is persisted.
+5. **Hydrated** from the backup on boot if a root hash exists, and **injected** into the agent's system prompt on every call.
 
-### Why 0G Storage over a database
+### Why decentralized storage over a database
 A central database is owned by the platform; storage on 0G is designed to be owned by the user. A student's financial life is deeply personal data — Stash puts it on a decentralized, encrypted, user-controllable substrate instead of a database we own. (Per-user key custody is the production step; the demo signs with one testnet wallet — see the honest-scope note above.)
 
 ### Bundle strategy
@@ -201,7 +193,7 @@ Uploads run with finality required — each sync blocks until 0G confirms the da
 
 ## Project
 
-- **120+ atomic commits**, conventional-commits style (`type(scope): description`).
+- Atomic commits, conventional-commits style (`type(scope): description`).
 - Full history: [github.com/Sammy949/Stash/commits/main](https://github.com/Sammy949/Stash/commits/main)
 
 ---
@@ -216,7 +208,6 @@ Not a Silicon Valley demo. Built for someone actually living this.
 
 ---
 
-**Built for Zero Cup 2026 · 0G Labs**
 by Samuel Yahaya · [@I_am_SamY01](https://twitter.com/I_am_SamY01) · [github.com/Sammy949/Stash](https://github.com/Sammy949/Stash)
 
 </div>
