@@ -63,18 +63,23 @@ export function Dashboard({
   // and reading `.length` off undefined crashes the whole dashboard render.
   const goals = getGoals(ledger);
 
-  // Consume the highlight after it has had time to play (the dashboard remounts
-  // when the user returns to it, so this runs each time there's one pending).
+  // Consume the highlight once it has had time to play.
+  //
+  // This used to be mount-only, which worked because the dashboard unmounted
+  // every time the user went to the transcript and came back. At lg it never
+  // unmounts — both panes are always on screen — so a highlight set by a turn
+  // would have been set once and never cleared, leaving the ring stuck on. It
+  // is keyed on the prop now, which is the thing that actually changed.
   useEffect(() => {
     if (!highlight) return;
     const t = window.setTimeout(onHighlightConsumed, 2400);
     return () => window.clearTimeout(t);
-    // Mount-only: the dashboard remounts on return, so a pending highlight
-    // plays then; we deliberately don't re-run on prop changes.
-  }, []);
+  }, [highlight, onHighlightConsumed]);
 
   return (
-    <FadeIn className="mx-auto w-full max-w-2xl">
+    // Width is owned once, by the pane, not again here. Five scattered
+    // max-w-2xl were what made every breakpoint a 672px phone screenshot.
+    <FadeIn className="w-full">
       <div className="space-y-5">
         <BalanceInstrument
           ledger={ledger}
@@ -90,11 +95,17 @@ export function Dashboard({
           />
         </Highlight>
 
-        {/* Deliberately NOT items-start: the two trackers are a parallel pair,
+        {/* @2xl, not sm: this keys off the DASHBOARD's width, not the window's.
+            In the lg two-pane layout the dashboard is a ~40% column, so a
+            viewport breakpoint would have paired these up at ~270px each on a
+            1440 screen. They pair when the column is genuinely wide enough
+            (42rem) and stack when it is not.
+
+            Deliberately NOT items-start: the two trackers are a parallel pair,
             so they share a height and their controls share a baseline. Letting
             each size to its own content is what makes a comparison row read as
             ragged. */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-2">
           <Highlight on={highlight === "scholarships"}>
             <ScholarshipRadar
               scholarships={ledger.scholarships}

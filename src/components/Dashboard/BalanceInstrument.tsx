@@ -60,7 +60,13 @@ export function BalanceInstrument({
           <AnimatedNumber
             value={bal}
             format={(n) => formatMoney(n, ledger.currency)}
-            className={`font-data mt-1 block text-[clamp(2rem,8vw,3.25rem)] font-semibold leading-none tracking-[-0.02em] ${
+            // cqi, not vw: the figure has to size against the column it sits
+            // in. In the lg two-pane layout the dashboard is ~40% of the
+            // window, so 8vw kept scaling with the whole screen and a long
+            // amount would have run under the card's overflow-hidden edge.
+            // (With no container ancestor — the preview harness — cqi falls
+            // back to the viewport, which is the old behaviour.)
+            className={`font-data mt-1 block text-[clamp(2rem,9cqi,3.25rem)] font-semibold leading-none tracking-[-0.02em] ${
               overdrawn ? "text-destructive" : "text-foreground"
             }`}
           />

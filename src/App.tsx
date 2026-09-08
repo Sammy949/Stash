@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Toaster, toast } from "sonner";
 import { Dashboard } from "@/components/Dashboard/Dashboard";
 import { DashboardStrip } from "@/components/Dashboard/DashboardStrip";
@@ -14,7 +14,9 @@ import { useAgent } from "@/hooks/useAgent";
 import { useMemory } from "@/hooks/useMemory";
 import { StashMark } from "@/components/UI/StashMark";
 import { AccountMenu } from "@/components/UI/AccountMenu";
+import { BuildBadge } from "@/components/UI/BuildBadge";
 import { MemoryIcon } from "@/components/UI/icons";
+import { useTheme } from "@/hooks/useTheme";
 import {
   Marker,
   MarkerContent,
@@ -60,7 +62,7 @@ function changedSection(before: Ledger, after: Ledger): SectionKey | null {
 }
 
 const SYNC_CONFIRMATION =
-  "Your financial data is encrypted and stored on 0G's decentralized network. Nobody else can access it. It'll be here next time you open Stash.";
+  "Your financial data is encrypted and backed up safely. Nobody else can access it. It'll be here next time you open Stash.";
 
 export default function App() {
   const { ledger, hydrating, syncPhase, sync, applyLedger, initProfile } =
@@ -70,6 +72,10 @@ export default function App() {
   const { recall, hydrating: recalling, port: memoryPort } = useMemory();
   // Read once per mount: the flag is a session decision, not live state.
   const [memoryOff] = useState(memoryDisabled);
+  // Owned here, not inside AccountMenu, so the Toaster can be painted in the
+  // same mode. Two useTheme() callers would each hold their own state and
+  // silently drift apart the moment one of them changed it.
+  const { theme, setTheme } = useTheme();
   const {
     messages,
     isThinking,
@@ -93,10 +99,12 @@ export default function App() {
   // agent panel (dashboard condenses to a strip). Tap the strip to return.
   const [agentActive, setAgentActive] = useState(false);
 
-  // "Just updated" emphasis — the section a turn changed. Persists (no timer)
-  // until the dashboard is next viewed and consumes it, since after an action
-  // the user is in the agent panel, not looking at the dashboard.
+  // "Just updated" emphasis — the section a turn changed.
   const [highlight, setHighlight] = useState<SectionKey | null>(null);
+  // Stable identity: the dashboard's consume effect is keyed on the highlight
+  // AND this callback, so an inline arrow here would give it a new function
+  // every render and restart the timer forever.
+  const consumeHighlight = useCallback(() => setHighlight(null), []);
 
   // Which tracker's Manage sheet is open (null = closed).
   const [manage, setManage] = useState<
@@ -161,19 +169,19 @@ export default function App() {
     setAgentActive(true);
     setWelcome(null); // greeting gives way once the conversation starts
 
-    // 1. "Sync to 0G" chip → real storage sync, no Compute needed.
+    // 1. The back-up chip → real storage sync, no model call needed.
     if (text === SYNC_CHIP) {
       const ok = await sync();
       pushAssistant(
         ok
           ? SYNC_CONFIRMATION
-          : "I couldn't sync to 0G Storage just now: the upload didn't go through. Check the toast for details and try again.",
+          : "I couldn't back up just now: the upload didn't go through. Check the toast for details and try again.",
       );
       return;
     }
 
     // 2. Everything else → the agent. It may call tools that mutate the
-    //    ledger; when it does, persist the new ledger and sync to 0G.
+    //    ledger; when it does, persist the new ledger and back it up.
     const before = ledger;
     let latest = ledger;
     const wantsBreakdown = isSpendingQuery(text);
@@ -296,61 +304,73 @@ export default function App() {
           : [];
 
   return (
-    <div className="h-dvh bg-background text-foreground">
-      {/* Centered platform column: doesn't stretch on wide screens. */}
-      <div className="mx-auto flex h-full max-w-2xl flex-col">
-        {/* Top bar: only on the dashboard. In chat mode the balance strip +
-            "Stash AI" header are the chrome (matches the Stitch reference), so
-            we drop this third bar to give the transcript back its height. */}
-        {!agentActive && (
-          <header className="flex shrink-0 items-center gap-3 border-b border-border px-5 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-            <StashMark className="h-7 w-7" />
-            <h1 className="text-lg font-semibold leading-none">Stash</h1>
-            <div className="ml-auto flex items-center gap-3">
-              <AccountMenu
-                name={rememberedName(ledger, recall)}
-                currency={ledger.currency}
-                memoryCount={rememberedCount(recall)}
-                onCurrencyChange={(next) =>
-                  applyLedger({ ...ledger, currency: next })
-                }
-                onSync={() => void sync()}
-                syncing={syncPhase !== "idle"}
-                onStartFresh={() => {
-                  startFresh(ledger, localStorage.getItem(LAST_VISIT_KEY));
-                  setAgentActive(true);
-                }}
-              />
-            </div>
-          </header>
-        )}
+    <div className="flex h-dvh flex-col bg-background text-foreground">
+      {/* The ONE app header, at every breakpoint and in every mode. There used
+          to be two competing ones: this bar (dashboard only) and the agent
+          panel's own "Stash AI" bar. At lg both panes are on screen together,
+          so those would have stacked in the same corner. */}
+      <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-5">
+        <StashMark className="size-7" />
+        <h1 className="text-lg font-semibold leading-none">Stash</h1>
+        <div className="ml-auto flex items-center gap-3">
+          {/* The build hash has to stay on screen continuously for the
+              submission's single-take recall beat, so it lives here rather than
+              in the panel bar that just went away. */}
+          <BuildBadge className="hidden sm:inline" />
+          <AccountMenu
+            name={rememberedName(ledger, recall)}
+            currency={ledger.currency}
+            memoryCount={rememberedCount(recall)}
+            onCurrencyChange={(next) =>
+              applyLedger({ ...ledger, currency: next })
+            }
+            onSync={() => void sync()}
+            syncing={syncPhase !== "idle"}
+            theme={theme}
+            onThemeChange={setTheme}
+            onStartFresh={() => {
+              startFresh(ledger, localStorage.getItem(LAST_VISIT_KEY));
+              setAgentActive(true);
+            }}
+          />
+        </div>
+      </header>
 
-        {/* Content: Split-Shift */}
-        {agentActive ? (
-          <div className="flex min-h-0 flex-1 animate-slide-up flex-col">
-            <DashboardStrip
-              ledger={ledger}
-              onExpand={() => setAgentActive(false)}
-            />
-            <AgentPanel
-              messages={messages}
-              onEditMessage={handleEditMessage}
-              onStartFresh={() =>
-                startFresh(ledger, localStorage.getItem(LAST_VISIT_KEY))
-              }
-              isThinking={isThinking}
-              goals={ledger.goals}
-              scholarships={ledger.scholarships}
-              currency={ledger.currency}
-            />
-          </div>
-        ) : (
-          <main className="flex-1 overflow-y-auto px-4 py-6">
-            {/* The deletion test, stated on screen. Without this the absence of
-                memory looks like a bug rather than the point being demonstrated,
-                and a judge has only my word for which mode they are seeing. */}
-            {memoryOff && (
-              <div className="mx-auto mb-5 w-full max-w-2xl">
+      {/*
+        Two panes at lg, one column below it.
+
+        Below lg this is still Split-Shift: the dashboard and the transcript
+        take turns, and the strip keeps the balance on screen while you talk.
+        At lg they simply both exist — nothing needs to condense when nothing is
+        hidden — so the strip and the swap are scoped to small screens with
+        `lg:` classes rather than a JS breakpoint listener.
+
+        min-h-0 on this row and on both panes is load-bearing. h-dvh gives the
+        page a definite height; every descendant that scrolls needs an unbroken
+        chain of min-h-0 to it, or a flex child refuses to shrink below its
+        content and the composer is pushed off the bottom of the screen.
+        min-w-0 is the same guarantee sideways: without it one long unbroken
+        string in the transcript widens that pane past its share.
+      */}
+      <div className="mx-auto flex w-full min-h-0 max-w-[100rem] flex-1 flex-col lg:flex-row">
+        {/* Dashboard pane. Owns its own width once, here, for everything in it. */}
+        <div
+          className={`min-w-0 flex-col lg:flex lg:min-h-0 lg:flex-[2] lg:border-r lg:border-border ${
+            agentActive ? "hidden" : "flex min-h-0 flex-1"
+          }`}
+        >
+          {/* lg:px-8 — at lg this pane is a ~576px column hard against the
+              window edge, and px-4 left the cards with a 16px gutter on one
+              side while the transcript beside them sat in ~96px of air. */}
+          <main className="flex-1 overflow-y-auto px-4 py-6 lg:px-8">
+            {/* @container, not a viewport breakpoint: inside a 40% pane the
+                dashboard has to lay itself out against the width it actually
+                has, not the width of the window. */}
+            <div className="@container mx-auto w-full max-w-2xl space-y-5">
+              {/* The deletion test, stated on screen. Without this the absence of
+                  memory looks like a bug rather than the point being demonstrated,
+                  and a judge has only my word for which mode they are seeing. */}
+              {memoryOff && (
                 <Marker role="status" variant="border">
                   <MarkerIcon>
                     <MemoryIcon className="size-4" />
@@ -361,10 +381,8 @@ export default function App() {
                     the URL to bring it back.
                   </MarkerContent>
                 </Marker>
-              </div>
-            )}
-            {recalling ? (
-              <div className="mx-auto mb-5 w-full max-w-2xl">
+              )}
+              {recalling ? (
                 <Marker role="status">
                   <MarkerIcon>
                     <MemoryIcon className="size-4" />
@@ -373,41 +391,70 @@ export default function App() {
                     Recalling what I know about you…
                   </MarkerContent>
                 </Marker>
-              </div>
-            ) : (
-              welcome && (
-                <div className="mx-auto mb-5 w-full max-w-2xl">
+              ) : (
+                welcome && (
                   <WelcomeBack
                     data={welcome}
                     onDismiss={() => setWelcome(null)}
                   />
-                </div>
-              )
-            )}
-            <Dashboard
-              ledger={ledger}
-              syncPhase={syncPhase}
-              hydrating={hydrating}
-              onPrompt={handleSend}
-              onManage={setManage}
-              highlight={highlight}
-              onHighlightConsumed={() => setHighlight(null)}
-            />
+                )
+              )}
+              <Dashboard
+                ledger={ledger}
+                syncPhase={syncPhase}
+                hydrating={hydrating}
+                onPrompt={handleSend}
+                onManage={setManage}
+                highlight={highlight}
+                onHighlightConsumed={consumeHighlight}
+              />
+            </div>
           </main>
-        )}
+        </div>
 
-        {/* Command bar: always present. While the panel is closed and a
-            conversation already exists, it offers a quiet way to reopen the
-            transcript (review only: no message sent, no agent turn). */}
-        <div className="shrink-0">
-          <CommandBar
-            onSend={handleSend}
-            onStop={stop}
-            isThinking={isThinking}
-            active={agentActive}
-            onOpenPanel={() => setAgentActive(true)}
-            canOpenPanel={!agentActive && messages.length > 0}
-          />
+        {/* Conversation pane. The command bar lives at its foot in BOTH layouts,
+            which is why this pane is always mounted: below lg, with the
+            transcript closed, the pane collapses to just the composer, so the
+            draft you are typing survives opening and closing the transcript. */}
+        <div
+          className={`flex min-w-0 flex-col lg:min-h-0 lg:flex-[3] ${
+            agentActive ? "min-h-0 flex-1" : "lg:flex-1"
+          }`}
+        >
+          {agentActive && (
+            <div className="lg:hidden">
+              <DashboardStrip
+                ledger={ledger}
+                onExpand={() => setAgentActive(false)}
+              />
+            </div>
+          )}
+
+          <div
+            className={`min-h-0 flex-1 flex-col ${
+              agentActive ? "flex animate-slide-up lg:animate-none" : "hidden lg:flex"
+            }`}
+          >
+            <AgentPanel
+              messages={messages}
+              onEditMessage={handleEditMessage}
+              isThinking={isThinking}
+              goals={ledger.goals}
+              scholarships={ledger.scholarships}
+              currency={ledger.currency}
+            />
+          </div>
+
+          <div className="shrink-0">
+            <CommandBar
+              onSend={handleSend}
+              onStop={stop}
+              isThinking={isThinking}
+              active={agentActive}
+              onOpenPanel={() => setAgentActive(true)}
+              canOpenPanel={!agentActive && messages.length > 0}
+            />
+          </div>
         </div>
       </div>
 
@@ -434,7 +481,9 @@ export default function App() {
         />
       )}
 
-      <Toaster theme="dark" position="top-center" richColors closeButton />
+      {/* Follows the app's own theme. It was pinned to "dark", which since the
+          two-mode palette landed meant a dark toast dropped onto a light page. */}
+      <Toaster theme={theme} position="top-center" richColors closeButton />
     </div>
   );
 }

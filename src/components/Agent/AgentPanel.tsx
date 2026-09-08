@@ -1,5 +1,4 @@
 import type { ChatMessage, Currency, Goal, Scholarship } from "@/types";
-import { BuildBadge } from "@/components/UI/BuildBadge";
 import { StashMark } from "@/components/UI/StashMark";
 import {
   MessageScroller,
@@ -11,11 +10,20 @@ import {
 } from "@/components/shadcn/message-scroller";
 import { MessageBubble } from "./MessageBubble";
 
-/** The conversation transcript — fills the space under the strip when active. */
+/**
+ * The conversation transcript. It fills its pane and owns nothing above itself:
+ * the app header is the only header now.
+ *
+ * This used to carry a second bar of its own ("Stash AI", a pulsing Active dot,
+ * Start fresh, the build hash). Beside the app header that was two competing
+ * headers, and at `lg` — where both panes are on screen at once — it was two
+ * stacked bars in the same corner. Everything it held already exists elsewhere:
+ * identity and the build hash in the app header, Start fresh in the account
+ * menu. The dot was decoration.
+ */
 export function AgentPanel({
   messages,
   onEditMessage,
-  onStartFresh,
   isThinking,
   goals,
   scholarships,
@@ -23,11 +31,6 @@ export function AgentPanel({
 }: {
   messages: ChatMessage[];
   onEditMessage: (id: string, text: string) => void;
-  /**
-   * Clear the transcript without touching memory. The reason it exists: a new
-   * session should meet a Stash that still knows you.
-   */
-  onStartFresh?: () => void;
   isThinking: boolean;
   /** Live goals — passed to bubbles to render inline goal cards. */
   goals: Goal[];
@@ -45,33 +48,7 @@ export function AgentPanel({
       : null;
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-2.5 border-b border-border px-5 py-3">
-        <StashMark className="h-7 w-7" />
-        <h2 className="shrink-0 text-sm font-semibold">Stash AI</h2>
-        {/* Hidden on the narrowest screens so the header can't overflow now that
-            it also carries the reset and the build badge. */}
-        <span className="hidden items-center gap-1.5 sm:flex">
-          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-          <span className="label-caps text-[10px] text-muted-foreground">Active</span>
-        </span>
-        <div className="ml-auto flex items-center gap-2">
-          {onStartFresh && (
-            <button
-              type="button"
-              onClick={onStartFresh}
-              disabled={isThinking}
-              title="Clear this conversation. Stash keeps what it remembers."
-              className="flex h-9 items-center rounded-lg px-2 text-[11px] text-muted-foreground transition-colors hover:bg-background hover:text-foreground disabled:opacity-40"
-            >
-              Start fresh
-            </button>
-          )}
-          <BuildBadge />
-        </div>
-      </div>
-
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Transcript. MessageScroller owns the scrolling: it sticks to the
           bottom only while you are at the live edge, anchors each user turn so
           the reply streams in below it, and holds position when history is
@@ -81,8 +58,12 @@ export function AgentPanel({
         <MessageScroller className="min-h-0 flex-1">
           <MessageScrollerViewport>
             {greeting ? (
-              <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-                <StashMark className="h-12 w-12" />
+              // Anchored to the BOTTOM, not centred. A conversation grows
+              // upward out of the composer, so the opening line belongs just
+              // above it. Centred, it left most of a 60%-wide desktop pane as
+              // dead space with one sentence floating in the middle of it.
+              <div className="flex h-full flex-col items-center justify-end px-6 pb-6 text-center">
+                <StashMark className="size-10" />
                 <p className="mt-4 max-w-sm whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
                   {greeting.content}
                 </p>

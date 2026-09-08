@@ -1,6 +1,6 @@
 import type { Currency } from "@/types";
 import { CURRENCY_LIST } from "@/lib/currency";
-import { useTheme, type ThemeChoice } from "@/hooks/useTheme";
+import { type ThemeChoice } from "@/hooks/useTheme";
 import { Avatar, AvatarFallback } from "@/components/shadcn/avatar";
 import {
   DropdownMenu,
@@ -68,6 +68,8 @@ export function AccountMenu({
   onSync,
   syncing = false,
   onStartFresh,
+  theme,
+  onThemeChange,
 }: {
   /** The name Stash remembers. Empty before onboarding fills it in. */
   name: string;
@@ -79,15 +81,22 @@ export function AccountMenu({
   syncing?: boolean;
   /** Clear the transcript. Memory is untouched, which the label says out loud. */
   onStartFresh?: () => void;
+  /**
+   * Theme state is owned by App and passed down, rather than this menu calling
+   * useTheme itself. The hook keeps its choice in local state, so a second
+   * caller (the Toaster, which has to be told which mode to paint) would never
+   * hear about a change made here and would drift out of sync.
+   */
+  theme: ThemeChoice;
+  onThemeChange: (next: ThemeChoice) => void;
 }) {
-  const { theme, setTheme } = useTheme();
   const label = name.trim() || "You";
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Account and settings"
-        className="rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:outline-1 focus-visible:outline-ring"
       >
         <Avatar>
           <AvatarFallback>{initials(label)}</AvatarFallback>
@@ -107,7 +116,7 @@ export function AccountMenu({
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup
           value={theme}
-          onValueChange={(v) => setTheme(v as ThemeChoice)}
+          onValueChange={(v) => onThemeChange(v as ThemeChoice)}
         >
           {/* Inside the RadioGroup, not beside it: GroupLabel reads
               MenuGroupContext, which only Group and RadioGroup provide. Outside,
@@ -154,7 +163,7 @@ export function AccountMenu({
         {onSync && (
           <DropdownMenuItem onClick={onSync} disabled={syncing}>
             <CloudArrowUpIcon className="size-4 text-muted-foreground" />
-            {syncing ? "Backing up…" : "Back up to 0G"}
+            {syncing ? "Backing up…" : "Back up my data"}
           </DropdownMenuItem>
         )}
         {onStartFresh && (

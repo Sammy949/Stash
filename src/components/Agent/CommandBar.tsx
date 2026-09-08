@@ -49,7 +49,9 @@ export function CommandBar({
               onClick={onOpenPanel}
               aria-label="Open conversation"
               title="Open conversation"
-              className="mb-1 size-11 shrink-0 rounded-full text-muted-foreground"
+              // Below lg only: at lg the transcript is always on screen beside
+              // the dashboard, so there is nothing to reopen.
+              className="mb-1 size-11 shrink-0 rounded-full text-muted-foreground lg:hidden"
             >
               <ChatIcon className="size-4" />
             </Button>
@@ -63,6 +65,12 @@ export function CommandBar({
             />
           </div>
         </div>
+        {/* Supporting text for the composer, not a UI element of its own: the
+            quietest ink in the system, and it wraps rather than truncates on a
+            narrow phone. Balanced so a two-line wrap breaks evenly. */}
+        <p className="mt-2 text-pretty px-1 text-center text-[11px] leading-snug text-muted-foreground">
+          Stash can make mistakes, so double-check anything important.
+        </p>
       </div>
     </div>
   );
