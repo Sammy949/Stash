@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from "react";
 import type { Ledger, SyncPhase } from "@/types";
 import {
   balance,
@@ -108,11 +107,13 @@ export function BalanceInstrument({
 /**
  * The trace itself.
  *
- * Draw-on motion is a `stroke-dashoffset` transition from a full-length dash to
- * zero, started by an effect on the next frame. The path is rendered at FULL
- * OPACITY from the first paint and the transition only moves the dash, so if the
- * effect never runs (no JS, a throttled tab, a screenshot pass) the trace is
- * still there and complete. Content is never gated on an animation.
+ * Draw-on motion is a CSS animation that runs BACKWARDS from a hidden start to
+ * the path's resting state, which is fully drawn. Nothing about the trace's
+ * existence depends on the animation running: if it never runs, or is
+ * interrupted, the line is complete. The earlier version transitioned a React
+ * state from hidden to drawn, which could be caught part-way — measured at
+ * stroke-dashoffset 0.917 on a real page load — leaving a stroke that stopped
+ * short of its own filled area, which is the half-built-motion tell.
  */
 function Trace({
   geo,
@@ -123,18 +124,6 @@ function Trace({
   started: boolean;
   overdrawn: boolean;
 }) {
-  const [drawn, setDrawn] = useState(false);
-  const reduced = useRef(false);
-
-  useEffect(() => {
-    reduced.current =
-      typeof window !== "undefined" &&
-      (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false);
-    // Next frame, so the browser has painted the undrawn state to transition from.
-    const id = requestAnimationFrame(() => setDrawn(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
-
   const stroke = overdrawn ? "var(--destructive)" : "var(--foreground)";
 
   return (
@@ -180,6 +169,7 @@ function Trace({
             <path d={geo.area} fill={stroke} opacity="0.06" />
 
             <path
+              className="animate-trace-draw"
               d={geo.line}
               fill="none"
               stroke={stroke}
@@ -191,12 +181,9 @@ function Trace({
               // regardless of its real length, so one offset works for any data.
               pathLength={1}
               strokeDasharray={1}
-              strokeDashoffset={drawn || reduced.current ? 0 : 1}
-              style={{
-                transition: reduced.current
-                  ? undefined
-                  : "stroke-dashoffset 900ms cubic-bezier(0.22, 1, 0.36, 1)",
-              }}
+              // Resting state: fully drawn. The animation supplies the hidden
+              // start, never the finished state.
+              strokeDashoffset={0}
             />
           </>
         )}

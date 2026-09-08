@@ -426,6 +426,25 @@
     animation: stash-highlight 2.2s ease-out;
   }
 
+  /* Balance-trace draw-on.
+     The resting state of the path is stroke-dashoffset:0, i.e. FULLY DRAWN, and
+     the animation only runs backwards from a hidden start. So if the animation
+     never runs at all (reduced motion, a throttled tab, a screenshot pass, no
+     JS) the trace is complete rather than half-drawn. The previous version
+     transitioned a React state the other way round and could be caught mid
+     flight, leaving the line stopping short of its own filled area. */
+  @keyframes stash-trace-draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  .animate-trace-draw {
+    animation: stash-trace-draw 900ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
   /* Respect reduced-motion: hold everything still. Covers the bespoke
      keyframes above AND Tailwind's built-in animate-pulse used for status
      dots, so a reduced-motion user gets no looping/entrance motion anywhere. */
@@ -442,6 +461,7 @@
     .animate-fade,
     .animate-flash,
     .animate-stash-pulse,
+    .animate-trace-draw,
     .animate-pulse {
       animation: none;
     }

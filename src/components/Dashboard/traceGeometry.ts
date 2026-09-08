@@ -49,6 +49,13 @@ export function traceGeometry(points: BalancePoint[]): TraceGeometry | null {
   let min = Math.min(...values);
   let max = Math.max(...values);
 
+  // Whether the account ACTUALLY went negative, captured before `min` is
+  // clamped toward zero below. This is the only thing the zero line may be
+  // decided on: reading it off the clamped `min` made every healthy, always
+  // positive ledger draw a red dashed "zero crossing" along its floor, which
+  // is both untrue and a use of the alarm colour on an account in good shape.
+  const wentNegative = min < 0;
+
   // Flatness is decided on the RAW values, before zero is pulled into range.
   // Order matters: clamping first would turn a steady £500 into a 0–500 range,
   // which is not flat, and the line would draw jammed against the top edge as if
@@ -85,7 +92,7 @@ export function traceGeometry(points: BalancePoint[]): TraceGeometry | null {
   // give the line weight, and a fill that flips sides at zero reads as a bug.
   const area = `${line} L${VIEW_W} ${VIEW_H} L0 ${VIEW_H} Z`;
 
-  const zeroInRange = !flat && min <= 0 && max >= 0;
+  const zeroInRange = !flat && wentNegative && max >= 0;
 
   return {
     line,
