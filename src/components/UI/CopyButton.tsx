@@ -1,7 +1,15 @@
 import { useState } from "react";
+import { Button } from "@/components/shadcn/button";
 import { CheckIcon, CopyIcon } from "@/components/UI/icons";
 
-/** Small icon button that copies `text` to the clipboard, flashing a check. */
+/**
+ * Copies `text` to the clipboard, flashing a tick.
+ *
+ * Built on the Button primitive rather than a hand-rolled `<button>`: the ghost
+ * icon variant already carries the hover, focus-visible and disabled states,
+ * and `size="icon"` is the system's 32px control — the hand-rolled version was
+ * a 44px outlier that no other control on the page matched.
+ */
 export function CopyButton({
   text,
   className = "",
@@ -22,17 +30,19 @@ export function CopyButton({
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon"
       onClick={copy}
       aria-label={copied ? "Copied" : "Copy"}
-      className={`flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-background hover:text-foreground ${className}`}
+      className={`text-muted-foreground hover:text-foreground ${className}`}
     >
       {copied ? (
-        <CheckIcon className="h-3.5 w-3.5 text-primary" />
+        <CheckIcon className="size-3.5 text-primary" />
       ) : (
-        <CopyIcon className="h-3.5 w-3.5" />
+        <CopyIcon className="size-3.5" />
       )}
-    </button>
+    </Button>
   );
 }

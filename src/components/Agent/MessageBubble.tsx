@@ -10,6 +10,8 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@/components/shadcn/avatar";
+import { Button } from "@/components/shadcn/button";
+import { Textarea } from "@/components/shadcn/textarea";
 import { Bubble, BubbleContent } from "@/components/shadcn/bubble";
 import {
   Message,
@@ -17,7 +19,7 @@ import {
   MessageFooter,
 } from "@/components/shadcn/message";
 import { Marker, MarkerContent, MarkerIcon } from "@/components/shadcn/marker";
-import { Spinner } from "@/components/shadcn/spinner";
+import { TypingDots } from "./TypingDots";
 import { SpendingCard } from "./SpendingCard";
 import { Markdown } from "./Markdown";
 
@@ -98,7 +100,7 @@ export function MessageBubble({
     return (
       <Message align="end">
         <MessageContent>
-          <textarea
+          <Textarea
             ref={taRef}
             value={draft}
             autoFocus
@@ -110,14 +112,17 @@ export function MessageBubble({
               }
               if (e.key === "Escape") setEditing(false);
             }}
-            className="w-full max-w-[80%] resize-none self-end overflow-hidden rounded-xl bg-secondary px-3 py-2 text-sm leading-relaxed text-foreground outline-none ring-1 ring-ring/50 focus:ring-ring"
+            // min-h-0 overrides the primitive's min-h-16: this editor is
+            // sized by the auto-grow effect below, and a 64px floor left a
+            // one-line message sitting in an oversized box.
+            className="w-full max-w-[80%] min-h-0 resize-none self-end overflow-hidden rounded-bubble bg-secondary px-3 py-2 text-sm leading-relaxed"
           />
           <MessageFooter className="gap-1">
             <RowButton label="Cancel edit" onClick={() => setEditing(false)}>
-              <CloseIcon className="h-4 w-4" />
+              <CloseIcon className="size-3.5" />
             </RowButton>
             <RowButton label="Save and resend" tone="emerald" onClick={save}>
-              <SendIcon className="h-4 w-4" />
+              <SendIcon className="size-3.5" />
             </RowButton>
             <span className="text-[10px] text-muted-foreground">
               Saving replaces everything below.
@@ -178,14 +183,22 @@ function MessageRow({
 
   return (
     <Message align={mine ? "end" : "start"} className="group/row">
-      {!mine && <StashAvatar />}
+      {/* The mark lands with the reply, not before it. While the turn is in
+          flight the row is a status line, and an avatar sitting beside
+          "Thinking…" reads as Stash having already spoken. */}
+      {!mine && !message.pending && <StashAvatar />}
       <MessageContent>
         {message.pending ? (
           // Thinking: a status line rather than an empty bubble, so assistive
           // tech is told a turn is in flight instead of meeting a blank row.
           <Marker role="status" className="w-fit">
-            <MarkerIcon>
-              <Spinner />
+            {/* MarkerIcon is a square size-4 slot built for a single glyph:
+                w-auto gives the three dots their width, and flex+items-center
+                actually centres them in the 16px slot. Without the flex the
+                dots are an inline box sitting on the text baseline, which
+                parks 6px dots low against the label beside them. */}
+            <MarkerIcon className="flex w-auto items-center">
+              <TypingDots />
             </MarkerIcon>
             <MarkerContent className="shimmer">Thinking…</MarkerContent>
           </Marker>
@@ -196,7 +209,7 @@ function MessageRow({
                 variant={mine ? "secondary" : "outline"}
                 align={mine ? "end" : "start"}
               >
-                <BubbleContent>
+                <BubbleContent className="rounded-bubble">
                   {mine ? (
                     <span className="whitespace-pre-wrap">{message.content}</span>
                   ) : (
@@ -224,14 +237,16 @@ function MessageRow({
               <MessageFooter className="gap-0.5 px-0 opacity-100 transition-opacity md:opacity-0 md:group-hover/row:opacity-100">
                 <CopyButton text={message.content} />
                 {mine && editable && onEdit && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     aria-label="Edit message"
                     onClick={startEdit}
-                    className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground"
                   >
-                    <PencilIcon className="h-3.5 w-3.5" />
-                  </button>
+                    <PencilIcon className="size-3.5" />
+                  </Button>
                 )}
               </MessageFooter>
             )}

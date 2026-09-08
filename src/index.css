@@ -60,6 +60,9 @@
   --radius-lg: var(--radius-panel);
   --radius-xl: var(--radius-panel);
   --radius-2xl: var(--radius-panel);
+  /* `rounded-bubble` — the speech step. Named, not a magic number, so the
+     transcript's radius stays one decision made in one place. */
+  --radius-bubble: var(--radius-speech);
 
 
   /* Geist for everything; Geist Mono is reserved for money/data figures and
@@ -91,6 +94,12 @@
   --radius-tight: 0.25rem;
   --radius: 0.4rem;
   --radius-panel: 0.625rem;
+  /* The conversational step, and the one deliberate exception to
+     "tight inside, softer outside". A speech bubble is not a panel: the extra
+     curve is what makes the transcript read as talking rather than as another
+     stack of cards. Used by the chat bubbles only (`rounded-bubble`) — if it
+     starts showing up on containers, it has stopped meaning anything. */
+  --radius-speech: 1.125rem;
 
   /* Surfaces: four tonal steps at ONE hue (75, the warm/amber direction). At
      chroma <= 0.006 the hue is not seen as colour, it only stops the grey from

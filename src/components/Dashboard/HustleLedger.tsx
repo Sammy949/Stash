@@ -114,8 +114,17 @@ export function HustleLedger({
               </ItemContent>
 
               <ItemActions>
+                {/* A row's status is a VALUE, so it is set like one — the same
+                    trailing-value treatment the scholarship row uses beside it.
+                    It used to wear `label-caps`, the mono-caps costume this
+                    dashboard reserves for field labels ("Balance", "Active
+                    income", the section headings). Dressing a value as a label
+                    put the identical tracked-caps costume on every small string
+                    on the page, and made the two paired trackers speak in two
+                    different voices in the very same slot. Colour still carries
+                    the meaning. */}
                 <span
-                  className={`label-caps text-[10px] ${STATUS_TONE[h.status]}`}
+                  className={`text-xs font-medium ${STATUS_TONE[h.status]}`}
                 >
                   {STATUS_LABEL[h.status]}
                 </span>

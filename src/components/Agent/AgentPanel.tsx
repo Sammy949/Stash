@@ -58,13 +58,13 @@ export function AgentPanel({
         <MessageScroller className="min-h-0 flex-1">
           <MessageScrollerViewport>
             {greeting ? (
-              // Anchored to the BOTTOM, not centred. A conversation grows
-              // upward out of the composer, so the opening line belongs just
-              // above it. Centred, it left most of a 60%-wide desktop pane as
-              // dead space with one sentence floating in the middle of it.
-              <div className="flex h-full flex-col items-center justify-end px-6 pb-6 text-center">
-                <StashMark className="size-10" />
-                <p className="mt-4 max-w-sm whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+              // Centred in the pane: before the first turn there is no
+              // conversation for the greeting to sit on top of, so the mark and
+              // the opening line read as the panel's resting state rather than
+              // one stray bubble pinned above the composer.
+              <div className="flex h-full flex-col items-center justify-center px-6 py-6 text-center">
+                <StashMark className="size-14" />
+                <p className="mt-5 max-w-sm whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
                   {greeting.content}
                 </p>
               </div>
@@ -92,11 +92,6 @@ export function AgentPanel({
           <MessageScrollerButton />
         </MessageScroller>
       </MessageScrollerProvider>
-
-      {/* Disclaimer: code owns the numbers, but advice/prose can still err. */}
-      <p className="shrink-0 px-5 pb-2 text-center text-[10px] text-muted-foreground">
-        Stash can make mistakes, so double-check anything important.
-      </p>
     </div>
   );
 }

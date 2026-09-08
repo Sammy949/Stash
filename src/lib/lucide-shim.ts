@@ -16,7 +16,17 @@
  *
  * Weight comes from the IconContext.Provider in main.tsx, same as the app's own
  * icons, so the whole interface is one weight.
+ *
+ * CheckIcon is the exception, and it is re-exported from the app's own icon
+ * vocabulary rather than from phosphor directly. Phosphor's `fill` Check is a
+ * rounded square with the tick knocked out of it, so under the global fill
+ * provider every vendored tick — the theme and currency radio items, the
+ * checkbox, the command list — rendered as a mark inside a box. icons.tsx
+ * already carries the corrected (bold) version; pointing at it means there is
+ * ONE definition and the two cannot drift apart again.
  */
+export { CheckIcon } from "@/components/UI/icons";
+
 export {
   ArrowDownIcon,
   CaretDownIcon as ChevronDownIcon,
@@ -24,7 +34,6 @@ export {
   CaretRightIcon as ChevronRightIcon,
   CaretUpIcon as ChevronUpIcon,
   CheckCircleIcon as CircleCheckIcon,
-  CheckIcon,
   DotsThreeIcon as MoreHorizontalIcon,
   InfoIcon,
   MagnifyingGlassIcon as SearchIcon,

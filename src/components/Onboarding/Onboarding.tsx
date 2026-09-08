@@ -284,7 +284,13 @@ function StepBalance({
         <Select value={currency} onValueChange={(v) => onCurrency(v as Currency)}>
           <SelectTrigger
             aria-label="Currency"
-            className="font-data h-11 w-auto focus-visible:ring-0"
+            // The height override has to be written in the SAME variant group
+            // as the primitive's own `data-[size=default]:h-8`, or it loses:
+            // that rule compiles to `.data-…\:h-8[data-size=default]`, which
+            // outranks a bare `.h-11` on specificity, and tailwind-merge can't
+            // dedupe across variant groups. A plain h-11 here rendered a 32px
+            // trigger beside the 44px amount field.
+            className="font-data w-auto data-[size=default]:h-11 focus-visible:ring-0"
           >
             <SelectValue />
           </SelectTrigger>
