@@ -15,7 +15,6 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/shadcn/dropdown-menu";
-import { BuildBadge } from "@/components/UI/BuildBadge";
 import {
   CloudArrowUpIcon,
   MoonIcon,
@@ -182,10 +181,6 @@ export function AccountMenu({
           </span>
         </DropdownMenuItem>
 
-        <DropdownMenuSeparator />
-        <div className="px-3 py-1.5">
-          <BuildBadge clock />
-        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );

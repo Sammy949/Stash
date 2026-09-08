@@ -14,7 +14,6 @@ import { useAgent } from "@/hooks/useAgent";
 import { useMemory } from "@/hooks/useMemory";
 import { StashMark } from "@/components/UI/StashMark";
 import { AccountMenu } from "@/components/UI/AccountMenu";
-import { BuildBadge } from "@/components/UI/BuildBadge";
 import { MemoryIcon } from "@/components/UI/icons";
 import { useTheme } from "@/hooks/useTheme";
 import {
@@ -313,10 +312,6 @@ export default function App() {
         <StashMark className="size-7" />
         <h1 className="text-lg font-semibold leading-none">Stash</h1>
         <div className="ml-auto flex items-center gap-3">
-          {/* The build hash has to stay on screen continuously for the
-              submission's single-take recall beat, so it lives here rather than
-              in the panel bar that just went away. */}
-          <BuildBadge className="hidden sm:inline" />
           <AccountMenu
             name={rememberedName(ledger, recall)}
             currency={ledger.currency}

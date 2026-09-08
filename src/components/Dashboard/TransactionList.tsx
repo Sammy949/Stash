@@ -43,7 +43,7 @@ export function TransactionList({
 }: {
   transactions: Transaction[];
   currency: Currency;
-  /** Restoring from 0G: show the shape of the rows, not a blank card. */
+  /** Restoring the backup: show the shape of the rows, not a blank card. */
   hydrating?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);

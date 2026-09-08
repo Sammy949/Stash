@@ -1,8 +1,8 @@
 /**
  * The Stash brand mark.
  *
- * Placeholder: this renders the app's own logo asset until a proper SVG lands.
- * It is one component so that swap is one file. Decorative by default — every
+ * Renders the brand SVG from /public, kept behind one component so the asset is
+ * swapped in exactly one place. Decorative by default — every
  * place it appears already has a visible label or the message text beside it, so
  * announcing it again would just be noise.
  */
@@ -19,7 +19,11 @@ export function StashMark({
       src="/logo.svg"
       alt={label ?? ""}
       aria-hidden={label ? undefined : true}
-      className={`shrink-0 rounded-lg ${className}`}
+      // No CSS radius: the artwork carries its own rounded silhouette on a
+      // transparent ground, and a `rounded-*` clip on top only shaves its
+      // corners at some sizes (rounded-lg is 28.6% of a 28px mark, but the
+      // mark's own corners are 25%). Let the asset define its shape.
+      className={`shrink-0 ${className}`}
     />
   );
 }

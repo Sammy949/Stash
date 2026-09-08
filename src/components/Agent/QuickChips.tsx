@@ -1,5 +1,5 @@
-/** The "Sync to 0G" chip is intercepted by App; the rest go to the agent. */
-export const SYNC_CHIP = "Sync to 0G";
+/** The back-up chip is intercepted by App; the rest go to the agent. */
+export const SYNC_CHIP = "Back up my data";
 
 /**
  * The "Review my goals" chip. A general query (no goal tool fires), so the
@@ -25,9 +25,13 @@ export const CHIPS = [
 
 /**
  * Conversation starters. Kept as real buttons rather than wrapped in Badge: the
- * 44px touch target and the horizontal-scroll row are load-bearing on phones,
- * and Badge's own sizing fights both. What it does borrow from the new system is
- * scroll-fade-e, so the cut edge reads as "more to the right" instead of clipped.
+ * horizontal-scroll row is load-bearing on phones and Badge's own sizing fights
+ * it. What it does borrow from the new system is scroll-fade-e, so the cut edge
+ * reads as "more to the right" instead of clipped.
+ *
+ * Height is h-8 (32px) — the same control height Input and SelectTrigger
+ * default to, so a chip is measured off the system's base control rather than
+ * being the one 44px object on the page.
  */
 export function QuickChips({
   onPick,
@@ -46,7 +50,7 @@ export function QuickChips({
           type="button"
           onClick={() => onPick(c)}
           disabled={disabled}
-          className="inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-full border border-border bg-background px-3.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-full border border-border bg-background px-3.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground focus-visible:border-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
         >
           {c}
         </button>

@@ -76,7 +76,7 @@ export function useLedger() {
       const result = await saveLedger(current, () => setSyncPhase("uploading"));
       setLedger({ ...ref.current, lastSyncedAt: result.syncedAt });
       setSyncPhase("confirmed");
-      toast.success("Saved locally and backed up to 0G", {
+      toast.success("Saved locally and backed up", {
         description: `Encrypted · Root: ${shortRoot(result.rootHash)}`,
       });
       window.setTimeout(() => setSyncPhase("idle"), 1800);
@@ -86,9 +86,11 @@ export function useLedger() {
       // Persistent "pending" — the local copy is safe; this stays visible
       // until a later sync succeeds, rather than flashing an error away.
       setSyncPhase("pending");
-      toast.warning("Saved locally, but couldn't reach 0G just now", {
+      toast.warning("Saved locally, but the backup didn't go through", {
         description:
-          e instanceof Error ? e.message : "It'll keep retrying; tap Sync to 0G to try now.",
+          e instanceof Error
+            ? e.message
+            : "It'll keep retrying; ask Stash to back up to try now.",
       });
       return false;
     }
