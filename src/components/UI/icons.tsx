@@ -49,7 +49,6 @@ export {
   SunIcon,
   TargetIcon,
   TrashIcon,
-  WalletIcon,
 } from "@phosphor-icons/react";
 
 /**

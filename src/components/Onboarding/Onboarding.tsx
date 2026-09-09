@@ -48,8 +48,8 @@ export type { OnboardingProfile } from "./onboardingModel";
  * first session already has something to recall. The goal is skippable, because
  * a required aspiration is a bad first impression.
  *
- * Deliberately still no login: the hackathon rules require none, and a wallet is
- * only needed later, at the point of locking money into a vault.
+ * Deliberately no login: the hackathon rules require none, and Stash has
+ * nothing to authenticate against — memory is keyed by a configured tenant.
  */
 export function Onboarding({
   onComplete,

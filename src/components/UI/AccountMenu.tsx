@@ -1,6 +1,5 @@
 import type { Currency } from "@/types";
 import { CURRENCY_LIST } from "@/lib/currency";
-import { shortAddress } from "@/lib/wallet";
 import { type ThemeChoice } from "@/hooks/useTheme";
 import { Avatar, AvatarFallback } from "@/components/shadcn/avatar";
 import {
@@ -22,7 +21,6 @@ import {
   SparkleIcon,
   SunIcon,
   SystemThemeIcon,
-  WalletIcon,
 } from "@/components/UI/icons";
 
 /**
@@ -53,8 +51,7 @@ const THEMES: { value: ThemeChoice; label: string; Icon: typeof SunIcon }[] = [
  *
  * Every row here does something today. There is no profile page, no
  * notifications, no billing, no language picker, because none of those exist to
- * configure. The wallet row is the one exception and it says so: disabled, with
- * the reason, rather than a control that looks live and is not.
+ * configure, and nothing here is a placeholder for something that might.
  *
  * Theme is a radio group rather than a sun/moon toggle. That pattern is the
  * stock switch, and more usefully it cannot express "follow my system", which is
@@ -68,11 +65,6 @@ export function AccountMenu({
   onSync,
   syncing = false,
   onStartFresh,
-  walletAddress = null,
-  walletAvailable = false,
-  connectingWallet = false,
-  onConnectWallet,
-  onDisconnectWallet,
   theme,
   onThemeChange,
 }: {
@@ -86,13 +78,6 @@ export function AccountMenu({
   syncing?: boolean;
   /** Clear the transcript. Memory is untouched, which the label says out loud. */
   onStartFresh?: () => void;
-  /** Connected account, or null. Identity only — never a balance. */
-  walletAddress?: string | null;
-  /** Whether an injected EIP-1193 provider exists in this browser. */
-  walletAvailable?: boolean;
-  connectingWallet?: boolean;
-  onConnectWallet?: () => void;
-  onDisconnectWallet?: () => void;
   /**
    * Theme state is owned by App and passed down, rather than this menu calling
    * useTheme itself. The hook keeps its choice in local state, so a second
@@ -184,34 +169,6 @@ export function AccountMenu({
             New conversation
           </DropdownMenuItem>
         )}
-        {/* The account is IDENTITY, not money: connecting decides whose memory
-            Stash reads, and reads no balance. The row still says something
-            honest in every state rather than offering a control that cannot
-            work — with no wallet extension present it explains why instead of
-            opening a prompt into nothing. */}
-        {walletAddress ? (
-          <DropdownMenuItem onClick={onDisconnectWallet}>
-            <WalletIcon className="size-4 text-muted-foreground" />
-            Disconnect
-            <span className="font-data ml-auto pl-3 text-[10px] text-muted-foreground">
-              {shortAddress(walletAddress)}
-            </span>
-          </DropdownMenuItem>
-        ) : walletAvailable ? (
-          <DropdownMenuItem onClick={onConnectWallet} disabled={connectingWallet}>
-            <WalletIcon className="size-4 text-muted-foreground" />
-            {connectingWallet ? "Connecting…" : "Connect wallet"}
-          </DropdownMenuItem>
-        ) : (
-          <DropdownMenuItem disabled>
-            <WalletIcon className="size-4" />
-            Connect wallet
-            <span className="ml-auto pl-3 text-[10px] text-muted-foreground">
-              No wallet found
-            </span>
-          </DropdownMenuItem>
-        )}
-
       </DropdownMenuContent>
     </DropdownMenu>
   );

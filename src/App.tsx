@@ -11,7 +11,6 @@ import { INCOME_SHAPES } from "@/components/Onboarding/onboardingModel";
 import { useLedger } from "@/hooks/useLedger";
 import { useAgent } from "@/hooks/useAgent";
 import { useMemory } from "@/hooks/useMemory";
-import { useWallet } from "@/hooks/useWallet";
 import { StashMark } from "@/components/UI/StashMark";
 import { AccountMenu } from "@/components/UI/AccountMenu";
 import { BuildBadge } from "@/components/UI/BuildBadge";
@@ -72,7 +71,6 @@ export default function App() {
   // has to re-read the pack. Without this the tenant would move while the
   // previous account's remembered habits stayed on screen — and, worse, fed
   // the next turn's observations.
-  const wallet = useWallet(memoryPort.refresh);
   // Read once per mount: the flag is a session decision, not live state.
   const [memoryOff] = useState(memoryDisabled);
   // Owned here, not inside AccountMenu, so the Toaster can be painted in the
@@ -385,17 +383,6 @@ export default function App() {
               startFresh(ledger, localStorage.getItem(LAST_VISIT_KEY));
               setAgentActive(true);
             }}
-            walletAddress={wallet.address}
-            walletAvailable={wallet.available}
-            connectingWallet={wallet.connecting}
-            onConnectWallet={() => {
-              void wallet.connect().catch((e) =>
-                toast.error("Couldn't connect that wallet", {
-                  description: e instanceof Error ? e.message : undefined,
-                }),
-              );
-            }}
-            onDisconnectWallet={wallet.disconnect}
           />
         </div>
       </header>

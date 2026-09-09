@@ -1,5 +1,4 @@
 import type { MemoryKind } from "@/types";
-import { connectedAddress } from "@/lib/wallet";
 
 /**
  * The TS side of the Sibyl boundary.
@@ -173,26 +172,23 @@ const TENANT_RE = /^0x[0-9a-f]{40}$/;
 const NOMEMORY_KEY = "stash_nomemory";
 
 /**
- * Which wallet's memory we are reading.
+ * Whose memory we are reading.
  *
- * The connected account wins, which is what the two duplicated comments here
- * used to promise for "when wallet-connect lands". It has landed: a connected
- * address makes memory genuinely per-person instead of every visitor to the
- * deployed app sharing the one configured tenant. `VITE_MEMORY_TENANT` stays as
- * the fallback so a browser with no wallet extension — and the whole local dev
- * flow — behaves exactly as before.
+ * One configured tenant, `VITE_MEMORY_TENANT`. It is address-shaped for
+ * historical reasons — Sibyl only needs a stable opaque key — and there is no
+ * wallet-connect to override it: an injected account bought identity for a
+ * chain feature this app no longer has, so it was removed rather than left on
+ * screen as a control that does nothing.
  *
- * `?nomemory` still wins over BOTH, and is checked first: the deletion test has
- * to hold whether or not an account is connected. No tenant means no reads, no
- * writes, and every recall resolves to EMPTY_RECALL — the app keeps working and
- * Stash meets a stranger.
+ * `?nomemory` wins, and is checked first: no tenant means no reads, no writes,
+ * and every recall resolves to EMPTY_RECALL — the app keeps working and Stash
+ * meets a stranger. That is the deletion test the demo leans on.
  *
- * Synchronous on purpose; see connectedAddress() for why that matters.
+ * Synchronous on purpose: this is called during render and from non-async code,
+ * so an await here would fire the first memory read against no tenant at all.
  */
 export function resolveTenant(): string | null {
   if (memoryDisabled()) return null;
-  const connected = connectedAddress();
-  if (connected) return connected;
   const raw = (import.meta.env.VITE_MEMORY_TENANT || "").trim().toLowerCase();
   return TENANT_RE.test(raw) ? raw : null;
 }
