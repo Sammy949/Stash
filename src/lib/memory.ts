@@ -1,4 +1,5 @@
 import type { MemoryKind } from "@/types";
+import { connectedAddress } from "@/lib/wallet";
 
 /**
  * The TS side of the Sibyl boundary.
@@ -145,21 +146,26 @@ const TENANT_RE = /^0x[0-9a-f]{40}$/;
 const NOMEMORY_KEY = "stash_nomemory";
 
 /**
- * Which wallet's memory we are reading. Until wallet-connect lands (D4) this
- * is a single configured address, so the whole app shares one tenant; after it,
- * this returns the connected account and each user gets their own memory.
- */
-/**
- * Which wallet's memory we are reading. Until wallet-connect lands (D4) this
- * is a single configured address, so the whole app shares one tenant; after it,
- * this returns the connected account and each user gets their own memory.
+ * Which wallet's memory we are reading.
  *
- * `?nomemory` forces it to null, which is the deletion test: no tenant means no
- * reads, no writes, and every recall resolves to EMPTY_RECALL. The app keeps
- * working and Stash meets a stranger, which is exactly what the judges check.
+ * The connected account wins, which is what the two duplicated comments here
+ * used to promise for "when wallet-connect lands". It has landed: a connected
+ * address makes memory genuinely per-person instead of every visitor to the
+ * deployed app sharing the one configured tenant. `VITE_MEMORY_TENANT` stays as
+ * the fallback so a browser with no wallet extension — and the whole local dev
+ * flow — behaves exactly as before.
+ *
+ * `?nomemory` still wins over BOTH, and is checked first: the deletion test has
+ * to hold whether or not an account is connected. No tenant means no reads, no
+ * writes, and every recall resolves to EMPTY_RECALL — the app keeps working and
+ * Stash meets a stranger.
+ *
+ * Synchronous on purpose; see connectedAddress() for why that matters.
  */
 export function resolveTenant(): string | null {
   if (memoryDisabled()) return null;
+  const connected = connectedAddress();
+  if (connected) return connected;
   const raw = (import.meta.env.VITE_MEMORY_TENANT || "").trim().toLowerCase();
   return TENANT_RE.test(raw) ? raw : null;
 }

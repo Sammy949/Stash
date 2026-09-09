@@ -69,6 +69,16 @@ export const STASH_MODEL = import.meta.env.VITE_AI_MODEL || ROUTER_MODEL;
  * llama-3.3-70b-versatile, was decommissioned by the provider, so every
  * fallback attempt 404'd and the rate-limit path was dead in the water.
  * openai/gpt-oss-20b is verified: HTTP 200, correct tool call, ~1.3s.
+ *
+ * IF THE PRIMARY'S DAILY CAP BITES AGAIN, the swap is one env edit and no code
+ * change: set VITE_AI_MODEL=openai/gpt-oss-20b (and either leave
+ * VITE_AI_FALLBACK_MODEL on 120b, or clear it). Both models were re-probed
+ * against this exact tool schema with tool_choice:required — 120b and 20b each
+ * returned HTTP 200 and a correctly-shaped log_expense call, and a full
+ * runAgentTurn on each committed the right ledger delta — so 20b is a
+ * drop-in for the primary slot, not just a rate-limit parachute. Kept as the
+ * fallback for now because the primary is answering normally again; promoting
+ * it early would trade the better model for a cap that is not currently hit.
  */
 export const FALLBACK_MODEL = import.meta.env.VITE_AI_FALLBACK_MODEL || "";
 
