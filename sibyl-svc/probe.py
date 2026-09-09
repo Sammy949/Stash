@@ -106,8 +106,14 @@ check("tenant isolation: Bob sees none of Ada's memory",
       status == 200 and bob["remembers"] is False)
 
 status, tier = call("GET", "/tier")
-print(f"\n  tier={tier.get('tier')} db={tier.get('db_size_bytes')}B "
-      f"cap={tier.get('soft_cap_bytes')}B used={round(tier.get('pct_used', 0) * 100, 3)}%")
+# An UNCAPPED account returns soft_cap_bytes/pct_used as explicit nulls. The
+# key exists, so `.get(k, 0)` hands back None rather than the default and the
+# arithmetic below used to raise TypeError — the probe crashed on exactly the
+# accounts that have nothing to worry about.
+cap = tier.get("soft_cap_bytes")
+pct = tier.get("pct_used")
+headroom = "uncapped" if cap is None else f"cap={cap}B used={round((pct or 0) * 100, 3)}%"
+print(f"\n  tier={tier.get('tier')} db={tier.get('db_size_bytes')}B {headroom}")
 
 print(f"\n{len(_failures)} failure(s)" if _failures else "\nall checks passed")
 sys.exit(1 if _failures else 0)
