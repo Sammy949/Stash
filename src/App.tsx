@@ -15,6 +15,7 @@ import { useMemory } from "@/hooks/useMemory";
 import { useWallet } from "@/hooks/useWallet";
 import { StashMark } from "@/components/UI/StashMark";
 import { AccountMenu } from "@/components/UI/AccountMenu";
+import { BuildBadge } from "@/components/UI/BuildBadge";
 import { MemoryIcon } from "@/components/UI/icons";
 import { useTheme } from "@/hooks/useTheme";
 import {
@@ -374,6 +375,14 @@ export default function App() {
         <StashMark className="size-7" />
         <h1 className="text-lg font-semibold leading-none">Stash</h1>
         <div className="ml-auto flex items-center gap-3">
+          {/* Proof of freshness, and it is load-bearing for the demo rather
+              than chrome: the recall beat is shot as ONE unbroken take across a
+              reload, and a constant build SHA beside a RUNNING clock is what
+              shows on camera that there was no cut. The clock has to be here,
+              in the always-visible header — it used to sit inside the account
+              menu, where a continuous shot can never see it. Hidden below sm
+              only because a phone header has no room for it. */}
+          <BuildBadge clock className="hidden sm:inline" />
           <AccountMenu
             name={rememberedName(ledger, recall)}
             currency={ledger.currency}
