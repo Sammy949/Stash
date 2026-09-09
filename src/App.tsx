@@ -302,6 +302,62 @@ export default function App() {
             }))
           : [];
 
+  /**
+   * Has a conversation actually started?
+   *
+   * Derived from the transcript, never stored. The opener Stash writes on load
+   * is an assistant message, so the presence of a USER message is the honest
+   * signal that someone asked for something — and it is the same state
+   * `startFresh` clears, so "New conversation" returns to the dashboard without
+   * a second flag to reset. `agentActive` still means what it always meant:
+   * which pane is showing below lg.
+   */
+  const conversing = messages.some((m) => m.role === "user");
+
+  /* The dashboard's content, defined once. Both shells render exactly this;
+     only the column around it differs, so the two states cannot drift. */
+  const dashboardBody = (
+    <>
+      {/* The deletion test, stated on screen. Without this the absence of
+          memory looks like a bug rather than the point being demonstrated. */}
+      {memoryOff && (
+        <Marker role="status" variant="border">
+          <MarkerIcon>
+            <MemoryIcon className="size-4" />
+          </MarkerIcon>
+          <MarkerContent>
+            Memory is switched off for this session. Stash keeps the maths and
+            forgets the person. Drop <code>?nomemory</code> from the URL to
+            bring it back.
+          </MarkerContent>
+        </Marker>
+      )}
+      {recalling ? (
+        <Marker role="status">
+          <MarkerIcon>
+            <MemoryIcon className="size-4" />
+          </MarkerIcon>
+          <MarkerContent className="shimmer">
+            Recalling what I know about you…
+          </MarkerContent>
+        </Marker>
+      ) : (
+        welcome && (
+          <WelcomeBack data={welcome} onDismiss={() => setWelcome(null)} />
+        )
+      )}
+      <Dashboard
+        ledger={ledger}
+        syncPhase={syncPhase}
+        hydrating={hydrating}
+        onPrompt={handleSend}
+        onManage={setManage}
+        highlight={highlight}
+        onHighlightConsumed={consumeHighlight}
+      />
+    </>
+  );
+
   return (
     <div className="flex h-dvh flex-col bg-background text-foreground">
       {/* The ONE app header, at every breakpoint and in every mode. There used
@@ -330,128 +386,99 @@ export default function App() {
           />
         </div>
       </header>
-
       {/*
-        Two panes at lg, one column below it.
+        The shell has two states, and which one you get is derived from the
+        transcript rather than tracked separately: `conversing` is simply
+        "has the user said anything yet". That means a reload lands back on the
+        dashboard for free (the transcript is session-local) and "New
+        conversation" resets it too, without a second flag to keep in sync.
 
-        Below lg this is still Split-Shift: the dashboard and the transcript
-        take turns, and the strip keeps the balance on screen while you talk.
-        At lg they simply both exist — nothing needs to condense when nothing is
-        hidden — so the strip and the swap are scoped to small screens with
-        `lg:` classes rather than a JS breakpoint listener.
-
-        min-h-0 on this row and on both panes is load-bearing. h-dvh gives the
-        page a definite height; every descendant that scrolls needs an unbroken
-        chain of min-h-0 to it, or a flex child refuses to shrink below its
-        content and the composer is pushed off the bottom of the screen.
-        min-w-0 is the same guarantee sideways: without it one long unbroken
-        string in the transcript widens that pane past its share.
+        Before that: ONE full-width dashboard with the composer at its foot.
+        After: the existing two-pane shell, unchanged. Chat is something you
+        open by asking, not a permanent half of the application.
       */}
-      <div className="mx-auto flex w-full min-h-0 max-w-[100rem] flex-1 flex-col lg:flex-row">
-        {/* Dashboard pane. Owns its own width once, here, for everything in it. */}
-        <div
-          className={`min-w-0 flex-col lg:flex lg:min-h-0 lg:flex-[2] lg:border-r lg:border-border ${
-            agentActive ? "hidden" : "flex min-h-0 flex-1"
-          }`}
-        >
-          {/* lg:px-8 — at lg this pane is a ~576px column hard against the
-              window edge, and px-4 left the cards with a 16px gutter on one
-              side while the transcript beside them sat in ~96px of air. */}
-          <main className="flex-1 overflow-y-auto px-4 py-6 lg:px-8">
-            {/* @container, not a viewport breakpoint: inside a 40% pane the
-                dashboard has to lay itself out against the width it actually
-                has, not the width of the window. */}
-            <div className="@container mx-auto w-full max-w-2xl space-y-5">
-              {/* The deletion test, stated on screen. Without this the absence of
-                  memory looks like a bug rather than the point being demonstrated,
-                  and a judge has only my word for which mode they are seeing. */}
-              {memoryOff && (
-                <Marker role="status" variant="border">
-                  <MarkerIcon>
-                    <MemoryIcon className="size-4" />
-                  </MarkerIcon>
-                  <MarkerContent>
-                    Memory is switched off for this session. Stash keeps the
-                    maths and forgets the person. Drop <code>?nomemory</code> from
-                    the URL to bring it back.
-                  </MarkerContent>
-                </Marker>
-              )}
-              {recalling ? (
-                <Marker role="status">
-                  <MarkerIcon>
-                    <MemoryIcon className="size-4" />
-                  </MarkerIcon>
-                  <MarkerContent className="shimmer">
-                    Recalling what I know about you…
-                  </MarkerContent>
-                </Marker>
-              ) : (
-                welcome && (
-                  <WelcomeBack
-                    data={welcome}
-                    onDismiss={() => setWelcome(null)}
-                  />
-                )
-              )}
-              <Dashboard
-                ledger={ledger}
-                syncPhase={syncPhase}
-                hydrating={hydrating}
-                onPrompt={handleSend}
-                onManage={setManage}
-                highlight={highlight}
-                onHighlightConsumed={consumeHighlight}
-              />
-            </div>
-          </main>
-        </div>
-
-        {/* Conversation pane. The command bar lives at its foot in BOTH layouts,
-            which is why this pane is always mounted: below lg, with the
-            transcript closed, the pane collapses to just the composer, so the
-            draft you are typing survives opening and closing the transcript. */}
-        <div
-          className={`flex min-w-0 flex-col lg:min-h-0 lg:flex-[3] ${
-            agentActive ? "min-h-0 flex-1" : "lg:flex-1"
-          }`}
-        >
-          {agentActive && (
-            <div className="lg:hidden">
-              <DashboardStrip
-                ledger={ledger}
-                onExpand={() => setAgentActive(false)}
-              />
-            </div>
-          )}
-
+      {conversing ? (
+        <div className="mx-auto flex w-full min-h-0 max-w-[100rem] flex-1 flex-col lg:flex-row">
+          {/* Dashboard pane. Owns its own width once, here, for everything in it. */}
           <div
-            className={`min-h-0 flex-1 flex-col ${
-              agentActive ? "flex animate-slide-up lg:animate-none" : "hidden lg:flex"
+            className={`min-w-0 flex-col lg:flex lg:min-h-0 lg:flex-[2] lg:border-r lg:border-border ${
+              agentActive ? "hidden" : "flex min-h-0 flex-1"
             }`}
           >
-            <AgentPanel
-              messages={messages}
-              onEditMessage={handleEditMessage}
-              isThinking={isThinking}
-              goals={ledger.goals}
-              scholarships={ledger.scholarships}
-              currency={ledger.currency}
-            />
+            {/* lg:px-8 — at lg this pane is a ~576px column hard against the
+                window edge, and px-4 left the cards with a 16px gutter on one
+                side while the transcript beside them sat in ~96px of air. */}
+            <main className="flex-1 overflow-y-auto px-4 py-6 lg:px-8">
+              <div className="@container mx-auto w-full max-w-2xl space-y-5">
+                {dashboardBody}
+              </div>
+            </main>
           </div>
 
-          <div className="shrink-0">
-            <CommandBar
-              onSend={handleSend}
-              onStop={stop}
-              isThinking={isThinking}
-              active={agentActive}
-              onOpenPanel={() => setAgentActive(true)}
-              canOpenPanel={!agentActive && messages.length > 0}
-            />
+          {/* Conversation pane. The command bar lives at its foot in BOTH
+              layouts, which is why this pane is always mounted: below lg, with
+              the transcript closed, the pane collapses to just the composer, so
+              the draft you are typing survives opening and closing it. */}
+          <div
+            className={`flex min-w-0 flex-col lg:min-h-0 lg:flex-[3] ${
+              agentActive ? "min-h-0 flex-1" : "lg:flex-1"
+            }`}
+          >
+            {agentActive && (
+              <div className="lg:hidden">
+                <DashboardStrip
+                  ledger={ledger}
+                  onExpand={() => setAgentActive(false)}
+                />
+              </div>
+            )}
+
+            <div
+              className={`min-h-0 flex-1 flex-col ${
+                agentActive ? "flex animate-slide-up lg:animate-none" : "hidden lg:flex"
+              }`}
+            >
+              <AgentPanel
+                messages={messages}
+                onEditMessage={handleEditMessage}
+                isThinking={isThinking}
+                goals={ledger.goals}
+                scholarships={ledger.scholarships}
+                currency={ledger.currency}
+              />
+            </div>
+
+            <div className="shrink-0">
+              <CommandBar
+                onSend={handleSend}
+                onStop={stop}
+                isThinking={isThinking}
+                active={agentActive}
+                onOpenPanel={() => setAgentActive(true)}
+                canOpenPanel={!agentActive}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        /* Home. One column, the dashboard scrolling above a composer pinned to
+           the foot of the screen — the composer is bottom-anchored rather than
+           floating mid-page, and shares the dashboard's max width so their
+           edges line up on the same axis. max-w-4xl rather than the pane's
+           2xl: with no transcript beside it there is real room, and at 896px
+           the dashboard's own @container queries pair the two secondary
+           trackers side by side instead of stacking them down a narrow strip. */
+        <div className="flex min-h-0 flex-1 flex-col">
+          <main className="flex-1 overflow-y-auto px-4 py-8 sm:px-6">
+            <div className="@container mx-auto w-full max-w-4xl space-y-6">
+              {dashboardBody}
+            </div>
+          </main>
+          <div className="shrink-0">
+            <CommandBar onSend={handleSend} isThinking={isThinking} compact />
+          </div>
+        </div>
+      )}
 
       {manage && manageItems.length > 0 && (
         <ManageSheet

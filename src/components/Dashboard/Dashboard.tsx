@@ -26,8 +26,11 @@ function Highlight({ on, children }: { on: boolean; children: ReactNode }) {
 /**
  * Full dashboard — the default, front-facing view.
  *
- * Order: the balance instrument → Recent Activity (the pulse) → the two
- * trackers as a paired row (stacked on mobile, side-by-side on ≥sm) → Goals.
+ * Order IS the hierarchy, and it is deliberate: the balance instrument →
+ * Recent Activity (the pulse) → Goals — what you are working toward — and only
+ * then the two ledgers as a paired secondary row. Scholarships and hustles are
+ * real, but they are reference material; putting them above Goals let them
+ * compete with the three things the dashboard exists to answer.
  * The whole view fades in as one unit (no stagger — keeps it stable); the
  * section a turn changed gets a one-shot highlight, played when the user
  * returns here.
@@ -95,6 +98,15 @@ export function Dashboard({
           />
         </Highlight>
 
+        <Highlight on={highlight === "goals"}>
+          <GoalsPanel
+            goals={goals}
+            currency={ledger.currency}
+            onManage={() => onManage("goals")}
+            onAdd={() => onPrompt("I want to set a savings goal.")}
+          />
+        </Highlight>
+
         {/* @2xl, not sm: this keys off the DASHBOARD's width, not the window's.
             In the lg two-pane layout the dashboard is a ~40% column, so a
             viewport breakpoint would have paired these up at ~270px each on a
@@ -126,14 +138,6 @@ export function Dashboard({
           </Highlight>
         </div>
 
-        <Highlight on={highlight === "goals"}>
-          <GoalsPanel
-            goals={goals}
-            currency={ledger.currency}
-            onManage={() => onManage("goals")}
-            onAdd={() => onPrompt("I want to set a savings goal.")}
-          />
-        </Highlight>
       </div>
     </FadeIn>
   );
