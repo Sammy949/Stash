@@ -23,6 +23,7 @@ import {
 } from "@/components/shadcn/marker";
 import { ensureStorageSchema } from "@/lib/localLedger";
 import { deriveObservation } from "@/lib/observations";
+import { journalCommittedTurn } from "@/lib/memoryJournal";
 import { deriveWelcomeBack } from "@/lib/welcomeBack";
 import type { WelcomeBack as WelcomeBackData } from "@/lib/welcomeBack";
 import { rememberedCount, rememberedName } from "@/lib/opener";
@@ -192,6 +193,13 @@ export default function App() {
       // after the agent's reply. Stays silent when there's nothing to say.
       const observation = deriveObservation(before, updated, memoryPort.read());
       if (observation) pushAssistant(observation);
+      // Second home for the event: local is the instant working copy, Sibyl's
+      // COLD tier is the durable temporal history. Fired from here because
+      // this callback runs only on a COMMITTED mutation, so the journal can
+      // never record money that did not move. Not awaited, and it cannot
+      // throw — the reply must not wait on a write, and a sidecar that is down
+      // must degrade to "no journal entry", never to a broken turn.
+      void journalCommittedTurn(before, updated);
     }).then((ok) => {
       // Inline spending breakdown — code-computed, attached after the agent's
       // prose reply. Numbers are code-owned; the model never sees/derives them.
@@ -226,6 +234,10 @@ export default function App() {
           if (changed) setHighlight(changed);
           const observation = deriveObservation(before, updated, memoryPort.read());
           if (observation) pushAssistant(observation);
+          // Same journal write as a normal turn. `before` is the RESTORED
+          // snapshot the edit rewound to, so the diff is what the edited turn
+          // actually did, not what the original one did.
+          void journalCommittedTurn(before, updated);
         },
       );
       if (ok) {
