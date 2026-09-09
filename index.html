@@ -24,6 +24,23 @@
       media="(prefers-color-scheme: dark)"
       content="#0d0c0a"
     />
+    <!-- Open Graph / Twitter. Absolute URLs on purpose: crawlers do not resolve
+         relative paths, which is the usual reason a card renders with no image.
+         og:image is a real 1200x630 PNG built from the app's own palette and
+         type (source: notes/og/og-card.svg) rather than a scaled-up icon. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Stash" />
+    <meta property="og:title" content="Stash - a finance agent that already knows you" />
+    <meta property="og:description" content="A finance agent for money that arrives in bursts. Know where you stand, see what's coming, stay ahead." />
+    <meta property="og:url" content="https://heystash.app/" />
+    <meta property="og:image" content="https://heystash.app/og-cover.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Stash - a finance agent that already knows you" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Stash - a finance agent that already knows you" />
+    <meta name="twitter:description" content="A finance agent for money that arrives in bursts. Know where you stand, see what's coming, stay ahead." />
+    <meta name="twitter:image" content="https://heystash.app/og-cover.png" />
     <title>Stash · Personal finance agent</title>
   </head>
   <body>
