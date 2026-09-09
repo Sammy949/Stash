@@ -1,5 +1,5 @@
 # Pinned: this service is the durable home of user memory, so builds stay reproducible.
-sibyl-memory-client==0.8.0
+sibyl-memory-client==0.8.1
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
 # Loads sibyl-svc/.env so the service starts identically from any cwd.
