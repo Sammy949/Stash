@@ -8,14 +8,28 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import sys
 import urllib.error
 import urllib.request
 
 BASE = (sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8787").rstrip("/")
 TOKEN = os.environ["STASH_SVC_TOKEN"]
-ALICE = "0x" + "a1" * 20
-BOB = "0x" + "b2" * 20
+# Fresh tenants per run, not fixed addresses.
+#
+# The probe asserts a tenant starts empty ("fresh tenant remembers nothing" —
+# the deletion-test path) and then asserts exact counts. Against fixed
+# addresses that is a one-shot script: the first run leaves Ada populated, so
+# every run after it fails those two checks and looks like a regression when
+# nothing is wrong. Randomising the tenant makes it idempotent, so it can be
+# re-run against the LIVE service any number of times — which is the point on a
+# judging day, when "run it now and watch it go green" is the whole value.
+#
+# Still valid wallet addresses (0x + 40 hex), because the service rejects
+# anything else, and still two distinct tenants so the isolation check is real.
+_RUN = secrets.token_hex(18)
+ALICE = "0x" + "a1" * 2 + _RUN
+BOB = "0x" + "b2" * 2 + _RUN
 
 _failures: list[str] = []
 
