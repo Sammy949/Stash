@@ -1,0 +1,22 @@
+# What Vercel uploads. NOT the same list as .gitignore — the CLI does not read
+# that file, so anything excluded there is still uploaded unless it is named
+# here. The deploy that prompted this died reading test-ledger/admin.rpc, a
+# unix socket left by a Solana test validator; the same directory also holds
+# faucet-keypair.json, which has no business inside a deployment bundle.
+
+# Solana test-validator leftovers: a socket the uploader cannot read, ~40MB of
+# ledger, and a keypair.
+test-ledger/
+
+# The Python memory sidecar. Deployed separately to its own host; Vercel only
+# ever talks to it over HTTP from api/memory.ts.
+sibyl-svc/
+
+# Working notes, storyboards, QA scripts — gitignored, and not part of the app.
+notes/
+
+# Built locally; Vercel runs its own build.
+dist/
+
+.env
+.env.*
