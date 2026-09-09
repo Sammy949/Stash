@@ -14,8 +14,8 @@ Live: **[heystash.app](https://heystash.app)**
 
 Stash's transcript is session-local. Reload the page and the conversation is
 gone. What survives is everything that matters about *you* — stored in
-[Sibyl Memory](https://sibyllabs.org) through a sidecar service, keyed to a
-wallet address.
+[Sibyl Memory](https://sibyllabs.org) through a sidecar service, filed under a
+tenant id.
 
 That gap is the point. A fresh session opens with a blank chat and a Stash that
 still knows your goal, your habits, and what moved since you were last here.
@@ -143,8 +143,8 @@ Copy `.env.example` to `.env` and fill in:
 - `SIBYL_SVC_URL` / `SIBYL_SVC_TOKEN` — the memory sidecar (server-side only,
   deliberately no `VITE_` prefix: a public service token would let anyone read
   any tenant's memory)
-- `VITE_MEMORY_TENANT` — which wallet's memory to read when no wallet is
-  connected
+- `VITE_MEMORY_TENANT` — whose memory to read. An address-shaped id, because
+  the sidecar validates that shape; nothing in the app connects a wallet
 
 Running the sidecar and verifying it:
 
@@ -162,12 +162,17 @@ export STASH_SVC_TOKEN=$(python3 -c "import secrets;print(secrets.token_urlsafe(
 
 ## Honest limitations
 
-- **Tenant ownership is not yet proven.** Connecting a wallet is a claim, not a
-  signature — SIWE is the next step. Until then the sidecar's bearer token is the
-  only gate, and a token holder can address any tenant.
-- **Keys in the dev bundle.** Local development reads `VITE_`-prefixed keys in the
-  browser; use throwaway testnet credentials only. Production moves 0G signing
-  and the memory token server-side.
+- **There is no wallet, and no chain code.** Stash reads no balance, signs
+  nothing and submits nothing on-chain. The tenant id is address-shaped because
+  the sidecar validates that shape, not because an account is connected. A
+  wallet-connect layer was built and then removed: with the 0G backup gone and
+  no Base integration shipped, it was identity nobody could see and a
+  dependency the product did not earn.
+- **Tenant ownership is therefore not proven.** Whoever holds the service token
+  can address any tenant. Signed sign-in (SIWE) is what would fix this, and it
+  is not built.
+- **The ledger is local-only.** Clear the browser and the numbers are gone. What
+  survives is the memory, which is the part worth carrying.
 - **Search is keyword, not semantic.** FTS5 over stored text.
 
 ---
