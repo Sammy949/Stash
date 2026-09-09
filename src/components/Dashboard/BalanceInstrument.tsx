@@ -2,7 +2,6 @@ import type { Ledger } from "@/types";
 import {
   balance,
   balanceSeries,
-  totalActiveIncome,
   totalExpenses,
   totalIncome,
 } from "@/lib/ledger";
@@ -39,19 +38,6 @@ export function BalanceInstrument({
   const expenses = totalExpenses(ledger);
   const overdrawn = bal < 0;
   const started = ledger.transactions.length > 0;
-
-  // Recurring monthly income from active streams. This came here when the
-  // Hustle Ledger card was retired, and the instrument is where it belongs:
-  // "what regularly arrives" is the forecast that gives a balance its meaning,
-  // which matters most for exactly the irregular-income student Stash is for.
-  //
-  // The count has to be of ACTIVE streams, not of every hustle on file:
-  // `totalActiveIncome` only sums the active ones, so counting all of them
-  // would caption the figure with a number it does not cover — three streams
-  // on record, one of them active, and the line would claim the amount came
-  // from three.
-  const expected = totalActiveIncome(ledger.hustles);
-  const activeStreams = ledger.hustles.filter((h) => h.status === "active").length;
 
   const series = balanceSeries(ledger, WINDOW_DAYS);
   const geo = traceGeometry(series);
@@ -94,29 +80,6 @@ export function BalanceInstrument({
           <div className="h-8 w-px shrink-0 bg-border" aria-hidden />
           <Flow label="Out" value={expenses} currency={ledger.currency} started={started} tone="out" />
         </div>
-
-        {/* The forecast, stated as a sentence rather than a third figure in the
-            flow row above. That row is actuals — money that genuinely moved —
-            and dropping an expectation in beside them as a matching column
-            would make a forecast look like a measurement.
-
-            It also stays in plain ink, with only the amount set in the data
-            face. Income colour is reserved for money that actually arrived; a
-            stream you have declared has not arrived yet, and tinting it the
-            same green would quietly claim otherwise. */}
-        {expected > 0 && (
-          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-            Expecting{" "}
-            <span className="font-data text-foreground">
-              {formatMoney(expected, ledger.currency)}
-            </span>{" "}
-            a month from{" "}
-            {activeStreams === 1
-              ? "one income stream"
-              : `${activeStreams} income streams`}
-            .
-          </p>
-        )}
 
         {!started && (
           <p className="mt-4 text-xs leading-relaxed text-muted-foreground">

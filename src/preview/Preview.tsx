@@ -1,10 +1,7 @@
 import { useState } from "react";
 import type { Ledger, Transaction } from "@/types";
 import { EMPTY_LEDGER, balance, balanceSeries } from "@/lib/ledger";
-import { deriveAttention } from "@/lib/attention";
 import { BalanceInstrument } from "@/components/Dashboard/BalanceInstrument";
-import { AttentionSlot } from "@/components/Dashboard/AttentionSlot";
-import { TrackingStrip } from "@/components/Dashboard/TrackingStrip";
 import { formatMoney } from "@/lib/currency";
 import { Card, CardContent } from "@/components/shadcn/card";
 import { useTheme } from "@/hooks/useTheme";
@@ -95,102 +92,6 @@ function steadyLedger(): Ledger {
   return { ...EMPTY_LEDGER, currency: "GBP", openingBalance: 500 };
 }
 
-/** Two deadlines, the nearer one inside the red band, so the slot has to pick. */
-function deadlineLedger(): Ledger {
-  const at = (days: number) =>
-    new Date(Date.now() + days * DAY).toISOString();
-  return {
-    ...EMPTY_LEDGER,
-    currency: "GBP",
-    scholarships: [
-      {
-        id: "sch-1",
-        name: "MTN Foundation",
-        status: "deadline",
-        statusLabel: "Open",
-        deadline: at(3),
-        color: "emerald",
-      },
-      {
-        id: "sch-2",
-        name: "Chevening",
-        status: "deadline",
-        statusLabel: "Open",
-        deadline: at(52),
-        color: "emerald",
-      },
-    ],
-  };
-}
-
-/** Enough spend history for a pace, and not much left to spend at it. */
-function tightRunwayLedger(): Ledger {
-  const now = Date.now();
-  return {
-    ...EMPTY_LEDGER,
-    currency: "GBP",
-    openingBalance: 300,
-    transactions: [22, 14, 7, 2].map((d, i) => ({
-      id: `run-${i}`,
-      type: "expense" as const,
-      amount: 55,
-      label: "Groceries",
-      category: "food" as const,
-      createdAt: new Date(now - d * DAY).toISOString(),
-    })),
-  };
-}
-
-/** A goal past the 90% line, for the one rule that is good news. */
-function nearlyDoneGoalLedger(): Ledger {
-  return {
-    ...EMPTY_LEDGER,
-    currency: "GBP",
-    goals: [
-      {
-        id: "goal-1",
-        name: "Replacement laptop",
-        targetAmount: 900,
-        savedAmount: 860,
-        createdAt: new Date(Date.now() - 60 * DAY).toISOString(),
-        events: [],
-      },
-    ],
-  };
-}
-
-/**
- * Two streams, ONE of them active. The instrument's folded forecast has to
- * caption its figure with the active count (1), never the total on file (2) —
- * `totalActiveIncome` only sums active streams, so saying "2" would attach the
- * number to money that is not arriving.
- */
-function hustlesLedger(): Ledger {
-  return {
-    ...EMPTY_LEDGER,
-    currency: "GBP",
-    openingBalance: 420,
-    hustles: [
-      {
-        id: "h-1",
-        name: "Tutoring, two evenings",
-        amountLabel: "£180/mo",
-        monthlyValue: 180,
-        tag: "Teaching",
-        status: "active",
-      },
-      {
-        id: "h-2",
-        name: "Brand identity retainer",
-        amountLabel: "£400/mo",
-        monthlyValue: 400,
-        tag: "Design",
-        status: "pending",
-      },
-    ],
-  };
-}
-
 export default function Preview() {
   const { theme, setTheme } = useTheme();
   const [days, setDays] = useState(30);
@@ -242,99 +143,35 @@ export default function Preview() {
         </Section>
 
         <Section
-          title="2 · The attention slot"
-          note="Absent unless something is genuinely urgent — that absence is the point, so the first frame here is the one that should be empty. Exactly one rule ever fires: a deadline inside 7 days, else a runway under 14, else a goal past 90%. Rule order and every boundary are verified by an executed check, not by eye."
-        >
-          <div className="grid gap-5 lg:grid-cols-2">
-            <Labelled label="Nothing urgent (renders nothing at all)">
-              <AttentionSlot attention={null} onAct={() => {}} />
-            </Labelled>
-            <Labelled label="Deadline inside the red band">
-              <AttentionSlot
-                attention={deriveAttention(deadlineLedger())}
-                onAct={() => {}}
-              />
-            </Labelled>
-            <Labelled label="Runway under two weeks">
-              <AttentionSlot
-                attention={deriveAttention(tightRunwayLedger())}
-                onAct={() => {}}
-              />
-            </Labelled>
-            <Labelled label="A goal within reach (accent, not the warning amber)">
-              <AttentionSlot
-                attention={deriveAttention(nearlyDoneGoalLedger())}
-                onAct={() => {}}
-              />
-            </Labelled>
-          </div>
-        </Section>
-
-        <Section
-          title="3 · The tracking strip"
-          note="What replaced the Scholarship Radar and Hustle Ledger cards. Two segments on one grid so the divider sits dead centre whichever label is longer; a populated segment opens the sheet, an empty one keeps the invitation the old card's empty state carried."
-        >
-          <div className="grid gap-5 lg:grid-cols-2">
-            <Labelled label="Both empty (the invitation)">
-              <TrackingStrip
-                scholarships={[]}
-                hustles={[]}
-                onOpen={() => {}}
-                onPrompt={() => {}}
-              />
-            </Labelled>
-            <Labelled label="Both populated">
-              <TrackingStrip
-                scholarships={deadlineLedger().scholarships}
-                hustles={hustlesLedger().hustles}
-                onOpen={() => {}}
-                onPrompt={() => {}}
-              />
-            </Labelled>
-            <Labelled label="Mixed, and singular labels (1 / 1)">
-              <TrackingStrip
-                scholarships={deadlineLedger().scholarships.slice(0, 1)}
-                hustles={hustlesLedger().hustles.slice(0, 1)}
-                onOpen={() => {}}
-                onPrompt={() => {}}
-              />
-            </Labelled>
-            <Labelled label="Instrument with the folded forecast (1 of 2 streams active)">
-              <BalanceInstrument ledger={hustlesLedger()} />
-            </Labelled>
-          </div>
-        </Section>
-
-        <Section
-          title="4 · The trace, against its own numbers"
+          title="2 · The trace, against its own numbers"
           note="The last point of the trace must equal the balance exactly. Proven in notes/qa/series-probe.mjs; shown here so it can be read off the screen too."
         >
           <SeriesTable days={days} onDays={setDays} />
         </Section>
 
         <Section
-          title="5 · Palette"
+          title="3 · Palette"
           note="One hue (75) at chroma <= 0.008 carries every surface and ink. Colour appears only where it means something about money."
         >
           <Swatches />
         </Section>
 
         <Section
-          title="6 · Radius"
+          title="4 · Radius"
           note="Three steps, by meaning. Tailwind's xl and 2xl are pinned to the container step so vendored code cannot introduce a fourth."
         >
           <Radii />
         </Section>
 
         <Section
-          title="7 · Type"
+          title="5 · Type"
           note="Geist for prose, Geist Mono for every figure. The mono is load-bearing here rather than decorative."
         >
           <TypeScale />
         </Section>
 
         <Section
-          title="8 · Onboarding"
+          title="6 · Onboarding"
           note="Four steps, no auth. Currency and amount are collapsed into one field. The right panel is the real instrument calibrating from your answers, replacing four decorative scenes. Fully interactive: complete it and it logs the profile it would have created rather than entering the app."
         >
           <OnboardingFrame />
