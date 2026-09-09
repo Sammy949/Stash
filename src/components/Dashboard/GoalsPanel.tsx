@@ -27,6 +27,7 @@ export function GoalsPanel({
   currency,
   onManage,
   onAdd,
+  onOpen,
 }: {
   goals: Goal[];
   currency: Currency;
@@ -34,6 +35,8 @@ export function GoalsPanel({
   onManage?: () => void;
   /** Prime the agent to set the first target, from the empty state. */
   onAdd?: () => void;
+  /** Open one goal's history. Rows are inert without it. */
+  onOpen?: (goal: Goal) => void;
 }) {
   const overflow = onManage && goals.length > VISIBLE;
   const shown = overflow ? goals.slice(0, VISIBLE) : goals;
@@ -67,16 +70,44 @@ export function GoalsPanel({
           action={onAdd ? { label: "Set a goal", onClick: onAdd } : undefined}
         />
       ) : (
-        <ItemGroup>
+        <ItemGroup
+          // A clickable goal is a real <button>, and a button cannot also be a
+          // listitem: an explicit role would override the one that actually
+          // matters to assistive tech. So the group drops its list semantics
+          // exactly when its rows become controls, the same trade PendingRows
+          // makes in TransactionList.
+          role={onOpen ? "presentation" : undefined}
+        >
           {shown.map((g) => {
             const pct = goalProgressPct(g);
             const done = isGoalComplete(g);
             return (
               <Item
                 key={g.id}
-                role="listitem"
+                role={onOpen ? undefined : "listitem"}
                 size="sm"
-                className="flex-col items-stretch gap-2 px-0"
+                // A goal opens its own history, so the row IS the control —
+                // rendered as a real button rather than a div with a click
+                // handler, which is what keeps it keyboard-reachable.
+                //
+                // The hover state is a tonal step off the card and nothing
+                // else: no lift, no shadow, no glowing edge. The negative
+                // margin lets that tone sit in its own padding without pushing
+                // the row's content off the alignment the other sections share.
+                render={
+                  onOpen ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpen(g)}
+                      aria-label={`${g.name}: open history`}
+                    />
+                  ) : undefined
+                }
+                className={`flex-col items-stretch gap-2 px-0 ${
+                  onOpen
+                    ? "-mx-2 w-[calc(100%+1rem)] cursor-pointer rounded-md px-2 py-1.5 text-left outline-none transition-colors hover:bg-foreground/[0.04] focus-visible:bg-foreground/[0.04]"
+                    : ""
+                }`}
               >
                 <ItemContent className="gap-2">
                   <ItemHeader>

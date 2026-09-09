@@ -99,7 +99,34 @@ export type MemoryOp =
       name: string;
       body: Record<string, unknown>;
     }
-  | { op: "archive"; category: MemoryCategory; name: string; reason?: string };
+  | { op: "archive"; category: MemoryCategory; name: string; reason?: string }
+  | { op: "journal"; entry: GoalJournalEntry };
+
+/**
+ * The WHY behind one goal history entry, written to Sibyl's COLD journal.
+ *
+ * The ledger already holds what happened and when, deterministically. This
+ * holds the one thing code cannot know — the reason, in the user's own words,
+ * captured by the model at the moment they said it. Keeping the note HERE and
+ * nowhere else is deliberate: the goal detail view renders its numbers from the
+ * ledger whatever happens, and switching memory off (`?nomemory`) or wiping the
+ * service visibly strips the voice from the history while every figure stands.
+ * That is the demonstration, made concrete on a surface you can point at.
+ *
+ * `goalEventId` is the join key back onto the ledger's `GoalEvent.id`.
+ */
+export interface GoalJournalEntry {
+  goalId: string;
+  goalEventId: string;
+  goalName: string;
+  kind: string;
+  /** The reason, in the user's words. Short. */
+  note: string;
+  /** Signed money delta, when the entry is a contribution. */
+  amount?: number;
+  /** ISO timestamp — the ledger event's own, so the two records agree. */
+  at: string;
+}
 
 /**
  * The seam the agent and the views read memory through. Ref-backed by useMemory,
@@ -263,9 +290,75 @@ export async function archiveMemory(
 /** Journal a money event to the COLD tier: the durable temporal history. */
 export async function writeMoneyEvent(
   tenant: string,
-  event: { evaluated: unknown; acted: unknown; forward: unknown },
+  event: {
+    evaluated: unknown;
+    acted: unknown;
+    forward: unknown;
+    /** Structured tags the reader filters on. Not interpreted by Sibyl. */
+    extra?: unknown;
+    /** Override the journal timestamp so it matches the ledger row exactly. */
+    ts?: string;
+  },
 ): Promise<void> {
   await request("event", tenant, { method: "POST", body: JSON.stringify(event) });
+}
+
+/**
+ * Journal the reason behind one goal history entry.
+ *
+ * `extra` carries the join keys, which is what makes these events findable
+ * later: the COLD journal is a flat chronological log with no query language of
+ * its own, so the reader pulls a page and matches on `extra.goalEventId`.
+ */
+export async function journalGoalEvent(
+  tenant: string,
+  entry: GoalJournalEntry,
+): Promise<void> {
+  await writeMoneyEvent(tenant, {
+    evaluated: { goal: entry.goalName, kind: entry.kind },
+    acted: { note: entry.note, amount: entry.amount ?? null },
+    forward: null,
+    extra: {
+      goalId: entry.goalId,
+      goalEventId: entry.goalEventId,
+      kind: entry.kind,
+    },
+    ts: entry.at,
+  });
+}
+
+/**
+ * Every remembered note for one goal, keyed by the ledger event it belongs to.
+ *
+ * Never throws, for the same reason recall doesn't: the detail view's numbers
+ * come from the ledger and must render regardless. An unreachable sidecar, a
+ * disabled memory session, or a tenant with nothing stored all resolve to an
+ * empty map, and the timeline simply shows the facts without the voice.
+ */
+export async function fetchGoalNotes(
+  goalId: string,
+  signal?: AbortSignal,
+): Promise<Map<string, string>> {
+  const notes = new Map<string, string>();
+  const tenant = resolveTenant();
+  if (!tenant) return notes;
+  try {
+    const res = (await request("events", tenant, {
+      signal,
+      query: { limit: "200" },
+    })) as { events?: MemoryEvent[] };
+    for (const ev of res?.events ?? []) {
+      const extra = (ev.extra ?? {}) as Record<string, unknown>;
+      if (extra.goalId !== goalId) continue;
+      const eventId = typeof extra.goalEventId === "string" ? extra.goalEventId : "";
+      const acted = (ev.acted ?? {}) as Record<string, unknown>;
+      const note = typeof acted.note === "string" ? acted.note.trim() : "";
+      if (eventId && note) notes.set(eventId, note);
+    }
+  } catch {
+    // Memory being down must never break the history. Facts only, then.
+  }
+  return notes;
 }
 
 /** Refresh the HOT financial snapshot the opener greets the user with. */
@@ -298,6 +391,8 @@ export async function applyMemoryOps(
     try {
       if (op.op === "write") {
         await writeMemory(tenant, op.category, op.name, op.body);
+      } else if (op.op === "journal") {
+        await journalGoalEvent(tenant, op.entry);
       } else {
         await archiveMemory(tenant, op.category, op.name, op.reason);
       }

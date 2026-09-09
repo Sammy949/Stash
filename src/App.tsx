@@ -32,6 +32,7 @@ import { memoryDisabled, rememberOnboarding } from "@/lib/memory";
 import { analyzeSpending, isSpendingQuery } from "@/lib/analysis";
 import {
   addGoal,
+  getGoals,
   goalProgressPct,
   radarBadge,
   removeGoal,
@@ -40,6 +41,7 @@ import {
 } from "@/lib/ledger";
 import { formatMoneyCompact } from "@/lib/currency";
 import { ManageSheet } from "@/components/Dashboard/ManageSheet";
+import { GoalDetail } from "@/components/Dashboard/GoalDetail";
 import type { ManageItem } from "@/components/Dashboard/ManageSheet";
 import type { Ledger } from "@/types";
 
@@ -116,6 +118,13 @@ export default function App() {
   const [manage, setManage] = useState<
     "scholarships" | "hustles" | "goals" | null
   >(null);
+
+  // Which goal's history is open. The ID, not the goal — so a turn that
+  // contributes while the detail is open updates what's on screen, and a goal
+  // the agent removes closes it instead of stranding a copy of something the
+  // ledger no longer has.
+  const [openGoalId, setOpenGoalId] = useState<string | null>(null);
+  const openGoal = getGoals(ledger).find((g) => g.id === openGoalId) ?? null;
 
   // Welcome-back greeting — "Since you were last here…". Computed ONCE per load,
   // after the ledger has hydrated, from the deterministic delta vs the last
@@ -359,6 +368,7 @@ export default function App() {
         hydrating={hydrating}
         onPrompt={handleSend}
         onManage={setManage}
+        onOpenGoal={(g) => setOpenGoalId(g.id)}
         highlight={highlight}
         onHighlightConsumed={consumeHighlight}
       />
@@ -528,6 +538,20 @@ export default function App() {
           onClose={() => setManage(null)}
         />
       )}
+
+      {/* One goal, opened up: its standing, and everything that happened to it.
+          "Ask Stash about this" hands the goal to the conversation rather than
+          answering inside the detail — the agent stays the one place that
+          talks. */}
+      <GoalDetail
+        goal={openGoal}
+        currency={ledger.currency}
+        onClose={() => setOpenGoalId(null)}
+        onAsk={(g) => {
+          setOpenGoalId(null);
+          void handleSend(`How am I doing on ${g.name}?`);
+        }}
+      />
 
       {/* Follows the app's own theme. It was pinned to "dark", which since the
           two-mode palette landed meant a dark toast dropped onto a light page. */}

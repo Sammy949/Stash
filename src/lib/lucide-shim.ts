@@ -17,15 +17,21 @@
  * Weight comes from the IconContext.Provider in main.tsx, same as the app's own
  * icons, so the whole interface is one weight.
  *
- * CheckIcon is the exception, and it is re-exported from the app's own icon
- * vocabulary rather than from phosphor directly. Phosphor's `fill` Check is a
- * rounded square with the tick knocked out of it, so under the global fill
- * provider every vendored tick — the theme and currency radio items, the
- * checkbox, the command list — rendered as a mark inside a box. icons.tsx
- * already carries the corrected (bold) version; pointing at it means there is
- * ONE definition and the two cannot drift apart again.
+ * Check, X, Plus and Minus are the exceptions, and they are re-exported from
+ * the app's own icon vocabulary rather than from phosphor directly. Phosphor's
+ * `fill` weight for all four is a rounded square with the mark knocked out of
+ * it, so under the global fill provider every vendored tick, close and add
+ * control rendered as a glyph inside a filled tile: the theme and currency
+ * radio items, the checkbox, the command list, and every dialog's close button.
+ * icons.tsx carries the corrected (bold) versions; pointing at it means there
+ * is ONE definition and the two cannot drift apart again.
  */
-export { CheckIcon } from "@/components/UI/icons";
+export {
+  CheckIcon,
+  CloseIcon as XIcon,
+  MinusIcon,
+  PlusIcon,
+} from "@/components/UI/icons";
 
 export {
   ArrowDownIcon,
@@ -37,12 +43,10 @@ export {
   DotsThreeIcon as MoreHorizontalIcon,
   InfoIcon,
   MagnifyingGlassIcon as SearchIcon,
-  MinusIcon,
   // lucide's Loader2 is a spinner arc; phosphor's Spinner is the same idea.
   SpinnerIcon as Loader2Icon,
   // lucide's PanelLeft is a sidebar toggle.
   SidebarSimpleIcon as PanelLeftIcon,
   WarningIcon as TriangleAlertIcon,
   WarningOctagonIcon as OctagonXIcon,
-  XIcon,
 } from "@phosphor-icons/react";

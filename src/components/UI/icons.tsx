@@ -12,7 +12,12 @@
  * Not icons, so not here: the brand mark (see StashMark), the balance trace in
  * BalanceInstrument (data visualisation), and the onboarding scene art.
  */
-import { CheckIcon as PhosphorCheckIcon } from "@phosphor-icons/react";
+import {
+  CheckIcon as PhosphorCheckIcon,
+  MinusIcon as PhosphorMinusIcon,
+  PlusIcon as PhosphorPlusIcon,
+  XIcon as PhosphorXIcon,
+} from "@phosphor-icons/react";
 import type { ComponentProps } from "react";
 
 export {
@@ -33,7 +38,6 @@ export {
   MoonIcon,
   PaperPlaneTiltIcon as SendIcon,
   PencilSimpleIcon as PencilIcon,
-  PlusIcon,
   ReceiptIcon,
   SparkleIcon,
   StopIcon,
@@ -41,24 +45,41 @@ export {
   TargetIcon,
   TrashIcon,
   WalletIcon,
-  XIcon as CloseIcon,
 } from "@phosphor-icons/react";
 
 /**
- * The one documented exception to "weight comes from the provider".
+ * The documented exceptions to "weight comes from the provider".
  *
- * Phosphor's `fill` weight for Check is not a heavier checkmark: it is a
- * ROUNDED SQUARE with the check knocked out of it (verified in the package
- * source, `defs/Check.es.js` — the fill path opens `M216,40H40A16,16,...`).
- * Under the global fill provider, every "done" tick in the app therefore
- * rendered as a mark sitting in a filled box, which is the component-kit look
- * this design explicitly refuses.
+ * Phosphor's `fill` weight for these marks is not a heavier stroke: it is a
+ * ROUNDED SQUARE with the mark knocked out of it. Under the global fill
+ * provider they therefore render as an icon sitting in a filled tile, which is
+ * the component-kit look this design explicitly refuses.
  *
- * `bold` is the heaviest weight that still draws the bare stroke, so the tick
- * keeps the presence the fill provider was chosen for without the container.
- * Check is the only bare mark in our vocabulary that does this — Plus, X and
- * Minus have no container at fill weight, so they are plain re-exports.
+ * Verified in the package source, and it is FOUR marks, not one — every path
+ * below opens with the same square:
+ *   defs/Check.es.js  fill: `M216,40H40A16,16,...`
+ *   defs/X.es.js      fill: `M208,32H48A16,16,...`
+ *   defs/Plus.es.js   fill: `M208,32H48A16,16,...`
+ *   defs/Minus.es.js  fill: `M208,32H48A16,16,...`
+ * This comment used to claim X, Plus and Minus were safe and re-export them
+ * raw, so the Manage sheet's close and add buttons were shipping a white tile
+ * with the glyph cut out of it.
+ *
+ * `bold` is the heaviest weight that still draws the bare mark, so each keeps
+ * the presence the fill provider was chosen for without the container.
  */
 export function CheckIcon(props: ComponentProps<typeof PhosphorCheckIcon>) {
   return <PhosphorCheckIcon weight="bold" {...props} />;
+}
+
+export function CloseIcon(props: ComponentProps<typeof PhosphorXIcon>) {
+  return <PhosphorXIcon weight="bold" {...props} />;
+}
+
+export function PlusIcon(props: ComponentProps<typeof PhosphorPlusIcon>) {
+  return <PhosphorPlusIcon weight="bold" {...props} />;
+}
+
+export function MinusIcon(props: ComponentProps<typeof PhosphorMinusIcon>) {
+  return <PhosphorMinusIcon weight="bold" {...props} />;
 }

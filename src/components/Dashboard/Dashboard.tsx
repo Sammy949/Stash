@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { ReactNode } from "react";
-import type { Ledger, SyncPhase } from "@/types";
+import type { Goal, Ledger, SyncPhase } from "@/types";
 import { getGoals } from "@/lib/ledger";
 import { BalanceInstrument } from "./BalanceInstrument";
 import { ScholarshipRadar } from "./ScholarshipRadar";
@@ -47,6 +47,7 @@ export function Dashboard({
   hydrating,
   onPrompt,
   onManage,
+  onOpenGoal,
   highlight,
   onHighlightConsumed,
 }: {
@@ -57,6 +58,8 @@ export function Dashboard({
   onPrompt: (text: string) => void;
   /** Open the Manage sheet for a tracker domain. */
   onManage: (domain: "scholarships" | "hustles" | "goals") => void;
+  /** Open one goal's history. */
+  onOpenGoal: (goal: Goal) => void;
   /** Section to emphasise on this mount, or null. */
   highlight: SectionKey | null;
   /** Called once the highlight has been shown, so it doesn't replay. */
@@ -104,6 +107,7 @@ export function Dashboard({
             currency={ledger.currency}
             onManage={() => onManage("goals")}
             onAdd={() => onPrompt("I want to set a savings goal.")}
+            onOpen={onOpenGoal}
           />
         </Highlight>
 

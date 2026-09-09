@@ -7,17 +7,21 @@ import {
   contributeToGoal,
   decisionContext,
   getGoals,
+  goalEvents,
   goalProgressPct,
   goalRemaining,
   isDuplicateGoal,
   isDuplicateTransaction,
+  lastGoalEvent,
   removeGoalByName,
   removeHustleByName,
   removeLastTransaction,
   removeScholarshipByName,
   setMonthlyBudget,
+  updateGoal,
 } from "@/lib/ledger";
 import { memorySubject, type MemoryOp } from "@/lib/memory";
+import type { Goal } from "@/types";
 import { formatMoney } from "@/lib/currency";
 import { incomeGoalFacts } from "@/lib/goalContext";
 
@@ -27,6 +31,15 @@ import { incomeGoalFacts } from "@/lib/goalContext";
  * OpenAI-compatible function schemas (sent to the Router/Groq) + a pure
  * `applyAction` that maps a tool call to a ledger reducer. This is what
  * makes the agent *act* on real state instead of narrating math.
+ *
+ * EVERY OPTIONAL STRING IS `["string", "null"]`, and that is load-bearing.
+ * Told a parameter is optional, gpt-oss-120b does not omit it — it sends
+ * `"note": null`. The provider validates tool calls against this schema BEFORE
+ * we ever see them, so a bare `"string"` type turns that into a 400
+ * (`tool_use_failed`) that kills the whole turn, mutation included. Verified
+ * live: `notes/qa/note-probe.mjs` reproduced it on the first no-reason
+ * contribution. Same lesson as the enum note below — never let the schema be
+ * stricter than the model's actual output.
  */
 
 const EXPENSE_CATEGORIES: ExpenseCategory[] = [
@@ -165,9 +178,9 @@ export const AGENT_TOOLS = [
           amount: { type: ["number", "string"], description: "Amount spent, in the user's currency" },
           label: { type: "string", description: "Short description, e.g. 'new laptop'" },
           category: {
-            type: "string",
+            type: ["string", "null"],
             description:
-              "Optional spending category. Prefer one of: transport, data, food, printing, airtime, rent, other. Anything else is fine too — it's bucketed in code.",
+              "Optional spending category. Prefer one of: transport, data, food, printing, airtime, rent, other. Anything else is fine too; it's bucketed in code.",
           },
           force: {
             type: ["boolean", "string"],
@@ -234,7 +247,7 @@ export const AGENT_TOOLS = [
         properties: {
           name: { type: "string", description: "Scholarship/program name" },
           deadline: {
-            type: "string",
+            type: ["string", "null"],
             description:
               "Application deadline as an ISO date YYYY-MM-DD, if known. Resolve relative dates using today's date from the snapshot.",
           },
@@ -260,7 +273,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "add_income_stream",
       description:
-        "Add an income stream / hustle (e.g. a freelance gig, a job, a side project). Use ONLY when the user states they HAVE a source of income — never to answer a question about existing streams.",
+        "Add an income stream / hustle (e.g. a freelance gig, a job, a side project). Use ONLY when the user states they HAVE a source of income. Never use it to answer a question about existing streams.",
       parameters: {
         type: "object",
         properties: {
@@ -295,7 +308,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "add_goal",
       description:
-        "Create a savings target the user is working TOWARD (e.g. 'save £1000 for the scholarship', '£8k for a semester abroad'). Use when they state something they need to save up for, OR after they accept your offer to track an upcoming cost as a goal. This does NOT move money — it sets a target with progress starting at zero.",
+        "Create a savings target the user is working TOWARD (e.g. 'save £1000 for the scholarship', '£8k for a semester abroad'). Use when they state something they need to save up for, OR after they accept your offer to track an upcoming cost as a goal. This does NOT move money; it sets a target with progress starting at zero. Calling it for a goal that ALREADY exists revises that goal's target amount or date instead of creating a second one. That is how 'make it 200k instead' is handled.",
       parameters: {
         type: "object",
         properties: {
@@ -308,9 +321,14 @@ export const AGENT_TOOLS = [
             description: "The amount to reach, in the user's currency.",
           },
           target_date: {
-            type: "string",
+            type: ["string", "null"],
             description:
               "Optional ISO date YYYY-MM-DD to hit it by. Resolve relative dates using today's date from the snapshot.",
+          },
+          note: {
+            type: ["string", "null"],
+            description:
+              "Optional: a SHORT phrase in the user's own words for why this goal exists ('so I stop panicking about rent'). Only if they actually said it. Never invent one.",
           },
         },
         required: ["name", "target_amount"],
@@ -322,7 +340,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "contribute_to_goal",
       description:
-        "Earmark money toward an existing goal when the user says they SET ASIDE / saved / put money toward it (e.g. 'I put £200 toward the phone fund'). This bumps the goal's progress ONLY — it is NOT spending and does NOT change their balance. Never use this for an actual purchase (that's log_expense).",
+        "Earmark money toward an existing goal when the user says they SET ASIDE / saved / put money toward it (e.g. 'I put £200 toward the phone fund'). This bumps the goal's progress ONLY. It is NOT spending and does NOT change their balance. Never use this for an actual purchase (that's log_expense).",
       parameters: {
         type: "object",
         properties: {
@@ -333,6 +351,11 @@ export const AGENT_TOOLS = [
           amount: {
             type: ["number", "string"],
             description: "Amount set aside toward the goal, in the user's currency.",
+          },
+          note: {
+            type: ["string", "null"],
+            description:
+              "Optional: a SHORT phrase in the user's own words for WHY this money went aside now ('after the client paid', 'moved it from what was left over'). Capture what they actually said. Omit entirely if they gave no reason. Never invent one.",
           },
         },
         required: ["name", "amount"],
@@ -357,7 +380,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "remember",
       description:
-        "Save a lasting fact about WHO the user is — a goal, habit, preference, opportunity, or identity detail — that should shape future advice. Use for non-money statements with long-term value ('I'm saving for a laptop', 'I overspend after payday', 'I prefer cooking', 'I'm a final-year student'). ALSO use this to REVISE a memory: call it again with the SAME subject and the memory is updated in place, never duplicated. Do NOT use for money events (use log_expense/log_income), questions, or throwaway chit-chat.",
+        "Save a lasting fact about WHO the user is (a goal, habit, preference, opportunity, or identity detail) that should shape future advice. Use for non-money statements with long-term value ('I'm saving for a laptop', 'I overspend after payday', 'I prefer cooking', 'I'm a final-year student'). ALSO use this to REVISE a memory: call it again with the SAME subject and the memory is updated in place, never duplicated. Do NOT use for money events (use log_expense/log_income), questions, or throwaway chit-chat.",
       parameters: {
         type: "object",
         properties: {
@@ -369,7 +392,7 @@ export const AGENT_TOOLS = [
           subject: {
             type: "string",
             description:
-              "A short stable label for WHAT this memory is about — 1-4 words, no punctuation, e.g. 'macbook', 'post payday spike', 'profile'. Reuse it VERBATIM when you learn more about the same thing so the memory evolves instead of forking. Subjects already stored are shown in [brackets] in what you remember.",
+              "A short stable label for WHAT this memory is about, 1-4 words, no punctuation, e.g. 'macbook', 'post payday spike', 'profile'. Reuse it VERBATIM when you learn more about the same thing so the memory evolves instead of forking. Subjects already stored are shown in [brackets] in what you remember.",
           },
           content: {
             type: "string",
@@ -454,7 +477,7 @@ function factSummary(
     `FACTS (use these exact numbers, do NOT recompute): new balance ${formatMoney(ctx.balance, cur)}.`,
   ];
   if (ctx.inTheRed) {
-    facts.push(`The user is now IN THE RED (below zero) — flag this with care.`);
+    facts.push(`The user is now IN THE RED (below zero). Flag this with care.`);
   }
   if (ctx.runwayDays !== null) {
     facts.push(
@@ -474,12 +497,49 @@ function factSummary(
  * Apply a single tool call to the ledger. Pure — returns a new ledger and
  * a factual summary the model uses to write its confirmation.
  */
+/**
+ * Ask the turn to journal the WHY behind the history entry a goal reducer just
+ * wrote — see `GoalJournalEntry` for why the note lives in Sibyl and not in the
+ * ledger beside the number.
+ *
+ * Returns nothing when the model captured no reason, which is the common and
+ * correct case: an unexplained contribution gets a row with a figure and no
+ * voice, rather than a made-up motive. Pure, like every other handler — the
+ * network write is the agent turn's job.
+ */
+function goalJournalOps(goal: Goal, note: string): MemoryOp[] {
+  // The last entry that isn't "reached": a contribution that completes a goal
+  // appends both, and the reason belongs to the money that moved, not to the
+  // milestone the crossing produced.
+  const event = [...goalEvents(goal)]
+    .reverse()
+    .find((e) => e.kind !== "reached");
+  if (!note || !event) return [];
+  return [
+    {
+      op: "journal",
+      entry: {
+        goalId: goal.id,
+        goalEventId: event.id,
+        goalName: goal.name,
+        kind: event.kind,
+        note,
+        amount: event.amount,
+        at: event.at,
+      },
+    },
+  ];
+}
+
 export function applyAction(
   ledger: Ledger,
   name: string,
   args: Record<string, unknown>,
 ): ActionResult {
   const cur = ledger.currency;
+  // The reason, in the user's words, when the model captured one. Trimmed and
+  // bounded: a journal note is a phrase, not an essay the model pads out.
+  const note = String(args.note ?? "").trim().slice(0, 200);
   // Models sometimes send amounts as strings ("60000", "₦60,000", "50k");
   // coerce + expand shorthand (50k → 50000) before any math touches it.
   const amount = coerceAmount(args.amount);
@@ -504,7 +564,7 @@ export function applyAction(
       if (!force && isDuplicateTransaction(ledger, parsed)) {
         return {
           ledger,
-          summary: `DUPLICATE_CONFIRM: a matching expense (${formatMoney(amount, cur)}, ${label}) was logged moments ago — NOT logged again yet. Ask the user if they really mean to log it a SECOND time (a genuine repeat purchase). Only if they confirm, call log_expense again with force=true. Do NOT log it otherwise.`,
+          summary: `DUPLICATE_CONFIRM: a matching expense (${formatMoney(amount, cur)}, ${label}) was logged moments ago and was NOT logged again yet. Ask the user if they really mean to log it a SECOND time (a genuine repeat purchase). Only if they confirm, call log_expense again with force=true. Do NOT log it otherwise.`,
         };
       }
       const next = addTransaction(ledger, parsed);
@@ -518,7 +578,7 @@ export function applyAction(
       if (!force && isDuplicateTransaction(ledger, parsed)) {
         return {
           ledger,
-          summary: `DUPLICATE_CONFIRM: matching income (${formatMoney(amount, cur)}, ${label}) was logged moments ago — NOT logged again yet. Ask the user if they really mean to log it a SECOND time. Only if they confirm, call log_income again with force=true. Do NOT log it otherwise.`,
+          summary: `DUPLICATE_CONFIRM: matching income (${formatMoney(amount, cur)}, ${label}) was logged moments ago and was NOT logged again yet. Ask the user if they really mean to log it a SECOND time. Only if they confirm, call log_income again with force=true. Do NOT log it otherwise.`,
         };
       }
       const next = addTransaction(ledger, parsed);
@@ -593,10 +653,35 @@ export function applyAction(
       const goalTarget = coerceAmount(args.target_amount ?? args.amount);
       if (!isFinite(goalTarget) || goalTarget <= 0)
         return { ledger, summary: "Invalid goal target; nothing added." };
+      // Naming a goal that already exists is a REVISION, not a duplicate. It
+      // used to be refused outright, which meant "make it 200k instead" quietly
+      // did nothing at all; now the target moves and the change is recorded in
+      // the goal's history, where the user can see what it used to be.
       if (isDuplicateGoal(ledger, goalName)) {
+        const revised = updateGoal(ledger, goalName, {
+          targetAmount: goalTarget,
+          // Only pass a date when one was given: `undefined` leaves the existing
+          // date alone, where an explicit null would clear it.
+          targetDate: args.target_date ? String(args.target_date) : undefined,
+        });
+        if (revised === ledger) {
+          return {
+            ledger,
+            summary: `A goal named "${goalName}" already exists with that same target, so nothing changed. To add progress, use contribute_to_goal.`,
+          };
+        }
+        const rg = getGoals(revised).find(
+          (x) => x.name.toLowerCase() === goalName.toLowerCase(),
+        )!;
+        const change = lastGoalEvent(rg, "target_changed");
         return {
-          ledger,
-          summary: `A goal named "${goalName}" already exists — no need to add it again. To add progress, use contribute_to_goal.`,
+          ledger: revised,
+          summary:
+            change && change.fromAmount !== undefined
+              ? `Revised goal "${rg.name}": target moved from ${formatMoney(change.fromAmount, cur)} to ${formatMoney(rg.targetAmount, cur)}. ${formatMoney(rg.savedAmount, cur)} is already set aside, so ${formatMoney(goalRemaining(rg), cur)} to go. Balance unchanged.`
+              : `Updated goal "${rg.name}": now due ${rg.targetDate ?? "with no date"}. ${formatMoney(rg.savedAmount, cur)} of ${formatMoney(rg.targetAmount, cur)} set aside. Balance unchanged.`,
+          relatedGoalIds: [rg.id],
+          memoryOps: goalJournalOps(rg, note),
         };
       }
       const next = addGoal(ledger, {
@@ -608,8 +693,9 @@ export function applyAction(
       const by = g.targetDate ? ` by ${g.targetDate}` : "";
       return {
         ledger: next,
-        summary: `Created goal "${g.name}" — target ${formatMoney(g.targetAmount, cur)}${by}, ${formatMoney(0, cur)} saved so far. This is a target only; it did NOT change their balance.`,
+        summary: `Created goal "${g.name}": target ${formatMoney(g.targetAmount, cur)}${by}, ${formatMoney(0, cur)} saved so far. This is a target only; it did NOT change their balance.`,
         relatedGoalIds: [g.id],
+        memoryOps: goalJournalOps(g, note),
       };
     }
     case "contribute_to_goal": {
@@ -621,7 +707,7 @@ export function applyAction(
       if (next === ledger)
         return {
           ledger,
-          summary: `No goal matching "${match}" — nothing to add to. Offer to create it with add_goal.`,
+          summary: `No goal matching "${match}", so nothing to add to. Offer to create it with add_goal.`,
         };
       const g = getGoals(next).find((x) => x.name.toLowerCase().includes(match.toLowerCase()));
       if (!g) return { ledger: next, summary: "Goal updated." };
@@ -629,9 +715,10 @@ export function applyAction(
       return {
         ledger: next,
         summary: done
-          ? `Earmarked ${formatMoney(amount, cur)} toward "${g.name}" — that's the full ${formatMoney(g.targetAmount, cur)} target reached! (Earmark only — their spendable balance is unchanged.)`
-          : `Earmarked ${formatMoney(amount, cur)} toward "${g.name}". FACTS (use verbatim): ${formatMoney(g.savedAmount, cur)} of ${formatMoney(g.targetAmount, cur)} saved (${Math.round(goalProgressPct(g))}%), ${formatMoney(goalRemaining(g), cur)} to go. Earmark only — balance unchanged.`,
+          ? `Earmarked ${formatMoney(amount, cur)} toward "${g.name}" , which is the full ${formatMoney(g.targetAmount, cur)} target reached! (Earmark only; their spendable balance is unchanged.)`
+          : `Earmarked ${formatMoney(amount, cur)} toward "${g.name}". FACTS (use verbatim): ${formatMoney(g.savedAmount, cur)} of ${formatMoney(g.targetAmount, cur)} saved (${Math.round(goalProgressPct(g))}%), ${formatMoney(goalRemaining(g), cur)} to go. Earmark only; balance unchanged.`,
         relatedGoalIds: [g.id],
+        memoryOps: goalJournalOps(g, note),
       };
     }
     case "remove_goal": {
@@ -654,7 +741,7 @@ export function applyAction(
       if (!name) return { ledger, summary: "No memory subject given." };
       return {
         ledger,
-        summary: `Remembered (${kind} · ${name}): ${content}. Acknowledge naturally — don't read it back like a robot.`,
+        summary: `Remembered (${kind} · ${name}): ${content}. Acknowledge naturally; don't read it back like a robot.`,
         memoryOps: [
           {
             op: "write",
@@ -671,7 +758,7 @@ export function applyAction(
       if (!name) return { ledger, summary: "No memory specified to forget." };
       return {
         ledger,
-        summary: `Archived the ${kind} memory "${name}" — it no longer applies.`,
+        summary: `Archived the ${kind} memory "${name}"; it no longer applies.`,
         memoryOps: [{ op: "archive", category: kind, name, reason: "no longer applies" }],
       };
     }

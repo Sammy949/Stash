@@ -108,6 +108,62 @@ export interface Goal {
   targetDate?: string;
   /** ISO 8601 timestamp. */
   createdAt: string;
+  /**
+   * Everything that has happened to this goal, oldest first (append-only).
+   * Schema v6. Pre-v6 goals are backfilled by the migration, so this is never
+   * legitimately empty for a goal that exists — read it via `goalEvents()`.
+   */
+  events?: GoalEvent[];
+}
+
+/**
+ * What kind of thing happened to a goal.
+ *
+ * `contribution` is the only kind that carries money, and its amount is SIGNED:
+ * a negative delta is a correction walking progress back, and it must still
+ * appear in the history rather than silently editing the past.
+ */
+export type GoalEventKind =
+  | "created"
+  | "contribution"
+  | "target_changed"
+  | "date_changed"
+  | "reached";
+
+/**
+ * One entry in a goal's history — the deterministic half of a goal's memory.
+ *
+ * This records WHAT happened and WHEN, in code, from the same reducer that
+ * changed the goal. It deliberately holds no free text: the WHY ("after the
+ * client paid") is model-written and lives in Sibyl's COLD journal, joined back
+ * onto this row by `id`. That split is the whole point — the numbers survive an
+ * offline reload or a wiped memory service, and only the human voice is lost.
+ * See `src/lib/memory.ts` (journalGoalEvent) and `useGoalMemory`.
+ */
+export interface GoalEvent {
+  /** Stable id; also the join key for the matching Sibyl journal entry. */
+  id: string;
+  kind: GoalEventKind;
+  /** ISO 8601 timestamp of the moment it happened. */
+  at: string;
+  /** Signed money delta. `contribution` only. */
+  amount?: number;
+  /** Earmarked total immediately after this event. `contribution` only. */
+  savedAfter?: number;
+  /** Target before → after. `target_changed` only. */
+  fromAmount?: number;
+  toAmount?: number;
+  /** Target date before → after (ISO date, or null for "no date"). */
+  fromDate?: string | null;
+  toDate?: string | null;
+  /** The target in force when the goal was created. `created` only. */
+  targetAmount?: number;
+  /**
+   * True for the single row the v5→v6 migration synthesizes from a goal's
+   * pre-existing `savedAmount`. Labelled honestly in the UI as money set aside
+   * before Stash tracked each step — never dressed up as a real contribution.
+   */
+  carriedOver?: boolean;
 }
 
 /** ───────────────── Memory ───────────────── */

@@ -1,5 +1,11 @@
 import type { Currency, Goal, Ledger } from "@/types";
-import { daysUntil, getGoals, goalProgressPct, goalRemaining } from "@/lib/ledger";
+import {
+  daysUntil,
+  getGoals,
+  goalEvents,
+  goalProgressPct,
+  goalRemaining,
+} from "@/lib/ledger";
 import { formatMoney } from "@/lib/currency";
 
 /**
@@ -65,6 +71,76 @@ export function paceFacts(goal: Goal, now: Date = new Date()): PaceFacts | null 
 }
 
 /**
+ * The pace they are ACTUALLY keeping, measured from the goal's own history —
+ * and where that lands them.
+ *
+ * `paceFacts` above answers "what would it take?" from the target date.
+ * This answers "what are you doing?" from what actually happened, which is only
+ * answerable now that contributions are recorded rather than summed away into
+ * one number. The two are deliberately separate: one is a demand, this is an
+ * observation, and mixing them would let a wish read as a measurement.
+ *
+ * The honesty gates, all of them load-bearing:
+ * - Two real contributions minimum. A single deposit (or a lone carried-over
+ *   row from the migration) is a point, not a trend, and extrapolating from it
+ *   would invent a rate out of nothing.
+ * - The window runs from the FIRST contribution to NOW, and only counts what
+ *   arrived after that first one. Ending at "now" rather than at the last
+ *   deposit is what makes a stalled goal's projection correctly slip away
+ *   instead of staying flattering.
+ * - A one-week floor on the window, so two deposits in two days cannot
+ *   extrapolate into a fantasy monthly rate.
+ * - No projected date past ten years out; beyond that the number is honest but
+ *   the date is theatre.
+ */
+export interface ObservedPace {
+  /** Money per 30 days, measured over the window. Always > 0. */
+  perMonth: number;
+  /** Days of history the rate is measured over (at least 7). */
+  spanDays: number;
+  /** How many real contributions the goal has (the sample size). */
+  basedOn: number;
+  /** ISO date this pace lands on the target, or null when it's too far out. */
+  projectedDate: string | null;
+}
+
+export function observedPace(goal: Goal, now: Date = new Date()): ObservedPace | null {
+  const remaining = goalRemaining(goal);
+  if (remaining <= 0) return null;
+
+  const contributions = goalEvents(goal)
+    .filter((e) => e.kind === "contribution" && (e.amount ?? 0) > 0)
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  if (contributions.length < 2) return null;
+
+  const first = Date.parse(contributions[0].at);
+  if (!Number.isFinite(first)) return null;
+  const spanDays = Math.max(7, (now.getTime() - first) / 86_400_000);
+
+  // Everything AFTER the opening deposit: those are the increments the window
+  // actually observed. Including the opener would credit the window with money
+  // that arrived at its very start, before any time had passed.
+  const gained = contributions
+    .slice(1)
+    .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+  if (gained <= 0) return null;
+
+  const perDay = gained / spanDays;
+  const daysToGo = remaining / perDay;
+  const projected =
+    daysToGo <= 3650
+      ? new Date(now.getTime() + daysToGo * 86_400_000).toISOString()
+      : null;
+
+  return {
+    perMonth: perDay * 30,
+    spanDays,
+    basedOn: contributions.length,
+    projectedDate: projected,
+  };
+}
+
+/**
  * How many weeks of required saving a purchase of `amount` represents, at the
  * pace the goal's date demands. Null when there's no dated pace to measure
  * against. Floored at 1 week for any positive, sub-week spend so a real
@@ -119,12 +195,12 @@ export function incomeGoalFacts(
   const money = (n: number) => formatMoney(n, currency);
   const remaining = goalRemaining(g);
   const pct = Math.round(goalProgressPct(g));
-  const close = pct >= 80 ? " They're SO close — worth a nudge." : "";
+  const close = pct >= 80 ? " They're SO close, worth a nudge." : "";
   const due =
     g.targetDate && daysUntil(g.targetDate, now) >= 0
       ? `, due ${g.targetDate} (${daysUntil(g.targetDate, now)} days)`
       : "";
-  return `GOAL CONTEXT (use verbatim, don't recompute): they're saving for "${g.name}" — ${money(g.savedAmount)} of ${money(g.targetAmount)} (${money(remaining)} to go, ${pct}%${due}).${close} Offer to set part of this income aside toward it (suggest contribute_to_goal). Do NOT move money yourself.`;
+  return `GOAL CONTEXT (use verbatim, don't recompute): they're saving for "${g.name}": ${money(g.savedAmount)} of ${money(g.targetAmount)} (${money(remaining)} to go, ${pct}%${due}).${close} Offer to set part of this income aside toward it (suggest contribute_to_goal). Do NOT move money yourself.`;
 }
 
 /**
@@ -148,7 +224,7 @@ export function purchaseImpactFacts(
   const head = `PURCHASE-IMPACT FACTS (use verbatim, don't recompute): they're weighing spending ${money(amount)}. Their focus goal "${g.name}" has ${money(remaining)} to go`;
   if (weeks !== null) {
     const pace = paceFacts(g, now)!;
-    return `${head} and is due ${g.targetDate}, needing ${money(pace.perWeek)}/week. That spend is about ${weeks} week${weeks === 1 ? "" : "s"} of "${g.name}" progress — weigh it honestly. Only state the week figure if you mention the trade-off.`;
+    return `${head} and is due ${g.targetDate}, needing ${money(pace.perWeek)}/week. That spend is about ${weeks} week${weeks === 1 ? "" : "s"} of "${g.name}" progress, so weigh it honestly. Only state the week figure if you mention the trade-off.`;
   }
   return `${head}. No target date set, so frame the trade-off in MONEY ("${money(amount)} that won't go toward ${g.name}"), NOT weeks.`;
 }

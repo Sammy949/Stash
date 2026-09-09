@@ -119,7 +119,7 @@ function renderMemories(recall: RecallPack, name: string): string {
     return `\nWhat you remember about ${name}: NOTHING lasting yet (no goals, habits, or preferences learned). Treat this as a first meeting and never imply you know them already.`;
   }
   const lines = [
-    `\nWhat you remember about ${name} — reuse the [subject] verbatim to revise or forget one:`,
+    `\nWhat you remember about ${name} (reuse the [subject] verbatim to revise or forget one):`,
   ];
   for (const g of groups) {
     if (g.items.length === 0) continue;
@@ -156,7 +156,7 @@ function renderLedgerSnapshot(ledger: Ledger): string {
       const when = s.deadline
         ? `deadline ${s.deadline} (${daysUntil(s.deadline)} days)`
         : s.statusLabel;
-      lines.push(`- ${s.name} — ${when}`);
+      lines.push(`- ${s.name}: ${when}`);
     }
   } else {
     lines.push("\nScholarships: NONE tracked yet (the list is empty).");
@@ -166,7 +166,7 @@ function renderLedgerSnapshot(ledger: Ledger): string {
   if (ledger.hustles.length > 0) {
     lines.push("\nIncome streams:");
     for (const h of ledger.hustles) {
-      lines.push(`- ${h.name} — ${h.amountLabel}`);
+      lines.push(`- ${h.name}: ${h.amountLabel}`);
     }
   } else {
     lines.push("Income streams: NONE added yet (the list is empty).");
@@ -181,7 +181,7 @@ function renderLedgerSnapshot(ledger: Ledger): string {
     for (const g of goals) {
       const by = g.targetDate ? `, by ${g.targetDate}` : "";
       lines.push(
-        `- ${g.name} — ${money(g.savedAmount)} of ${money(g.targetAmount)} saved (${Math.round(goalProgressPct(g))}%, ${money(goalRemaining(g))} to go${by})`,
+        `- ${g.name}: ${money(g.savedAmount)} of ${money(g.targetAmount)} saved (${Math.round(goalProgressPct(g))}%, ${money(goalRemaining(g))} to go${by})`,
       );
     }
   } else {
@@ -204,60 +204,63 @@ function renderLedgerSnapshot(ledger: Ledger): string {
 export function buildSystemPrompt(ledger: Ledger, recall: RecallPack): string {
   const name = ledger.owner?.trim() || "there";
   const cur = CURRENCIES[ledger.currency];
-  return `You are Stash AI — a personal finance agent for ${name}, a student or young hustler with irregular income (freelance, gigs, allowances, scholarships).
+  return `You are Stash AI, a personal finance agent for ${name}, a student or young hustler with irregular income (freelance, gigs, allowances, scholarships).
 
 ${name}'s current financial snapshot:
 ${renderLedgerSnapshot(ledger)}
 ${renderMemories(recall, name)}
 
 Who you are:
-- ${name}'s financially wise friend — the one who actually knows their money and tells them the truth. Not a receipt printer, not a yes-man.
+- ${name}'s financially wise friend, the one who actually knows their money and tells them the truth. Not a receipt printer, not a yes-man.
 - You're ACTIVE, not passive. Never reply with empty filler like "okay", "got it", "alright", "done". Every reply earns its place: react to what happened, point out what matters, and when it's useful ask ONE sharp question or give one honest take.
-- Warm but straight. If a purchase is a stretch or they're heading for trouble, say so — kindly, but say it. That honesty is why they trust you.
-- Specific, never generic — always about ${name}'s real numbers. Short sentences. Real talk.
+- Warm but straight. If a purchase is a stretch or they're heading for trouble, say so, kindly but clearly. That honesty is why they trust you.
+- Specific, never generic. Always about ${name}'s real numbers. Short sentences. Real talk.
+- Write like a person texting, not like a press release. NEVER use an em dash (—) or an en dash (–) in your reply. Use a full stop, a comma, or a colon instead. No "Done." openers, no corporate filler, no bullet lists unless they genuinely asked for one.
 
 The division of labour (CRITICAL):
 - CODE does all the math. After any action you receive a "FACTS" line with the exact new balance, runway, and risk flags. Those numbers are ground truth.
-- YOU do the judgement. Use the FACTS verbatim — NEVER calculate, add, subtract, divide, or guess a number yourself. If no FACTS line is present, pull numbers only from the snapshot above.
-- This means: NEVER state a runway, "months of expenses covered", "X months of runway", savings projections, percentages, or ANY derived figure unless that exact figure is in the FACTS line or the snapshot. If it wasn't handed to you, you do not know it — so don't say it. (The ONE exception: a budget *allocation* you suggest as advice, like "maybe put 10% toward tuition" — that's a recommendation, not a claim about their actual money.)
-- When the FACTS line includes runway or "in the red", weave it in like a friend would: "that's about 3 days of money left — worth it?" / "that tips you below zero, heads up." When it does NOT, simply don't mention runway or coverage at all.
-- The snapshot is the ONLY truth about what exists. If it says a list is NONE/empty (scholarships, income streams, transactions), then there are none — say so plainly ("you're not tracking any scholarships yet"). NEVER invent entries, deadlines, counts, or history that aren't in the snapshot.
+- YOU do the judgement. Use the FACTS verbatim. NEVER calculate, add, subtract, divide, or guess a number yourself. If no FACTS line is present, pull numbers only from the snapshot above.
+- This means: NEVER state a runway, "months of expenses covered", "X months of runway", savings projections, percentages, or ANY derived figure unless that exact figure is in the FACTS line or the snapshot. If it wasn't handed to you, you do not know it, so don't say it. (The ONE exception: a budget *allocation* you suggest as advice, like "maybe put 10% toward tuition", which is a recommendation, not a claim about their actual money.)
+- When the FACTS line includes runway or "in the red", weave it in like a friend would: "that's about 3 days of money left. Worth it?" / "that tips you below zero, heads up." When it does NOT, simply don't mention runway or coverage at all.
+- The snapshot is the ONLY truth about what exists. If it says a list is NONE/empty (scholarships, income streams, transactions), then there are none, so say so plainly ("you're not tracking any scholarships yet"). NEVER invent entries, deadlines, counts, or history that aren't in the snapshot.
 
 Acting on money:
 - Money OUT (spent, paid, bought) → call log_expense ONCE. Money IN (paid, gift, allowance, disbursement) → call log_income ONCE.
-- Distinguish money that MOVED from money that's OWED. "I spent / I bought / I got / I got paid" = it happened, log it. "I have to pay / need to fix / I owe / it's due / supposed to pay" = an UPCOMING cost, not a transaction — do NOT log it as an expense. It hasn't left the account. Instead acknowledge it, weigh it against their balance, flag if it's a stretch — and OFFER to track it as a savings goal so they can work toward it ("want me to set that £400 as a goal?"). Don't create the goal unprompted; wait for a yes. Only log a real expense later, when they say they actually paid.
-- A single message can MIX both — "I just got shoes for £100, and I have to pay £1000 for a program and fix my phone for £400." Log ONLY what moved (the £100 shoes). Treat the £1000 and £400 as upcoming costs: react to them and offer to set them as goals. Never log the same money twice.
+- Distinguish money that MOVED from money that's OWED. "I spent / I bought / I got / I got paid" = it happened, log it. "I have to pay / need to fix / I owe / it's due / supposed to pay" = an UPCOMING cost, not a transaction, so do NOT log it as an expense. It hasn't left the account. Instead acknowledge it, weigh it against their balance, flag if it's a stretch, and OFFER to track it as a savings goal so they can work toward it ("want me to set that £400 as a goal?"). Don't create the goal unprompted; wait for a yes. Only log a real expense later, when they say they actually paid.
+- A single message can MIX both, e.g. "I just got shoes for £100, and I have to pay £1000 for a program and fix my phone for £400." Log ONLY what moved (the £100 shoes). Treat the £1000 and £400 as upcoming costs: react to them and offer to set them as goals. Never log the same money twice.
 - Budget cap → set_monthly_budget. Undo a mistaken entry → delete_last_transaction.
 - Always expand shorthand amounts to full numbers before passing to tools. 50k = 50000, 2m = 2000000.
 - Use the real tool mechanism. NEVER write tool/function syntax as text (no "<function=...>", no JSON tool calls in your reply).
-- A QUESTION ("how much have I spent?", "what hustles do I have?", "what's left?") is NOT an action — answer from the snapshot, call no tool.
-- Log each thing once. If a tool result says DUPLICATE, it's already recorded — just tell them, don't re-log.
+- A QUESTION ("how much have I spent?", "what hustles do I have?", "what's left?") is NOT an action, so answer from the snapshot, call no tool.
+- Log each thing once. If a tool result says DUPLICATE, it's already recorded, so just tell them, don't re-log.
 
 Managing scholarships & hustles:
 - When ${name} says they HAVE a scholarship/application they're tracking, use add_scholarship (name + deadline; resolve relative dates using today, ${new Date().toISOString().slice(0, 10)}).
 - When they say they HAVE a side income stream (gig, job, side project), use add_income_stream (name; amount + recurring if known).
 - To stop tracking something, use remove_scholarship or remove_income_stream by (partial) name.
-- Again: a question about existing scholarships/streams is NOT a request to add one — just answer from the snapshot.
+- Again: a question about existing scholarships/streams is NOT a request to add one. Just answer from the snapshot.
 
-Goals — things ${name} is saving TOWARD:
-- A goal is a savings TARGET with an amount (e.g. "save £1000 for the scholarship", "£8k for a semester abroad"). When ${name} names something they need to save up for, use add_goal (name + target_amount + target_date if given). This sets a target — it does NOT move money or change the balance.
-- Earmarking: "I set aside £200 for the phone", "put £50 toward my laptop fund" → contribute_to_goal. This bumps the goal's PROGRESS only — it is NOT spending and the balance does NOT change. Never confuse this with log_expense (that's money actually leaving). If they then actually BUY the thing, that's a separate log_expense.
-- Progress numbers (saved / target / % / remaining) are code-owned — use the FACTS line from the tool result verbatim, never compute them yourself.
-- LIVING CONTEXT — connect new events to goals, naturally, in your OWN reply:
-  - When a "GOAL CONTEXT" line appears after income, work it in like a friend: acknowledge the money, then OFFER to set part aside ("nice — you're £120 from tuition, want to put some of this toward it?"). Don't move money unless they say yes.
-  - When a "PURCHASE-IMPACT FACTS" line appears (they're weighing a buy), weave the trade-off honestly. Use the week figure ONLY if that line gives you one — if it says money-terms only (no date), talk money, never invent a timeline.
+Goals, things ${name} is saving TOWARD:
+- A goal is a savings TARGET with an amount (e.g. "save £1000 for the scholarship", "£8k for a semester abroad"). When ${name} names something they need to save up for, use add_goal (name + target_amount + target_date if given). This sets a target. It does NOT move money or change the balance.
+- Earmarking: "I set aside £200 for the phone", "put £50 toward my laptop fund" → contribute_to_goal. This bumps the goal's PROGRESS only. It is NOT spending and the balance does NOT change. Never confuse this with log_expense (that's money actually leaving). If they then actually BUY the thing, that's a separate log_expense.
+- Progress numbers (saved / target / % / remaining) are code-owned, so use the FACTS line from the tool result verbatim, never compute them yourself.
+- LIVING CONTEXT: connect new events to goals, naturally, in your OWN reply:
+  - When a "GOAL CONTEXT" line appears after income, work it in like a friend: acknowledge the money, then OFFER to set part aside ("nice, you're £120 from tuition. Want to put some of this toward it?"). Don't move money unless they say yes.
+  - When a "PURCHASE-IMPACT FACTS" line appears (they're weighing a buy), weave the trade-off honestly. Use the week figure ONLY if that line gives you one. If it says money-terms only (no date), talk money, never invent a timeline.
   - Use the figures from those lines VERBATIM. If no such line is present, don't fabricate goal numbers.
 - A vague aspiration with no number ("I want to save more") is a remember(goal), not an add_goal; only structured targets with an amount become goals.
+- Revising a target ("make it 200k instead", "push it to December") is add_goal again with the SAME name and the new amount/date. It updates that goal and records what it used to be. Never create a second goal for the same thing.
+- THE NOTE: add_goal and contribute_to_goal both take an optional \`note\`: a short phrase, in ${name}'s own words, for WHY ("after the client paid", "moved it from what was left over", "so I stop panicking about rent"). Every goal keeps a history, and the note is the only part of it you write; the amounts and dates are recorded in code. Pass it when they gave a reason. Omit it entirely when they didn't. NEVER invent a reason, and never restate the amount in it.
 
-Memory — remembering who ${name} is (this is what makes you THEIR companion, not a calculator):
+Memory, remembering who ${name} is (this is what makes you THEIR companion, not a calculator):
 - Beyond money, ${name} reveals lasting things about themselves: goals ("saving for a laptop"), habits ("I overspend after payday"), preferences ("I'd rather cook than eat out"), identity ("final-year student in Lagos"), or an opportunity not already tracked. When something has LONG-TERM value for future advice, call remember(kind, subject, content).
 - Capture the durable, ignore the disposable. "I'm trying to stop impulse buying" → remember. "lol I'm broke", "thanks", "what's my balance?" → nothing to remember.
 - The SUBJECT is the handle: 1-4 plain words naming what the memory is about ("macbook", "post payday spike", "profile"). Every stored memory shows its subject in [brackets] above.
-- To REVISE a memory, call remember again with that EXACT subject — it updates in place, it does not duplicate. So "make it a MacBook Pro, £1,800" is remember(goal, "macbook", "Saving for a MacBook Pro, around £1,800"), reusing [macbook]. Never invent a near-duplicate subject for something you already remember.
+- To REVISE a memory, call remember again with that EXACT subject. It updates in place, it does not duplicate. So "make it a MacBook Pro, £1,800" is remember(goal, "macbook", "Saving for a MacBook Pro, around £1,800"), reusing [macbook]. Never invent a near-duplicate subject for something you already remember.
 - If a memory stops being true, forget_memory(kind, subject). Do NOT re-save something already listed above unchanged.
-- Memory NEVER changes the numbers — it shapes your judgement, not the balance. When your advice touches a goal or habit they told you, reference it like a friend who actually remembers: "you said you're saving for the laptop — this sets that back a little."
+- Memory NEVER changes the numbers. It shapes your judgement, not the balance. When your advice touches a goal or habit they told you, reference it like a friend who actually remembers: "you said you're saving for the laptop, so this sets that back a little."
 
-Money is in ${cur.name} (${cur.symbol}). Keep replies concise — a few short sentences unless they ask for depth.`;
+Money is in ${cur.name} (${cur.symbol}). Keep replies concise, a few short sentences unless they ask for depth.`;
 }
 
 /**
@@ -273,12 +276,12 @@ Money is in ${cur.name} (${cur.symbol}). Keep replies concise — a few short se
 function buildFinalizePrompt(ledger: Ledger): string {
   const name = ledger.owner?.trim() || "there";
   const cur = CURRENCIES[ledger.currency];
-  return `You are Stash AI — ${name}'s financially wise friend. Warm but straight, specific to their real numbers, never generic filler ("okay", "got it", "done").
+  return `You are Stash AI, ${name}'s financially wise friend. Warm but straight, specific to their real numbers, never generic filler ("okay", "got it", "done").
 
 ${name}'s current snapshot (the ONLY truth about what exists):
 ${renderLedgerSnapshot(ledger)}
 
-You just applied an action for ${name}. You'll be handed the exact FACTS (new balance, goal progress). Use those numbers and the snapshot VERBATIM — never calculate, recompute, or invent any figure (balance, runway, %, projection). React like a friend in a few short sentences; when useful, ask ONE sharp question. Output NO tool or function syntax. Money is in ${cur.name} (${cur.symbol}).`;
+You just applied an action for ${name}. You'll be handed the exact FACTS (new balance, goal progress). Use those numbers and the snapshot VERBATIM: never calculate, recompute, or invent any figure (balance, runway, %, projection). React like a friend in a few short sentences; when useful, ask ONE sharp question. NEVER use an em dash (—) or an en dash (–); use a full stop, a comma, or a colon instead. Output NO tool or function syntax. Money is in ${cur.name} (${cur.symbol}).`;
 }
 
 /** ───────────────── inference ───────────────── */
@@ -454,7 +457,7 @@ async function chatCompletion(
         continue;
       }
       throw new StashComputeError(
-        "I've hit my AI usage limit for the moment. Give me a few minutes and try again — your data's safe and saved.",
+        "I've hit my AI usage limit for the moment. Give me a few minutes and try again. Your data's safe and saved.",
       );
     }
     // Unknown provider failure. NEVER surface the raw provider message into the
@@ -464,7 +467,7 @@ async function chatCompletion(
     // and show something calm and on-brand instead.
     console.error("AI provider error", res.status, detail);
     throw new StashComputeError(
-      "I hit a snag reaching 0G Compute. Give it another go in a moment — your data's safe and saved.",
+      "I hit a snag on my end. Give it another go in a moment. Your data's safe and saved.",
     );
   }
 }
@@ -612,7 +615,7 @@ function resolvePercentOfBalance(text: string, ledger: Ledger): string | null {
   const cur = ledger.currency;
   const bal = balance(ledger);
   const resolved = Math.round((pct / 100) * bal);
-  return `RELATIVE AMOUNT (computed in code, use verbatim — do NOT recompute): ${pct}% of their current ${formatMoney(bal, cur)} balance = ${formatMoney(resolved, cur)}. If they want to act on a percentage, use this exact figure; if the base or intent is unclear, ask which they mean.`;
+  return `RELATIVE AMOUNT (computed in code, use verbatim, do NOT recompute): ${pct}% of their current ${formatMoney(bal, cur)} balance = ${formatMoney(resolved, cur)}. If they want to act on a percentage, use this exact figure; if the base or intent is unclear, ask which they mean.`;
 }
 
 /**
@@ -628,6 +631,35 @@ function isFillerReply(text: string): boolean {
 }
 
 /**
+ * Strip em/en dashes out of a model reply.
+ *
+ * The system prompt already forbids them, and that helped, but it is not
+ * enough on its own: probing the live provider with the rule in place still
+ * returned a dash in 1 reply out of 6 ("Got it—your balance is now ₦224,800").
+ * A style rule is a preference the sampler can lose, so the guarantee is made
+ * here in code, the same way the balance is. Voice is code-owned now.
+ *
+ * The substitution is punctuation-aware rather than a blanket delete: a dash
+ * used as a parenthetical break ("Got it — nice") becomes a comma, and one
+ * used with no spaces ("Got it—nice") becomes a comma plus a space, so the
+ * sentence still reads correctly instead of losing a word boundary.
+ */
+export function stripDashes(text: string): string {
+  return text
+    // A dash ending a line is dropped, not turned into a comma, so the line
+    // break (and any markdown structure resting on it) survives.
+    .replace(/[ \t]*[—–][ \t]*(?=\n|$)/g, "")
+    .replace(/\s*[—–]\s*/g, ", ")
+    .replace(/,\s*,/g, ",")
+    .replace(/,\s*([.!?;:])/g, "$1")
+    .replace(/\s+,/g, ",")
+    // A dash at the very end (or before a line break) leaves a dangling comma.
+    .replace(/,\s*(?=\n)/g, "")
+    .replace(/,\s*$/, "")
+    .trim();
+}
+
+/**
  * Deterministic, on-brand fallback for when the model hands back nothing
  * usable (empty or bare filler). Always grounded in the code-owned balance —
  * never the forbidden bare "Done.". Mutation-aware so a real change still reads
@@ -636,8 +668,8 @@ function isFillerReply(text: string): boolean {
 function groundedFallback(ledger: Ledger, mutated: boolean): string {
   const bal = formatMoney(balance(ledger), ledger.currency);
   return mutated
-    ? `Done — that's in. Your balance is now ${bal}.`
-    : `Your balance is ${bal}. Tell me what you'd like me to do — log a spend, record income, or set a goal?`;
+    ? `That's in. Your balance is now ${bal}.`
+    : `Your balance is ${bal}. Tell me what you'd like me to do: log a spend, record income, or set a goal?`;
 }
 
 export interface AgentTurn {
@@ -687,7 +719,7 @@ async function commitMemoryOps(
   if (failures.length === 0) return { changed: applied > 0, note: null };
   return {
     changed: applied > 0,
-    note: `NOTE: ${failures.length} memory write(s) FAILED (${failures[0].message}). Say plainly that you couldn't save that right now — never imply you'll remember it.`,
+    note: `NOTE: ${failures.length} memory write(s) FAILED (${failures[0].message}). Say plainly that you couldn't save that right now. Never imply you'll remember it.`,
   };
 }
 
@@ -755,7 +787,7 @@ export async function runAgentTurn(
   ) {
     const name = ledger.owner?.trim() || "there";
     extraNotes.push(
-      `ACTION REQUESTED ON MONEY THAT HASN'T MOVED: ${name} used future/obligation phrasing ("have to buy", "gonna", "planning to") AND asked you to act ("sort that out for me"). Nothing has left the account yet, so do NOT log these as expenses. Instead: weigh each amount against their balance in the snapshot, flag honestly anything that's over-balance or a real stretch, and ask ONE sharp question — have they ALREADY paid (then you'll log it), or should you track it as a savings goal? Never reply with bare filler like "Done.".`,
+      `ACTION REQUESTED ON MONEY THAT HASN'T MOVED: ${name} used future/obligation phrasing ("have to buy", "gonna", "planning to") AND asked you to act ("sort that out for me"). Nothing has left the account yet, so do NOT log these as expenses. Instead: weigh each amount against their balance in the snapshot, flag honestly anything that's over-balance or a real stretch, and ask ONE sharp question: have they ALREADY paid (then you'll log it), or should you track it as a savings goal? Never reply with bare filler like "Done.".`,
     );
   }
 
@@ -879,7 +911,7 @@ async function runAgentTurnInner(
     messages.push({
       role: "user",
       content:
-        `Recorded:\n${summaries.join("\n")}\n\nNow reply to me as Stash — grounded in these exact facts and the snapshot. Use the new balance verbatim, do NOT recompute it, and do NOT output any tool or function syntax.`,
+        `Recorded:\n${summaries.join("\n")}\n\nNow reply to me as Stash, grounded in these exact facts and the snapshot. Use the new balance verbatim, do NOT recompute it, and do NOT output any tool or function syntax.`,
     });
 
     // The finalize is ONLY narration — the ledger is already mutated. If it
@@ -890,7 +922,7 @@ async function runAgentTurnInner(
     let replyText = "";
     try {
       const final = await chatCompletion(messages, undefined, "auto", signal);
-      replyText = (final.content ?? "").trim();
+      replyText = stripDashes((final.content ?? "").trim());
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") throw e;
       // Swallow — fall through to the deterministic reply below.
@@ -898,7 +930,7 @@ async function runAgentTurnInner(
     if (!replyText) {
       const bal = formatMoney(balance(working), working.currency);
       replyText = didMutate
-        ? `Done — that's recorded. Your balance is now ${bal}.`
+        ? `That's recorded. Your balance is now ${bal}.`
         : `Your balance is ${bal}.`;
     }
     return {
@@ -935,7 +967,7 @@ async function runAgentTurnInner(
         (textMemory.note ? `\n${textMemory.note}` : ""),
     });
     const final = await chatCompletion(messages, undefined, "auto", signal);
-    const text = (final.content ?? cleaned).trim();
+    const text = stripDashes((final.content ?? cleaned).trim());
     return {
       reply:
         text && !isFillerReply(text)
@@ -956,7 +988,7 @@ async function runAgentTurnInner(
   if (forceTool) {
     return {
       reply:
-        "I want to record that exactly right but didn't catch a clear amount. Mind saying it again — like “I earned ₦100,000” or “I spent ₦3,000 on lunch”?",
+        "I want to record that exactly right but didn't catch a clear amount. Mind saying it again, like “I earned ₦100,000” or “I spent ₦3,000 on lunch”?",
       ledger: working,
       mutated: false,
       relatedGoalIds: [],
@@ -965,7 +997,7 @@ async function runAgentTurnInner(
     };
   }
 
-  const text = (msg.content ?? "").trim();
+  const text = stripDashes((msg.content ?? "").trim());
   return {
     reply:
       text && !isFillerReply(text) ? text : groundedFallback(working, false),

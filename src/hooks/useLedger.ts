@@ -27,7 +27,15 @@ function shortRoot(rootHash: string): string {
  */
 export function useLedger() {
   // Seed from the local working copy if present (instant, offline-safe).
-  const initial = getLocalLedger() ?? EMPTY_LEDGER;
+  // Migrate the LOCAL copy too, not just the one restored from 0G.
+  //
+  // localStorage is the canonical working copy, so a cached ledger written by
+  // an older build was reaching the app in its old shape and no migration ever
+  // ran on it — the 0G restore below was the only path that normalised
+  // anything, and it only fires on a device with no local copy at all. Goals
+  // added before v6 therefore arrived with no history and their detail view
+  // was empty. Everything downstream already assumed the current shape.
+  const initial = migrateLedger(getLocalLedger() ?? EMPTY_LEDGER);
   const ref = useRef<Ledger>(initial);
   const [ledger, setLedgerState] = useState<Ledger>(initial);
   const [hydrating, setHydrating] = useState<boolean>(

@@ -1,5 +1,7 @@
 import type {
   Goal,
+  GoalEvent,
+  GoalEventKind,
   Hustle,
   Ledger,
   ParsedTransaction,
@@ -22,7 +24,7 @@ import { formatMoney } from "@/lib/currency";
  * user's own entries. No hardcoded demo data anywhere.
  */
 export const EMPTY_LEDGER: Ledger = {
-  version: 5,
+  version: 6,
   owner: "",
   currency: "NGN",
   openingBalance: 0,
@@ -431,6 +433,37 @@ export function getGoals(ledger: Ledger): Goal[] {
   return ledger.goals ?? [];
 }
 
+/**
+ * A goal's history, oldest first — the same order it is stored in.
+ *
+ * Defensive for the same reason `getGoals` is: a goal restored from a pre-v6
+ * backup that skipped the migration would have no `events` at all, and the
+ * detail view must render an empty history rather than crash the dashboard.
+ */
+export function goalEvents(goal: Goal): GoalEvent[] {
+  return goal.events ?? [];
+}
+
+/**
+ * Mint one history entry.
+ *
+ * `at` is passed in rather than read from the clock inside, so the migration can
+ * date a synthesized row from the goal's own `createdAt` and every event this
+ * module writes still stays a pure function of its inputs.
+ */
+function goalEvent(
+  kind: GoalEventKind,
+  at: string,
+  rest: Omit<GoalEvent, "id" | "kind" | "at"> = {},
+): GoalEvent {
+  return { id: crypto.randomUUID(), kind, at, ...rest };
+}
+
+/** Append entries to a goal's history. Append-only: history is never rewritten. */
+function withEvents(goal: Goal, ...added: GoalEvent[]): Goal {
+  return { ...goal, events: [...goalEvents(goal), ...added] };
+}
+
 /** Progress toward the target as a 0–100 percentage (clamped). */
 export function goalProgressPct(goal: Goal): number {
   if (goal.targetAmount <= 0) return 0;
@@ -463,15 +496,82 @@ export function addGoal(
 ): Ledger {
   const target =
     input.targetAmount > 0 ? Math.round(input.targetAmount) : 0;
+  const createdAt = new Date().toISOString();
+  const targetDate = normalizeDate(input.targetDate) ?? undefined;
   const g: Goal = {
     id: crypto.randomUUID(),
     name: input.name.trim(),
     targetAmount: target,
     savedAmount: 0,
-    targetDate: normalizeDate(input.targetDate) ?? undefined,
-    createdAt: new Date().toISOString(),
+    targetDate,
+    createdAt,
+    // The history opens with the goal itself, so the detail view always has a
+    // first entry to show — a brand-new goal reads as "started", not as blank.
+    events: [
+      goalEvent("created", createdAt, {
+        targetAmount: target,
+        toDate: targetDate ?? null,
+      }),
+    ],
   };
   return { ...ledger, goals: [...getGoals(ledger), g] };
+}
+
+/**
+ * Revise an existing goal's target amount and/or date, recording what changed.
+ *
+ * This exists because a target that can never move makes the history a lie:
+ * "make it 200k instead" used to hit `add_goal`'s duplicate guard and silently
+ * do nothing. Only genuine changes are written — re-stating the same target
+ * returns the ledger untouched, so a repeated ask cannot pile up empty rows.
+ */
+export function updateGoal(
+  ledger: Ledger,
+  match: string,
+  input: { targetAmount?: number | null; targetDate?: string | null },
+): Ledger {
+  const q = match.trim().toLowerCase();
+  if (!q) return ledger;
+  const idx = getGoals(ledger).findIndex((g) => g.name.toLowerCase().includes(q));
+  if (idx < 0) return ledger;
+
+  const goal = getGoals(ledger)[idx];
+  const at = new Date().toISOString();
+  const added: GoalEvent[] = [];
+  let next = goal;
+
+  const target =
+    typeof input.targetAmount === "number" && input.targetAmount > 0
+      ? Math.round(input.targetAmount)
+      : null;
+  if (target !== null && target !== goal.targetAmount) {
+    added.push(
+      goalEvent("target_changed", at, {
+        fromAmount: goal.targetAmount,
+        toAmount: target,
+      }),
+    );
+    next = { ...next, targetAmount: target };
+  }
+
+  // undefined means "not mentioned" and leaves the date alone; an explicit null
+  // clears it. Only `undefined` can mean untouched, which is why this reads the
+  // key rather than testing truthiness.
+  if (input.targetDate !== undefined) {
+    const date = normalizeDate(input.targetDate) ?? null;
+    const current = goal.targetDate ?? null;
+    if (date !== current) {
+      added.push(goalEvent("date_changed", at, { fromDate: current, toDate: date }));
+      next = { ...next, targetDate: date ?? undefined };
+    }
+  }
+
+  if (added.length === 0) return ledger;
+  next = withEvents(next, ...added);
+  return {
+    ...ledger,
+    goals: getGoals(ledger).map((g, i) => (i === idx ? next : g)),
+  };
 }
 
 /**
@@ -490,14 +590,46 @@ export function contributeToGoal(
     g.name.toLowerCase().includes(q),
   );
   if (idx < 0) return ledger;
+
+  const goal = getGoals(ledger)[idx];
+  const savedAfter = Math.max(0, Math.round(goal.savedAmount + amount));
+  // The clamp at zero can swallow part of a negative correction, so record what
+  // actually moved rather than what was asked for — history has to reconcile
+  // against `savedAmount` exactly, or the timeline stops being an audit trail.
+  const applied = savedAfter - goal.savedAmount;
+  if (applied === 0) return ledger;
+
+  const at = new Date().toISOString();
+  const added: GoalEvent[] = [
+    goalEvent("contribution", at, { amount: applied, savedAfter }),
+  ];
+  // The moment the target is covered gets its own entry, but only on the
+  // crossing: a goal already complete that receives more must not re-announce.
+  const wasComplete = isGoalComplete(goal);
+  const nowComplete = goal.targetAmount > 0 && savedAfter >= goal.targetAmount;
+  if (!wasComplete && nowComplete) added.push(goalEvent("reached", at));
+
   return {
     ...ledger,
     goals: getGoals(ledger).map((g, i) =>
-      i === idx
-        ? { ...g, savedAmount: Math.max(0, Math.round(g.savedAmount + amount)) }
-        : g,
+      i === idx ? withEvents({ ...g, savedAmount: savedAfter }, ...added) : g,
     ),
   };
+}
+
+/**
+ * The history entry a reducer just wrote, or null.
+ *
+ * The reducers stay pure and return only a `Ledger`, so a caller that needs the
+ * id of the row it just created (to journal the matching note to Sibyl under
+ * the same key) reads it back off the end of the history.
+ */
+export function lastGoalEvent(goal: Goal, kind?: GoalEventKind): GoalEvent | null {
+  const events = goalEvents(goal);
+  for (let i = events.length - 1; i >= 0; i--) {
+    if (!kind || events[i].kind === kind) return events[i];
+  }
+  return null;
 }
 
 /** Remove the first goal whose name matches (agent action, partial match). */
@@ -524,32 +656,68 @@ export function removeGoal(ledger: Ledger, id: string): Ledger {
 /** ───────────────── Migration ───────────────── */
 
 /**
+ * Give a pre-v6 goal the history it never recorded.
+ *
+ * A goal restored from an older backup has a `savedAmount` and nothing to
+ * explain it. Rather than show a goal at 42% above an empty timeline, the
+ * migration synthesizes the two things it can honestly infer from what IS
+ * stored: the goal was started (dated `createdAt`), and whatever is already set
+ * aside was set aside before Stash tracked each step. The carried row is
+ * flagged `carriedOver` so the UI can label it as exactly that and never pass
+ * it off as a contribution someone actually made on that day.
+ *
+ * Idempotent: a goal that already has history is returned untouched.
+ */
+function backfillGoalHistory(goal: Goal): Goal {
+  if (Array.isArray(goal.events) && goal.events.length > 0) return goal;
+  const at = goal.createdAt || new Date().toISOString();
+  const events: GoalEvent[] = [
+    goalEvent("created", at, {
+      targetAmount: goal.targetAmount,
+      toDate: goal.targetDate ?? null,
+    }),
+  ];
+  if (goal.savedAmount > 0) {
+    events.push(
+      goalEvent("contribution", at, {
+        amount: goal.savedAmount,
+        savedAfter: goal.savedAmount,
+        carriedOver: true,
+      }),
+    );
+    if (isGoalComplete(goal)) events.push(goalEvent("reached", at));
+  }
+  return { ...goal, events };
+}
+
+/**
  * Normalize a ledger loaded from localStorage (or an older backup) into the
- * current (v5) shape. Guards against NaN when an older v1 ledger (budget:
+ * current (v6) shape. Guards against NaN when an older v1 ledger (budget:
  * {total,spent}) is restored: maps budget.total → monthlyBudget, synthesizes a
  * single expense for the old `spent` so the balance stays consistent. Pre-v4
  * ledgers get empty `goals`. v5 is the version that moved memory OUT of the
  * ledger and into Sibyl, so any stored `memories` array is dropped here rather
- * than carried as an orphaned copy the app never reads.
+ * than carried as an orphaned copy the app never reads. v6 gives every goal a
+ * history (`backfillGoalHistory`), which is what the goal detail view reads.
  */
 export function migrateLedger(raw: unknown): Ledger {
   if (!raw || typeof raw !== "object") return EMPTY_LEDGER;
   const r = raw as Record<string, unknown>;
 
-  // Already v2–v5 shape (transactions-based). Backfill goals (pre-v4) and strip
+  // Already v2–v6 shape (transactions-based). Backfill goals (pre-v4) and strip
   // the retired memory field so an older cached ledger restores cleanly.
   if (typeof r.openingBalance === "number" && Array.isArray(r.transactions)) {
     const rest: Record<string, unknown> = { ...r };
     delete rest.memories;
     return {
       ...(rest as unknown as Ledger),
-      version: 5,
+      version: 6,
       monthlyBudget: (r.monthlyBudget as number | null) ?? null,
-      goals: (r.goals as Goal[]) ?? [],
+      goals: ((r.goals as Goal[]) ?? []).map(backfillGoalHistory),
     };
   }
 
-  // v1 → v5.
+  // v1 → v6.
   const budget = r.budget as { total?: number; spent?: number } | undefined;
   const transactions = Array.isArray(r.transactions)
     ? (r.transactions as Transaction[])
@@ -565,7 +733,7 @@ export function migrateLedger(raw: unknown): Ledger {
     });
   }
   return {
-    version: 5,
+    version: 6,
     owner: (r.owner as string) ?? "",
     currency: "NGN",
     openingBalance: 0,
@@ -573,7 +741,7 @@ export function migrateLedger(raw: unknown): Ledger {
     transactions,
     scholarships: (r.scholarships as Ledger["scholarships"]) ?? [],
     hustles: (r.hustles as Ledger["hustles"]) ?? [],
-    goals: (r.goals as Goal[]) ?? [],
+    goals: ((r.goals as Goal[]) ?? []).map(backfillGoalHistory),
     lastSyncedAt: (r.lastSyncedAt as string | null) ?? null,
   };
 }
