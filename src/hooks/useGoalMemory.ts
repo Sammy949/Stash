@@ -6,7 +6,7 @@ import { fetchGoalNotes, isMemoryConfigured, memoryDisabled } from "@/lib/memory
  *
  * A goal's timeline is assembled from two halves that fail independently: the
  * ledger's own events (what and when — always present, offline, restored from
- * the 0G backup) and these notes (why — written by the model into Sibyl's COLD
+ * the ledger) and these notes (why — written by the model into Sibyl's COLD
  * journal). This hook fetches the second half only.
  *
  * It therefore NEVER gates rendering. The caller draws every row from the

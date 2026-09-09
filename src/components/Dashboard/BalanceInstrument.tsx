@@ -1,16 +1,14 @@
-import type { Ledger, SyncPhase } from "@/types";
+import type { Ledger } from "@/types";
 import {
   balance,
   balanceSeries,
-  formatSyncedAt,
+  totalActiveIncome,
   totalExpenses,
   totalIncome,
 } from "@/lib/ledger";
 import { formatMoney } from "@/lib/currency";
 import { AnimatedNumber } from "@/components/UI/AnimatedNumber";
-import { SyncIndicator } from "@/components/UI/SyncIndicator";
 import { Card, CardContent } from "@/components/shadcn/card";
-import { Skeleton } from "@/components/shadcn/skeleton";
 import { traceGeometry, VIEW_H, VIEW_W } from "./traceGeometry";
 
 const WINDOW_DAYS = 30;
@@ -31,18 +29,29 @@ const WINDOW_DAYS = 30;
  */
 export function BalanceInstrument({
   ledger,
-  syncPhase = "idle",
-  hydrating = false,
+
 }: {
   ledger: Ledger;
-  syncPhase?: SyncPhase;
-  hydrating?: boolean;
+
 }) {
   const bal = balance(ledger);
   const income = totalIncome(ledger);
   const expenses = totalExpenses(ledger);
   const overdrawn = bal < 0;
   const started = ledger.transactions.length > 0;
+
+  // Recurring monthly income from active streams. This came here when the
+  // Hustle Ledger card was retired, and the instrument is where it belongs:
+  // "what regularly arrives" is the forecast that gives a balance its meaning,
+  // which matters most for exactly the irregular-income student Stash is for.
+  //
+  // The count has to be of ACTIVE streams, not of every hustle on file:
+  // `totalActiveIncome` only sums the active ones, so counting all of them
+  // would caption the figure with a number it does not cover — three streams
+  // on record, one of them active, and the line would claim the amount came
+  // from three.
+  const expected = totalActiveIncome(ledger.hustles);
+  const activeStreams = ledger.hustles.filter((h) => h.status === "active").length;
 
   const series = balanceSeries(ledger, WINDOW_DAYS);
   const geo = traceGeometry(series);
@@ -54,10 +63,7 @@ export function BalanceInstrument({
           Balance
         </div>
 
-        {hydrating ? (
-          <Skeleton className="mt-2 h-10 w-48" />
-        ) : (
-          <AnimatedNumber
+        <AnimatedNumber
             value={bal}
             format={(n) => formatMoney(n, ledger.currency)}
             // cqi, not vw: the figure has to size against the column it sits
@@ -68,21 +74,13 @@ export function BalanceInstrument({
             // back to the viewport, which is the old behaviour.)
             className={`font-data mt-1 block text-[clamp(2rem,9cqi,3.25rem)] font-semibold leading-none tracking-[-0.02em] ${
               overdrawn ? "text-destructive" : "text-foreground"
-            }`}
-          />
-        )}
+          }`}
+        />
 
-        <div className="mt-2.5 h-4 text-xs">
-          {hydrating ? (
-            <span className="text-muted-foreground">Restoring your ledger…</span>
-          ) : syncPhase === "idle" ? (
-            <span className="text-muted-foreground">
-              {formatSyncedAt(ledger.lastSyncedAt)}
-            </span>
-          ) : (
-            <SyncIndicator phase={syncPhase} />
-          )}
-        </div>
+        {/* The ledger is local and written synchronously, so there is no sync
+            state to report and nothing to wait on. What used to live here was a
+            remote backup indicator; durability belongs to the memory layer,
+            which speaks for itself in the conversation rather than as chrome. */}
       </CardContent>
 
       {/* The trace. Bleeds the full width of the card and sits behind the
@@ -97,7 +95,30 @@ export function BalanceInstrument({
           <Flow label="Out" value={expenses} currency={ledger.currency} started={started} tone="out" />
         </div>
 
-        {!hydrating && !started && (
+        {/* The forecast, stated as a sentence rather than a third figure in the
+            flow row above. That row is actuals — money that genuinely moved —
+            and dropping an expectation in beside them as a matching column
+            would make a forecast look like a measurement.
+
+            It also stays in plain ink, with only the amount set in the data
+            face. Income colour is reserved for money that actually arrived; a
+            stream you have declared has not arrived yet, and tinting it the
+            same green would quietly claim otherwise. */}
+        {expected > 0 && (
+          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+            Expecting{" "}
+            <span className="font-data text-foreground">
+              {formatMoney(expected, ledger.currency)}
+            </span>{" "}
+            a month from{" "}
+            {activeStreams === 1
+              ? "one income stream"
+              : `${activeStreams} income streams`}
+            .
+          </p>
+        )}
+
+        {!started && (
           <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
             Nothing measured yet. Tell Stash{" "}
             <span className="text-foreground">&ldquo;got paid 600&rdquo;</span> or{" "}

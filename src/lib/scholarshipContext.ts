@@ -149,9 +149,9 @@ export function proactiveDeadlineNudge(
   const when = d === 0 ? "today" : d === 1 ? "tomorrow" : `in ${d} days`;
   const who = ledger.owner?.trim() ? `${ledger.owner.trim()}'s` : "their";
   const facts =
-    `DEADLINE NUDGE (code-owned fact — use it verbatim, don't recompute): ` +
+    `DEADLINE NUDGE (code-owned fact, use it verbatim, don't recompute): ` +
     `${who} "${s.name}" application is due ${when} (${s.deadline}). ` +
-    `Give a brief, warm heads-up about it — one line — then get back to what they asked. ` +
+    `Give a brief, warm heads-up about it, one line, then get back to what they asked. ` +
     `Mention it naturally; don't nag or repeat it if it's already been raised.`;
   return { id, facts };
 }

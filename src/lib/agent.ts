@@ -25,37 +25,28 @@ import { extractPrimaryAmount, purchaseImpactFacts } from "@/lib/goalContext";
 import { proactiveDeadlineNudge } from "@/lib/scholarshipContext";
 
 /**
- * 0G Compute integration — the Stash AI agent.
+ * The Stash AI agent.
  *
  * Calls an OpenAI-compatible chat endpoint with the live ledger injected
  * into the system prompt, so every reply is specific to Samuel.
  *
- * PROVIDER: defaults to the 0G Compute Router (router-api.0g.ai). The
- * Router is billed against a mainnet 0G balance; for a testnet/hackathon
- * build where that balance isn't available, point VITE_AI_BASE_URL /
- * VITE_AI_API_KEY / VITE_AI_MODEL at any OpenAI-compatible provider
- * (Anthropic, OpenAI, Together, …). The request shape, system prompt,
- * ledger injection, and error handling are identical either way — only
- * the endpoint, key, and model name change. Set VITE_AI_BASE_URL back to
- * "https://router-api.0g.ai/v1" (model glm-5) once the mainnet Router
- * balance is funded to run fully on 0G Compute.
+ * PROVIDER: any OpenAI-compatible chat-completions endpoint, named entirely by
+ * environment (VITE_AI_BASE_URL / _API_KEY / _MODEL). The agent loop does not
+ * know or care which provider is behind it.
  */
-
-/** 0G Compute Router defaults — used when no fallback provider is set. */
-export const ROUTER_URL = "https://router-api.0g.ai/v1";
-// Verified against the live /v1/models catalog — the spec's
-// "zai-org/GLM-5-FP8" does not exist on the Router. glm-5 is the
-// general-purpose flagship; swap to glm-5.1 / deepseek-v3 if desired.
-export const ROUTER_MODEL = "glm-5";
 
 /**
- * Resolved provider config: the optional OpenAI-compatible fallback
- * (VITE_AI_*) takes precedence; otherwise the 0G Router (VITE_OG_*).
+ * Resolved provider config.
+ *
+ * One provider, named entirely by environment. There used to be a hardcoded
+ * default pointing at the 0G Compute Router, with the env vars treated as an
+ * override; that inverted the truth (the Router was never the thing actually
+ * serving requests) and left a URL in the bundle nothing would ever call.
+ * Unset means unconfigured, and the agent says so plainly.
  */
-const BASE_URL = import.meta.env.VITE_AI_BASE_URL?.replace(/\/$/, "") || ROUTER_URL;
-const API_KEY =
-  import.meta.env.VITE_AI_API_KEY || import.meta.env.VITE_OG_COMPUTE_API_KEY;
-export const STASH_MODEL = import.meta.env.VITE_AI_MODEL || ROUTER_MODEL;
+const BASE_URL = import.meta.env.VITE_AI_BASE_URL?.replace(/\/$/, "") || "";
+const API_KEY = import.meta.env.VITE_AI_API_KEY;
+export const STASH_MODEL = import.meta.env.VITE_AI_MODEL || "";
 
 /**
  * Optional SAME-PROVIDER fallback model. Groq rate-limits PER MODEL, so when
@@ -63,8 +54,7 @@ export const STASH_MODEL = import.meta.env.VITE_AI_MODEL || ROUTER_MODEL;
  * retrying the identical request on a different model (e.g.
  * openai/gpt-oss-20b, a separate bucket) gets a fresh budget —
  * same key, same endpoint, no new credentials. Empty = no fallback (we throw
- * the calm limit message as before). Leave unset on the 0G Router, whose model
- * catalog differs. The fallback model must be tool-call capable (the agent loop
+ * the calm limit message as before). The fallback model must be tool-call capable (the agent loop
  * depends on it) and it must still EXIST: the previous value here,
  * llama-3.3-70b-versatile, was decommissioned by the provider, so every
  * fallback attempt 404'd and the rate-limit path was dead in the water.
@@ -81,9 +71,6 @@ export const STASH_MODEL = import.meta.env.VITE_AI_MODEL || ROUTER_MODEL;
  * it early would trade the better model for a cap that is not currently hit.
  */
 export const FALLBACK_MODEL = import.meta.env.VITE_AI_FALLBACK_MODEL || "";
-
-/** Whether the active provider is the 0G Router (vs a fallback). */
-export const usingRouter = BASE_URL === ROUTER_URL;
 
 /** True when an API key is present for the active provider. */
 export function isComputeConfigured(): boolean {
@@ -325,7 +312,7 @@ function toRouterMessages(history: ChatMessage[]): RouterMessage[] {
  * the user on the first 429 (as this path used to), we wait that hint out and
  * retry. Only when waiting genuinely can't help (no retries left, or the hint is
  * a long daily-reset beyond our cap) do we surface the calm limit message.
- * Mirrors the storage-side backoff in ogStorage.ts (PROXY_BACKOFF_MS). */
+ */
 const RATE_LIMIT_MAX_RETRIES = 2;
 /** Per-wait ceiling. A hint longer than this is a daily-style reset where
  *  waiting is pointless in a live session — bail to the calm message instead. */
@@ -430,11 +417,6 @@ async function chatCompletion(
 
     const detail = await res.json().catch(() => null);
     const code = detail?.error?.code;
-    if (usingRouter && (res.status === 402 || code === "insufficient_balance")) {
-      throw new StashComputeError(
-        "Stash's 0G Compute balance is empty. Top it up at pc.0g.ai to keep chatting.",
-      );
-    }
     // Rate / token limit. Usually a transient per-minute reset — wait the
     // provider's hint out and retry rather than dumping the user. Only give up
     // (with a calm, on-brand message, never the raw billing error) when we're
@@ -812,7 +794,7 @@ async function runAgentTurnInner(
 ): Promise<AgentTurn> {
   if (!isComputeConfigured()) {
     throw new StashComputeError(
-      "0G Compute is not configured — set VITE_AI_API_KEY (dev) or AI_API_KEY (prod).",
+      "The model provider is not configured — set VITE_AI_BASE_URL, VITE_AI_API_KEY and VITE_AI_MODEL.",
     );
   }
 

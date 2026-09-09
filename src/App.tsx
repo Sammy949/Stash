@@ -5,7 +5,6 @@ import { DashboardStrip } from "@/components/Dashboard/DashboardStrip";
 import { WelcomeBack } from "@/components/Dashboard/WelcomeBack";
 import { AgentPanel } from "@/components/Agent/AgentPanel";
 import { CommandBar } from "@/components/Agent/CommandBar";
-import { SYNC_CHIP } from "@/components/Agent/QuickChips";
 import { Onboarding } from "@/components/Onboarding/Onboarding";
 import type { OnboardingProfile } from "@/components/Onboarding/Onboarding";
 import { INCOME_SHAPES } from "@/components/Onboarding/onboardingModel";
@@ -23,7 +22,7 @@ import {
   MarkerContent,
   MarkerIcon,
 } from "@/components/shadcn/marker";
-import { ensureStorageSchema, getStoredRootHash } from "@/lib/ogStorage";
+import { ensureStorageSchema } from "@/lib/localLedger";
 import { deriveObservation } from "@/lib/observations";
 import { deriveWelcomeBack } from "@/lib/welcomeBack";
 import type { WelcomeBack as WelcomeBackData } from "@/lib/welcomeBack";
@@ -64,12 +63,8 @@ function changedSection(before: Ledger, after: Ledger): SectionKey | null {
   return null;
 }
 
-const SYNC_CONFIRMATION =
-  "Your financial data is encrypted and backed up safely. Nobody else can access it. It'll be here next time you open Stash.";
-
 export default function App() {
-  const { ledger, hydrating, syncPhase, sync, applyLedger, initProfile } =
-    useLedger();
+  const { ledger, applyLedger, initProfile } = useLedger();
   // Sibyl memory: hydrated once on mount and handed to the agent as a port, so
   // every turn recalls from it and any write refreshes it.
   const { recall, hydrating: recalling, port: memoryPort } = useMemory();
@@ -96,11 +91,11 @@ export default function App() {
     startFresh,
   } = useAgent(memoryPort);
 
-  // Returning users (a synced ledger exists) skip onboarding.
-  const [onboarded, setOnboarded] = useState(
-    () =>
-      Boolean(localStorage.getItem(ONBOARDED_KEY)) ||
-      Boolean(getStoredRootHash()),
+  // Returning users skip onboarding. This used to also accept a stored backup
+  // root hash as evidence of a returning user; with that backup gone, the
+  // onboarding flag is the only signal, and it is the honest one.
+  const [onboarded, setOnboarded] = useState(() =>
+    Boolean(localStorage.getItem(ONBOARDED_KEY)),
   );
 
   // Split-Shift: dashboard is full by default; asking anything opens the
@@ -131,7 +126,7 @@ export default function App() {
   // visit (code owns every number). Null when there's nothing worth saying.
   const [welcome, setWelcome] = useState<WelcomeBackData | null>(null);
   useEffect(() => {
-    if (!onboarded || hydrating || recalling) return;
+    if (!onboarded || recalling) return;
     const last = localStorage.getItem(LAST_VISIT_KEY);
     setWelcome(deriveWelcomeBack(ledger, last, recall));
     // The transcript's first line is the same recall, as prose. Computed here so
@@ -141,7 +136,7 @@ export default function App() {
     // Intentionally keyed on hydration settling, not on every ledger change —
     // the greeting is a one-shot snapshot of "since last visit". It also waits
     // on the Sibyl read, since what Stash remembers IS the greeting.
-  }, [onboarded, hydrating, recalling]);
+  }, [onboarded, recalling]);
 
   /**
    * Finish first run: seed the ledger, then seed MEMORY.
@@ -161,7 +156,6 @@ export default function App() {
     if (profile.goal) {
       next = addGoal(next, profile.goal);
       applyLedger(next);
-      void sync(next);
     }
 
     const shape = INCOME_SHAPES.find((s) => s.value === profile.incomeShape);
@@ -184,26 +178,15 @@ export default function App() {
     setAgentActive(true);
     setWelcome(null); // greeting gives way once the conversation starts
 
-    // 1. The back-up chip → real storage sync, no model call needed.
-    if (text === SYNC_CHIP) {
-      const ok = await sync();
-      pushAssistant(
-        ok
-          ? SYNC_CONFIRMATION
-          : "I couldn't back up just now: the upload didn't go through. Check the toast for details and try again.",
-      );
-      return;
-    }
-
-    // 2. Everything else → the agent. It may call tools that mutate the
-    //    ledger; when it does, persist the new ledger and back it up.
+    // The agent may call tools that mutate the ledger; when it does, persist
+    // the new ledger. Writes are synchronous and local, so there is nothing to
+    // wait on and no failure path to report.
     const before = ledger;
     let latest = ledger;
     const wantsBreakdown = isSpendingQuery(text);
     void send(text, ledger, (updated) => {
       latest = updated;
       applyLedger(updated);
-      void sync(updated);
       const changed = changedSection(before, updated);
       if (changed) setHighlight(changed);
       // Proactive observation — code (not the model) notices when a money
@@ -226,7 +209,7 @@ export default function App() {
   // re-run fails or is stopped, we roll the ledger back to its pre-edit state
   // (which also re-persists localStorage) and skip the sync, so a failed edit
   // can never destroy the prior conversation. Only a successful re-run is
-  // persisted locally and backed up to 0G once at the end.
+  // persisted locally.
   function handleEditMessage(id: string, newText: string) {
     setAgentActive(true);
     const prevLedger = ledger;
@@ -248,7 +231,6 @@ export default function App() {
         },
       );
       if (ok) {
-        void sync();
       } else {
         // Re-run failed or was stopped — restore the pre-edit ledger (the
         // transcript was already rolled back inside editMessage) and do NOT
@@ -272,7 +254,6 @@ export default function App() {
           ? removeHustle(ledger, id)
           : removeGoal(ledger, id);
     applyLedger(next);
-    void sync(next);
     const remaining =
       domain === "scholarships"
         ? next.scholarships.length
@@ -364,8 +345,6 @@ export default function App() {
       )}
       <Dashboard
         ledger={ledger}
-        syncPhase={syncPhase}
-        hydrating={hydrating}
         onPrompt={handleSend}
         onManage={setManage}
         onOpenGoal={(g) => setOpenGoalId(g.id)}
@@ -400,8 +379,6 @@ export default function App() {
             onCurrencyChange={(next) =>
               applyLedger({ ...ledger, currency: next })
             }
-            onSync={() => void sync()}
-            syncing={syncPhase !== "idle"}
             theme={theme}
             onThemeChange={setTheme}
             onStartFresh={() => {

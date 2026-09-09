@@ -49,14 +49,6 @@ export default defineConfig(({ mode }) => {
         "lucide-react": path.resolve(__dirname, "./src/lib/lucide-shim.ts"),
       },
     },
-    // ethers and the 0G SDK are loaded via dynamic import() in ogStorage.ts
-    // (to keep the initial bundle small). Pre-bundle them at dev startup so
-    // the first "Sync to 0G" doesn't trigger a mid-session Vite re-optimize,
-    // which invalidates the module graph and breaks the in-flight import
-    // ("Failed to fetch dynamically imported module: .../ethers.js").
-    optimizeDeps: {
-      include: ["ethers", "@0gfoundation/0g-storage-ts-sdk"],
-    },
     server: {
       proxy: {
         // Dev stand-in for api/memory.ts (the Vercel function): same ?path=

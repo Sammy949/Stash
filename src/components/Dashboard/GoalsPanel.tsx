@@ -19,8 +19,10 @@ const VISIBLE = 4;
 /**
  * Goals panel — savings targets with earmarked progress. Each goal shows
  * saved/target (compact) and a progress bar. Progress is the earmark counter,
- * never the spendable balance (see `Goal` in types). Mirrors the structure of
- * ScholarshipRadar / HustleLedger so the dashboard reads as one system.
+ * never the spendable balance (see `Goal` in types). Built on the shared
+ * `Section` shell, so it is measured off the same object as the rest of the
+ * dashboard. (It used to say it mirrored ScholarshipRadar and HustleLedger;
+ * those two cards are gone, and their contents now live behind TrackingStrip.)
  */
 export function GoalsPanel({
   goals,

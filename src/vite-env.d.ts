@@ -4,27 +4,17 @@
 declare const __BUILD_SHA__: string;
 
 interface ImportMetaEnv {
-  /** 0G Compute Router API key (OpenAI-compatible). */
-  readonly VITE_OG_COMPUTE_API_KEY: string;
-
   /**
-   * Optional OpenAI-compatible fallback provider. When VITE_AI_BASE_URL is
-   * set, it overrides the 0G Router for chat (testnet builds without a
-   * mainnet Router balance). Leave unset to run on 0G Compute.
+   * Inference provider. Any OpenAI-compatible chat-completions endpoint —
+   * the agent loop does not care which, and the deployed build points these
+   * at Groq. Optional so a build without them still compiles; the app
+   * degrades to a clear error rather than failing to start.
    */
   readonly VITE_AI_BASE_URL?: string;
   readonly VITE_AI_API_KEY?: string;
   readonly VITE_AI_MODEL?: string;
-  /** Testnet wallet private key used to sign 0G Storage uploads. */
-  readonly VITE_OG_PRIVATE_KEY: string;
-  /** 0G Galileo testnet EVM RPC. */
-  readonly VITE_OG_RPC_URL: string;
-  /** 0G Storage turbo indexer gateway. */
-  readonly VITE_OG_INDEXER_URL: string;
-  /**
-   * Which wallet's Sibyl memory to read. A stand-in until wallet-connect
-   * supplies the connected account. Not secret.
-   */
+  /** Same provider, separate rate-limit bucket. Used when the primary caps. */
+  readonly VITE_AI_FALLBACK_MODEL?: string;
   readonly VITE_MEMORY_TENANT?: string;
 }
 

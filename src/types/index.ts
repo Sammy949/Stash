@@ -1,10 +1,14 @@
 /**
  * Stash domain model.
  *
- * The `Ledger` is the single object that gets serialized to JSON,
- * encrypted, and persisted to 0G Storage. Everything the agent needs
- * to be "personalized" lives here so it can be injected into the
- * system prompt on every 0G Compute call.
+ * The `Ledger` is the single object the app persists: transactions are the
+ * source of truth and balance is derived from them, never stored. It is held
+ * locally and injected into the agent's system prompt on every call, so the
+ * model always answers against the real numbers.
+ *
+ * Durability across devices is NOT this object's job — that belongs to the
+ * memory layer, which holds who the person is rather than what their balance
+ * happens to be.
  */
 
 export type Currency =
@@ -211,26 +215,7 @@ export interface Ledger {
   hustles: Hustle[];
   /** Structured savings targets (earmark progress, never balance). */
   goals: Goal[];
-  /** ISO timestamp of the last successful 0G Storage sync. */
-  lastSyncedAt: string | null;
 }
-
-/** ───────────────── 0G Storage ───────────────── */
-
-export interface SyncResult {
-  rootHash: string;
-  syncedAt: string;
-}
-
-export type SyncPhase =
-  | "idle"
-  | "encrypting"
-  | "uploading"
-  | "confirmed"
-  | "error"
-  /** Sync didn't go through; data is safe locally and will retry. Persists
-   *  (no auto-clear) until a sync succeeds. */
-  | "pending";
 
 /** ───────────────── Agent cards (structured replies) ───────────────── */
 

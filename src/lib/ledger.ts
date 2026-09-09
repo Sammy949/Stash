@@ -33,20 +33,9 @@ export const EMPTY_LEDGER: Ledger = {
   scholarships: [],
   hustles: [],
   goals: [],
-  lastSyncedAt: null,
 };
 
 /** ───────────────── Formatting ───────────────── */
-
-/** Human "Last synced" string; null → not yet synced. */
-export function formatSyncedAt(iso: string | null): string {
-  if (!iso) return "Not yet synced to 0G";
-  const time = new Date(iso).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  return `Last synced: ${time}`;
-}
 
 /** ───────────────── Balance math (derived) ───────────────── */
 
@@ -742,6 +731,5 @@ export function migrateLedger(raw: unknown): Ledger {
     scholarships: (r.scholarships as Ledger["scholarships"]) ?? [],
     hustles: (r.hustles as Ledger["hustles"]) ?? [],
     goals: ((r.goals as Goal[]) ?? []).map(backfillGoalHistory),
-    lastSyncedAt: (r.lastSyncedAt as string | null) ?? null,
   };
 }

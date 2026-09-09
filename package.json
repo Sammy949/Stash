@@ -11,7 +11,6 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@0gfoundation/0g-storage-ts-sdk": "^1.2.10",
     "@base-ui/react": "1.7.0",
     "@fontsource-variable/geist": "^5.2.9",
     "@fontsource-variable/geist-mono": "^5.2.8",
@@ -20,9 +19,9 @@
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "^1.1.1",
+    "cn": "^0.2.6",
     "date-fns": "^4.4.0",
     "embla-carousel-react": "^8.6.0",
-    "ethers": "6.13.1",
     "input-otp": "^1.5.0",
     "motion": "^13.2.0",
     "react": "19.2.8",
@@ -37,6 +36,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.20.2",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
     "@vitejs/plugin-react": "^4.3.4",

@@ -1,5 +1,6 @@
 import type { Ledger } from "@/types";
 import { balance, decisionContext, getGoals, goalRemaining } from "@/lib/ledger";
+import { deriveAttention } from "@/lib/attention";
 import { formatMoney } from "@/lib/currency";
 import { memoryLine, type RecallPack } from "@/lib/memory";
 
@@ -80,7 +81,19 @@ export function deterministicOpener(
   recall: RecallPack,
   lastVisitAt?: string | null,
 ): string {
-  if (!recall.remembers) return PLAIN_OPENER;
+  // An urgent deadline is said in BOTH branches, and it is the one thing here
+  // that does not come from memory. It is a ledger fact — the same class as the
+  // balance — so it survives `?nomemory` for the same reason the arithmetic
+  // does. The deletion test is about Stash forgetting the person, not about it
+  // going blind to its own data, and a scholarship closing in three days is not
+  // something to withhold to make a demo tidier.
+  const urgent = deriveAttention(ledger);
+  const deadline =
+    urgent?.kind === "deadline" ? `Worth knowing: ${urgent.text}` : null;
+
+  if (!recall.remembers) {
+    return deadline ? `${PLAIN_OPENER} ${deadline}` : PLAIN_OPENER;
+  }
 
   const cur = ledger.currency;
   const name = rememberedName(ledger, recall);
@@ -115,6 +128,10 @@ export function deterministicOpener(
   if (ctx.inTheRed) {
     parts.push(`You're below zero right now, at ${formatMoney(balance(ledger), cur)}.`);
   }
+
+  // Last before the question, so the closing line follows straight on from the
+  // most time-critical thing Stash has to say.
+  if (deadline) parts.push(deadline);
 
   parts.push("What do you want to stay ahead of?");
   return parts.join(" ");

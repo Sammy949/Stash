@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import type { AgentCard, ChatMessage, Ledger } from "@/types";
-import { runAgentTurn, StashComputeError } from "@/lib/ogCompute";
+import { runAgentTurn, StashComputeError } from "@/lib/agent";
 import { getGoals } from "@/lib/ledger";
 import { EMPTY_RECALL, type MemoryPort } from "@/lib/memory";
 import { PLAIN_OPENER, deterministicOpener } from "@/lib/opener";
@@ -9,9 +9,9 @@ import {
   mostUrgentScholarships,
 } from "@/lib/scholarshipContext";
 import {
-  REVIEW_GOALS_CHIP,
-  SCHOLARSHIP_DEADLINES_CHIP,
-} from "@/components/Agent/QuickChips";
+  REVIEW_GOALS_PROMPT,
+  SCHOLARSHIP_DEADLINES_PROMPT,
+} from "@/lib/knownPrompts";
 
 function makeMessage(
   role: ChatMessage["role"],
@@ -28,7 +28,7 @@ function makeMessage(
 }
 
 /**
- * useAgent — chat transcript + 0G Compute calls.
+ * useAgent — chat transcript + agent turns.
  *
  * A ref mirrors the transcript so async handlers always read the latest
  * state (no stale closures); `setMessages` just pushes the ref to React.
@@ -150,7 +150,7 @@ export function useAgent(memory?: MemoryPort) {
       // The "Review my goals" chip is a plain query (no tool fires), so on that
       // exact prompt we surface ALL active goals — the grouped-stack moment.
       const isReview =
-        text.trim().toLowerCase() === REVIEW_GOALS_CHIP.toLowerCase();
+        text.trim().toLowerCase() === REVIEW_GOALS_PROMPT.toLowerCase();
       const relatedGoalIds = isReview
         ? getGoals(turn.ledger)
             .filter((g) => g.targetAmount > 0)
@@ -163,7 +163,7 @@ export function useAgent(memory?: MemoryPort) {
       // the nudge's FACTS line is injected so the model MENTIONS it); here we
       // only layer on any scholarship the user NAMED this turn.
       const isDeadlines =
-        text.trim().toLowerCase() === SCHOLARSHIP_DEADLINES_CHIP.toLowerCase();
+        text.trim().toLowerCase() === SCHOLARSHIP_DEADLINES_PROMPT.toLowerCase();
       let relatedScholarshipIds: string[];
       if (isDeadlines) {
         relatedScholarshipIds = mostUrgentScholarships(turn.ledger, 3).map(
@@ -199,7 +199,7 @@ export function useAgent(memory?: MemoryPort) {
         ? "Stopped."
         : e instanceof StashComputeError
           ? e.message
-          : "Something went wrong reaching 0G Compute. Try again in a moment.";
+          : "Something went wrong reaching the model. Try again in a moment.";
       commit(
         ref.current.map((m) =>
           m.id === pending.id ? { ...m, content: msg, pending: false } : m,

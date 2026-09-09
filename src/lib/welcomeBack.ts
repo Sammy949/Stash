@@ -1,5 +1,6 @@
 import type { Ledger } from "@/types";
 import { daysUntil, getGoals, goalRemaining } from "@/lib/ledger";
+import { DEADLINE_DAYS } from "@/lib/attention";
 import { EMPTY_RECALL, type RecallPack } from "@/lib/memory";
 import {
   movedSince,
@@ -76,22 +77,30 @@ export function deriveWelcomeBack(
     }
   }
 
-  // Nearest upcoming scholarship deadline.
+  // Nearest upcoming scholarship deadline — but only once it is far enough out
+  // that the attention slot is not already carrying it.
+  //
+  // The two surfaces sit on the same screen, so without this split a deadline
+  // three days away appeared as a bullet here AND as the attention row directly
+  // below, which is the same sentence twice. The division is by urgency and it
+  // is a real one: the slot owns anything inside the red band (it is a standing
+  // row that persists until dealt with), and this greeting keeps the wider
+  // horizon — the deadline that is coming but not yet pressing, which the slot
+  // deliberately stays silent about.
   const next = ledger.scholarships
     .filter((s) => s.deadline)
     .map((s) => ({ s, d: daysUntil(s.deadline!, now) }))
-    .filter((x) => x.d >= 0)
+    .filter((x) => x.d >= DEADLINE_DAYS)
     .sort((a, b) => a.d - b.d)[0];
   if (next) {
-    const when =
-      next.d === 0
-        ? "closes today"
-        : next.d === 1
-          ? "closes tomorrow"
-          : `closes in ${next.d} days`;
+    // Always plural days and always the neutral tone, both of which follow from
+    // the filter above: nothing under DEADLINE_DAYS reaches here, so there is no
+    // "closes today" case left to handle and nothing to raise the alarm for.
+    // Amber is warnings-only in this palette, and a deadline more than a week
+    // out is not a warning — it is the horizon.
     facts.push({
-      text: `${next.s.name} ${when}`,
-      tone: next.d < 7 ? "warn" : "default",
+      text: `${next.s.name} closes in ${next.d} days`,
+      tone: "default",
     });
   }
 

@@ -33,6 +33,11 @@ export {
   CircleHalfIcon as SystemThemeIcon,
   CloudArrowUpIcon,
   CopyIcon,
+  // Sand mostly run through, which is the runway warning exactly: not "time
+  // exists" but "time is nearly out". Its `fill` weight is the hourglass itself
+  // (`M200,75.64V40…`), not the knocked-out tile the four marks below carry, so
+  // it is safe under the global fill provider — checked in defs/HourglassLow.
+  HourglassLowIcon as RunwayIcon,
   LightningIcon as BoltIcon,
   LockIcon,
   MoonIcon,

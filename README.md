@@ -1,213 +1,175 @@
-<div align="center">
-
 # Stash
 
-### Know where you stand. See what's coming. Stay ahead.
+**A personal finance agent that already knows you.**
 
-**The financial memory companion for students with irregular income — it knows your real numbers, remembers what you're working toward, and acts on both.**
+Built for students and young people whose money arrives in bursts — freelance
+work, gigs, allowances, scholarships. Not a budgeting app: a companion that
+remembers who you are between sessions and acts on it.
 
-### 🔗 [Live demo → heystash.app](https://heystash.app)
-
-by [Samuel Yahaya](https://twitter.com/I_am_SamY01) · [@Sammy949](https://github.com/Sammy949)
-
-</div>
+Live: **[heystash.app](https://heystash.app)**
 
 ---
 
-## The problem
+## What makes it work: persistent memory
 
-Students don't have a budgeting problem. They have a **visibility problem**.
+Stash's transcript is session-local. Reload the page and the conversation is
+gone. What survives is everything that matters about *you* — stored in
+[Sibyl Memory](https://sibyllabs.org) through a sidecar service, keyed to a
+wallet address.
 
-Money moves in unpredictable bursts — allowances drop late, clients pay in chunks, scholarships disburse on their own schedule. You can't budget like someone with a salary, because you don't have one. So most students just wing it.
+That gap is the point. A fresh session opens with a blank chat and a Stash that
+still knows your goal, your habits, and what moved since you were last here.
 
-**Stash exists so you don't have to wing it.**
+### What breaks when memory is deleted
 
-It tracks where your money actually goes, keeps you ahead of scholarship deadlines, holds the things you're saving toward, and gives you an AI agent that knows your real numbers — your balance, your income streams, your next deadline — and talks to you about them specifically. It even remembers the durable things about you: your goals, your habits, what you're trying to become — and it keeps all of it across sessions, encrypted and yours.
+Append `?nomemory` to the URL. `resolveTenant()` returns null, every read
+resolves to `EMPTY_RECALL`, nothing is written. Then:
+
+1. **The cold-start opener goes generic.** With memory, Stash's first line names
+   your goal, your habit, and the delta since your last visit — rebuilt entirely
+   from Sibyl, because the transcript is gone. Without it, you get a greeting
+   that could be addressed to anyone.
+
+2. **Proactive guidance dies completely.** `deriveObservation()`
+   ([`src/lib/observations.ts`](src/lib/observations.ts)) matches a *committed*
+   money event against remembered habits. With the habit *"Overspends the week
+   after getting paid"* stored, logging income produces a specific intervention
+   naming your own words back to you. With `EMPTY_RECALL`, the same event
+   produces `null`. Silence.
+
+3. **Stash stops being able to act on who you are** — which is the entire
+   product claim.
+
+**What honestly does not break:** the arithmetic. Balance is
+`openingBalance + Σincome − Σexpenses`, computed in code, and maths does not need
+recall. We are not going to pretend otherwise. The gate is not "nothing works
+without memory" — it is "the thing this product claims to be does not work
+without memory."
+
+### Three-line walkthrough
+
+**Persist** — facts and money events are written to Sibyl through the sidecar.
+Entities via `writeMemory()` (consolidating in place when the subject already
+exists), money events journalled to the COLD tier via `writeMoneyEvent()`, the
+financial snapshot via `writeSnapshot()`. All in
+[`src/lib/memory.ts`](src/lib/memory.ts) → [`api/memory.ts`](api/memory.ts) →
+[`sibyl-svc/`](sibyl-svc/).
+
+**Recall** — one round-trip. `fetchRecallPack()` calls `/recall-pack`, which
+returns identity, goals, habits, preferences, opportunities, the financial
+snapshot and recent events *together*, so the cold-start opener needs a single
+fetch. A tenant with nothing stored returns `remembers: false` and Stash greets
+plainly rather than showing a blank screen.
+
+**Changes the decision by** — code, not the model, matches the event against
+what is remembered. A remembered *risk* habit plus a committed income event
+produces a deterministic intervention. The model never decides whether to
+intervene, so it cannot be lost to a sampling roll or a rate limit.
+
+### Memory primitives used
+
+`recall` · `entities` · `temporal` · `consolidation` · `summarization`
+
+Two we deliberately do **not** claim:
+
+- **semantic search** — the sidecar exposes FTS5 keyword search
+  (`GET /entities?q=`), not embeddings.
+- **reflection** — designed, not built.
+
+---
+
+## Architecture
+
+**Code owns the math.** Transactions are the source of truth and balance is
+derived, never stored. The agent acts through tool calls
+([`src/lib/agentTools.ts`](src/lib/agentTools.ts)); a pure reducer applies the
+action and hands the model the computed result, including the exact new balance.
+The system prompt forbids the model from inventing figures. Every invalid amount
+(negative, zero, `NaN`, a string, an object) is rejected by reference, so a
+rejected action cannot report success or trigger a memory write.
+
+**Local-first.** `localStorage` is the working copy, written synchronously on
+every change, so the UI never waits on a network call.
+
+**The memory sidecar.** Sibyl Memory is a Python library over local SQLite, so it
+runs as a small FastAPI service ([`sibyl-svc/`](sibyl-svc/)) that the browser
+never talks to directly — every call goes through `/api/memory`, which injects
+the service token server-side. Nothing secret reaches the bundle.
+[`sibyl-svc/probe.py`](sibyl-svc/probe.py) is the end-to-end proof: 12 checks
+over real HTTP including auth rejection, tenant isolation, consolidation
+(same row id, evolved body) and the `remembers: false` cold-start path.
+
+**Inference** is provider-agnostic over any OpenAI-compatible endpoint. The
+deployed build runs Groq (`openai/gpt-oss-120b`, with `openai/gpt-oss-20b` as a
+separate-rate-limit-bucket fallback), configured entirely by environment.
 
 ---
 
-## Persistence & inference
+## Prior work
 
-### 🔐 Encrypted backup (0G Storage)
+Stash existed before this hackathon, built for **Zero Cup 2026 (0G Labs)**. That
+work is tagged `pre-sibyl-hackathon`; everything after it belongs to the Sibyl
+build window.
 
-Your financial ledger is stored as an **encrypted JSON file on the 0G decentralized storage network** as its durable backup — not a database we own. The app is local-first (`localStorage` is the working copy), and 0G is where your state is encrypted, finalized on-chain, and made portable.
+The 0G integration has been **removed**, not just relabelled. The encrypted
+ledger backup on 0G Storage, its serverless signing proxy, `ethers` and the 0G
+SDK are all gone from the tree. It was removed rather than kept because it could
+not deliver what it claimed: restoring a ledger required a root hash that itself
+lived in `localStorage`, so it could only ever restore a browser that had not
+actually lost anything.
 
-- Ledger serialized and encrypted with the SDK's **native AES-256** encryption.
-- The AES key is **derived from a wallet private key** — `sha256("stash-ledger-v1:" + privateKey)` → 32 bytes — so only that key decrypts the ledger.
-- In production (`heystash.app`), sync runs through a same-origin **Vercel serverless proxy** (`/api/og-sync`) that holds the wallet key in **server env** (not the client bundle) and encrypts + uploads server-side. This also dodges the HTTPS→HTTP mixed-content block against the testnet's HTTP-only storage nodes. On `localhost`, the SDK runs directly in the browser.
-- Uploaded via `MemData` to 0G Storage; the returned **root hash** is the only thing kept locally (`localStorage`).
-- On the next session, the ledger is **downloaded and decrypted** (`downloadToBlob`) by that root hash — full state restored.
-- Every sync surfaces the **real root hash** in a toast.
-- `ethers` + the 0G SDK are **lazy-loaded** so the initial bundle stays small; the storage libraries load only on first sync.
+What replaced it is not a like-for-like swap, and the distinction is worth being
+precise about. The ledger is now local-first and local-only. Durability moved to
+the memory layer, which holds who you are, what you are working toward and a
+journal of money events — the things worth carrying between sessions. The
+balance in front of you is reconstructable from your own entries; who you are
+is not, which is why that is the part Sibyl keeps.
 
-**The result:** your financial life — income, spending, goals, scholarship status, and what Stash remembers about you — is AES-256 encrypted and finalized on a decentralized network, not a platform-owned database.
-
-> **Honest scope.** This demo signs with a single testnet/throwaway wallet, so the encryption is real but not yet per-user. A production multi-user build derives a per-user key and moves all signing behind the proxy — the architecture is already shaped for it.
-
-### 🤖 Inference
-
-The agent talks to any **OpenAI-compatible** chat-completions endpoint.
-
-- **Provider-agnostic by design** — the endpoint, key, and model are environment variables. Repointing them at another provider needs no code change.
-- The **live ledger is injected into the system prompt on every call**, so the agent knows your exact balance, deadlines, and income streams and answers specifically — never with generic advice.
-- The deployed build runs on **Groq** (`openai/gpt-oss-120b`, with `openai/gpt-oss-20b` as a separate-rate-limit-bucket fallback; both swappable via env).
-- **Resilient by default** — rate-limit backoff (Retry-After-aware), a same-key fallback model for when a provider's per-minute cap is hit, robust tool-call parsing, and a deterministic fallback reply mean a completed action is never lost to a flaky provider mid-demo.
-
----
-
-## Core features
-
-### 💸 Expense & income tracking
-Just talk to it. Type *"Spent ₦2,000 on transport"* or *"Got ₦12k from a client"* → the agent emits a **structured tool call** (`log_expense` / `log_income`), the ledger reducer applies it, the balance instrument and the numbers **update live**, and the state is backed up with a real root-hash toast. No brittle regex — all natural language goes through the agent, and the **code owns the math** so the dashboard and the agent's words never disagree. Ask *"analyze my spending"* and you get a **code-computed** category breakdown card — exact percentages, never model arithmetic.
-
-### 🎯 Living savings goals
-Set a target by talking — *"I want to save ₦200k for a laptop"* (`add_goal`) — and earmark money toward it whenever you set funds aside (`contribute_to_goal`). Goals track progress **independently of your spendable balance** (an earmark model, never a transaction), so saving toward something never distorts what you can actually spend. When income lands, Stash offers to set some aside; before a big purchase, it tells you honestly what the buy costs you in goal progress.
-
-### 🧠 Financial memory
-Beyond the numbers, Stash remembers the durable things about you — goals, habits, preferences, identity, and opportunities (`remember` / `update_memory` / `forget_memory`). That memory is injected into every prompt, so advice arrives with context instead of starting from zero. It's **felt in the replies**, not shown as a database screen.
-
-### 🔔 Proactive guidance
-Stash speaks up unprompted — a scholarship deadline closing this week, a goal trade-off, a *"since you were last here…"* recap on return. Each is computed in **code** (deterministic, never a hallucinated number) and surfaced one at a time, never as spam.
-
-### ✏️ Edit & replay
-Edit a past message and Stash rewinds to the exact state it held before that turn and re-runs from there. The money is **restored from a snapshot, never reconstructed by the model** — correcting *"₦5,000"* to *"₦500"* updates everything downstream, deterministically.
-
-### 🎓 Scholarship Radar
-A **dynamic urgency system** — red / amber / green are derived from the actual deadline dates, not hardcoded. Under 7 days is critical, under 30 is approaching. You add and manage scholarships through the agent (`add_scholarship` / `remove_scholarship`).
-
-### ⚡ Hustle Ledger
-Income streams with status tracking — *received, active, pending, building* — and a live-calculated total of active monthly income. Managed conversationally (`add_income_stream` / `remove_income_stream`).
-
-### 🤖 The agent that acts (and owns its math)
-A conversational agent with full ledger context — your balance, deadlines, income streams, goals, and what it remembers about you, all injected into every call. It **acts via tool calls**, distinguishes money that actually *moved* from money that's only *owed or planned* (so it never logs a phantom expense — it offers to turn an obligation into a goal instead), and **never computes a balance itself**: code hands it the exact numbers as facts it must use verbatim. Direct, warm, built for the student hustle — short sentences, no fluff, real talk.
-
----
-
-## Tech Stack
-
-- React 18 + TypeScript + Vite 6
-- 0G Storage (AES-256 encrypted ledger backup)
-- Groq `openai/gpt-oss-120b` over an OpenAI-compatible interface (`openai/gpt-oss-20b` fallback, swappable via env)
-- Tailwind CSS v4 (light + dark), ethers.js
-- Sibyl (`sibyl-svc`) for durable agent memory
-- Vercel Serverless Functions (`/api/og-sync`, `/api/memory`)
-
----
+Removing it also dropped ~570KB from the bundle and five of the project's nine
+dependency vulnerabilities.
 
 ## Getting started
 
-### Prerequisites
-- Node.js 18+
-- A funded [0G Galileo testnet](https://faucet.0g.ai) wallet (throwaway — see the security note)
-- A [Groq API key](https://console.groq.com) (free), or any OpenAI-compatible endpoint
-
-### Installation
-
 ```bash
-git clone https://github.com/Sammy949/Stash
-cd Stash
 npm install
-```
-
-### Environment setup
-
-```bash
-cp .env.example .env
-```
-
-Fill in `.env` for **local dev** (on `localhost` the browser runs the SDK directly):
-
-```bash
-# AI inference — Groq (OpenAI-compatible) for the testnet demo
-VITE_AI_BASE_URL=https://api.groq.com/openai/v1
-VITE_AI_API_KEY=gsk_your_groq_key
-VITE_AI_MODEL=openai/gpt-oss-120b
-VITE_AI_FALLBACK_MODEL=openai/gpt-oss-20b        # separate rate-limit bucket; used when the primary hits its cap
-
-# 0G Storage — funded Galileo testnet wallet (throwaway only)
-VITE_OG_PRIVATE_KEY=0x_your_testnet_wallet_key
-VITE_OG_RPC_URL=https://evmrpc-testnet.0g.ai
-VITE_OG_INDEXER_URL=https://indexer-storage-testnet-turbo.0g.ai
-```
-
-In **production** (Vercel), set the 0G Storage keys **server-side** — no `VITE_` prefix, so they never reach the client bundle — and sync flows through the `/api/og-sync` proxy:
-
-```bash
-OG_PRIVATE_KEY=0x_your_testnet_wallet_key
-OG_RPC_URL=https://evmrpc-testnet.0g.ai
-OG_INDEXER_URL=https://indexer-storage-testnet-turbo.0g.ai
-```
-
-To use a different provider, point the three `VITE_AI_*` values at any OpenAI-compatible endpoint — no code change.
-
-Agent memory runs against the `sibyl-svc` sidecar; see the `SIBYL_SVC_*` block in `.env.example` (server-side only, deliberately no `VITE_` prefix).
-
-> **Security note.** In the deployed build, 0G signing already runs **server-side** in the `/api/og-sync` proxy (`OG_PRIVATE_KEY` is never in the client bundle); the AI key and the local-dev `VITE_OG_PRIVATE_KEY` are still client-side. Use a **throwaway, testnet-only wallet with minimal funds** either way — a full production build moves inference behind the proxy too and derives per-user keys. `.env` is gitignored.
-
-### Run & build
-
-```bash
 npm run dev      # http://localhost:5173
 npm run build    # tsc -b && vite build
 ```
 
----
+Copy `.env.example` to `.env` and fill in:
 
-## Walkthrough
+- `VITE_AI_BASE_URL` / `VITE_AI_API_KEY` / `VITE_AI_MODEL` — any
+  OpenAI-compatible provider
+- `SIBYL_SVC_URL` / `SIBYL_SVC_TOKEN` — the memory sidecar (server-side only,
+  deliberately no `VITE_` prefix: a public service token would let anyone read
+  any tenant's memory)
+- `VITE_MEMORY_TENANT` — which wallet's memory to read when no wallet is
+  connected
 
-### Flow 1 — Expense logging + backup
-Type **"Spent ₦2,000 on transport"**. The balance instrument and the numbers update live, and a toast confirms the backup with its **real storage root hash**.
+Running the sidecar and verifying it:
 
-### Flow 2 — Persistence
-**Hard-refresh** the page (`Ctrl/Cmd + Shift + R`). You'll see *"Restoring your ledger…"*, and your logged expense is still there — reconstructed from the encrypted remote backup by its root hash, not just localStorage.
+```bash
+cd sibyl-svc
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+export STASH_SVC_TOKEN=$(python3 -c "import secrets;print(secrets.token_urlsafe(24))")
+.venv/bin/uvicorn app:app --port 8787
 
-### Flow 3 — Agent with live context
-Click **"Scholarship deadlines"**. The agent responds with *your* specific deadlines, the exact days remaining, and concrete next steps — because the live ledger is in its prompt.
-
-### Flow 4 — Edit a message, watch reality re-derive
-Hover a message you sent, edit the amount, and save. Stash rewinds to the state it held before that turn and re-runs — the balance and everything downstream update from the **restored snapshot, not a model guess**. The clearest proof of *intelligent agent, deterministic money*.
-
----
-
-## Architecture notes
-
-### Data flow
-A single `Ledger` object — transactions, goals, scholarships, hustles, and soft memories — flows through everything:
-
-1. **Empty on first load** — no seed data; your ledger grows from your own entries (onboarding sets name, currency, and opening balance).
-2. **Local-first** — `localStorage` is the canonical working copy, written synchronously on every change so the UI never waits on the network.
-3. **Updated** on every agent tool call via a pure reducer (the code computes the new balance; the model never invents math).
-4. **Re-encrypted and backed up** on sync — through a Vercel serverless proxy — and the new root hash is persisted.
-5. **Hydrated** from the backup on boot if a root hash exists, and **injected** into the agent's system prompt on every call.
-
-### Why decentralized storage over a database
-A central database is owned by the platform; storage on 0G is designed to be owned by the user. A student's financial life is deeply personal data — Stash puts it on a decentralized, encrypted, user-controllable substrate instead of a database we own. (Per-user key custody is the production step; the demo signs with one testnet wallet — see the honest-scope note above.)
-
-### Bundle strategy
-`ethers` + the 0G SDK total ~500 KB. They're dynamically imported inside the sync functions, so the initial dashboard chunk is ~150 KB and the 0G libraries load only on first sync. Fast first paint, snappy feel.
-
-### Sync durability
-Uploads run with finality required — each sync blocks until 0G confirms the data is durably stored, so the root hash in the toast points at genuinely finalized, verifiable data. The UI updates optimistically in the meantime, so the wait is never blocking.
+# in another shell, same token exported:
+.venv/bin/python probe.py http://127.0.0.1:8787
+```
 
 ---
 
-## Project
+## Honest limitations
 
-- Atomic commits, conventional-commits style (`type(scope): description`).
-- Full history: [github.com/Sammy949/Stash/commits/main](https://github.com/Sammy949/Stash/commits/main)
-
----
-
-## Built for
-
-A final-year student running a design agency, teaching a coding bootcamp, pursuing international scholarships, and building something real — all at the same time.
-
-Not a Silicon Valley demo. Built for someone actually living this.
-
-<div align="center">
+- **Tenant ownership is not yet proven.** Connecting a wallet is a claim, not a
+  signature — SIWE is the next step. Until then the sidecar's bearer token is the
+  only gate, and a token holder can address any tenant.
+- **Keys in the dev bundle.** Local development reads `VITE_`-prefixed keys in the
+  browser; use throwaway testnet credentials only. Production moves 0G signing
+  and the memory token server-side.
+- **Search is keyword, not semantic.** FTS5 over stored text.
 
 ---
 
-by Samuel Yahaya · [@I_am_SamY01](https://twitter.com/I_am_SamY01) · [github.com/Sammy949/Stash](https://github.com/Sammy949/Stash)
-
-</div>
+Built by [Samuel Yahaya](https://github.com/Sammy949).

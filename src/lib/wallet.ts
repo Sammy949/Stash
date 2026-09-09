@@ -7,9 +7,8 @@
  * Stash's balance is a personal-finance ledger in fiat (₦, GHS, KES…), derived
  * from transactions the user tells Stash about. It is NOT a token balance and a
  * connected account can never fund it. This module reads no balance, signs no
- * transaction and submits nothing on-chain. The only chain-signing code in the
- * project is server-side (`api/og-sync.ts`), where the app's OWN throwaway key
- * signs encrypted ledger backups to 0G — that is the app's key, not the user's.
+ * transaction and submits nothing on-chain. Nothing anywhere in this project
+ * does — there is no signing code left in the tree at all.
  *
  * What connecting actually buys: an address to file memory under. `memory.ts`
  * has always resolved a tenant, and both it and `.env.example` said the same
@@ -18,10 +17,10 @@
  * every visitor to the deployed app shared a single memory. Connecting makes
  * memory genuinely per-person.
  *
- * Deliberately raw EIP-1193 rather than ethers: `ethers` is a ~260KB dependency
- * that ogStorage.ts loads with a dynamic import precisely to keep it out of the
- * initial bundle. Pulling it in eagerly for `eth_requestAccounts` — one string
- * over a JSON-RPC pipe — would undo that for no gain, and needs no new package.
+ * Deliberately raw EIP-1193 rather than a library: `eth_requestAccounts` is one
+ * string over a JSON-RPC pipe, and this is the whole surface. ethers was a
+ * ~260KB dependency carried for the retired storage layer and it left with it;
+ * pulling it back for this would trade the entire saving for nothing.
  */
 
 /** Where the connected address is remembered across reloads. */

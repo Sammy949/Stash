@@ -12,7 +12,6 @@ import {
   ItemGroup,
   ItemTitle,
 } from "@/components/shadcn/item";
-import { Skeleton } from "@/components/shadcn/skeleton";
 
 const PREVIEW = 3;
 
@@ -39,12 +38,9 @@ function shortDate(iso: string): string {
 export function TransactionList({
   transactions,
   currency,
-  hydrating = false,
 }: {
   transactions: Transaction[];
   currency: Currency;
-  /** Restoring the backup: show the shape of the rows, not a blank card. */
-  hydrating?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -59,7 +55,7 @@ export function TransactionList({
       icon={<ReceiptIcon className="size-3.5" />}
       title="Recent Activity"
       action={
-        !hydrating && ordered.length > PREVIEW ? (
+        ordered.length > PREVIEW ? (
           <SectionAction
             kind="expand"
             expanded={expanded}
@@ -69,9 +65,7 @@ export function TransactionList({
         ) : undefined
       }
     >
-      {hydrating ? (
-        <PendingRows />
-      ) : ordered.length === 0 ? (
+      {ordered.length === 0 ? (
         <EmptyState
           title="No activity yet"
           hint={
@@ -126,32 +120,5 @@ export function TransactionList({
         </ItemGroup>
       )}
     </Section>
-  );
-}
-
-/** Hydrating placeholder, shaped like the rows it stands in for. */
-function PendingRows() {
-  return (
-    <>
-      <span className="sr-only" role="status">
-        Restoring your recent activity
-      </span>
-      {/* role="presentation" overrides ItemGroup's role="list": a list with no
-          listitem children announces as an empty list, and these rows are
-          placeholders, not content. */}
-      <ItemGroup role="presentation" aria-hidden>
-        {[0, 1, 2].map((i) => (
-          <Item key={i} size="sm" className="px-0">
-            <ItemContent className="gap-1.5">
-              <Skeleton className="h-3.5 w-32" />
-              <Skeleton className="h-3 w-20" />
-            </ItemContent>
-            <ItemActions>
-              <Skeleton className="h-4 w-16" />
-            </ItemActions>
-          </Item>
-        ))}
-      </ItemGroup>
-    </>
   );
 }
