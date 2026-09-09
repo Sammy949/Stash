@@ -1,0 +1,14 @@
+# Automatic HTTPS via Let's Encrypt. Caddy provisions and renews the
+# certificate on its own — the only requirement is that this hostname's DNS A
+# record already points at this machine BEFORE the stack starts, because the
+# ACME challenge is served on port 80.
+sibyl.heystash.app {
+	reverse_proxy sibyl-svc:8000
+
+	# The sidecar is called server-to-server by Vercel, never by a browser, so
+	# there is no CORS to configure and nothing here needs to be public.
+	log {
+		output stdout
+		format console
+	}
+}

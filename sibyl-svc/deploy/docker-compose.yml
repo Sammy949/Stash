@@ -1,0 +1,44 @@
+# Stash memory sidecar — single-VM deployment.
+#
+# Two containers: the FastAPI service, and Caddy in front of it for automatic
+# HTTPS. The service is NOT published on a host port; only Caddy is reachable
+# from outside, so the bearer token never crosses the wire in plaintext and the
+# only open ports on the box are 80 and 443.
+#
+# The DB is a BIND MOUNT to the host, not a named volume: `docker compose down
+# -v` or a stack rebuild would take a named volume with it, and the whole point
+# of this host is that memory.db outlives the container.
+
+services:
+  sibyl-svc:
+    build: ..
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - /opt/stash/data:/data
+    expose:
+      - "8000"
+    healthcheck:
+      # /healthz is the one route that needs no auth.
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - sibyl-svc
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
