@@ -157,3 +157,5 @@ __pycache__/
 *.db-shm
 .vercel
 .env*
+
+.vscode
