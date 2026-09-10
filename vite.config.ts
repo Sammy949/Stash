@@ -30,8 +30,10 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const svcUrl = (env.SIBYL_SVC_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
   const svcToken = env.SIBYL_SVC_TOKEN || "";
+  // X-Stash-Auth, matching api/memory.ts: the sidecar's host may own the
+  // Authorization header for its own gate, so the service token gets its own.
   const proxyHeaders: Record<string, string> = svcToken
-    ? { Authorization: `Bearer ${svcToken}` }
+    ? { "X-Stash-Auth": svcToken }
     : {};
 
   return {

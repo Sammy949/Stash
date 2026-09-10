@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   EMPTY_RECALL,
-  fetchRecallPack,
+  fetchRecall,
   isMemoryConfigured,
   resolveTenant,
   type MemoryPort,
@@ -21,12 +21,19 @@ import {
  * means an unreachable sidecar degrades to a plain greeting instead of a blank
  * screen.
  *
+ * `unreachable` is true when a configured tenant's read finished without an
+ * answer. It is the difference between "Stash knows nothing about you" and
+ * "Stash cannot reach its memory right now", which matters because the sidecar
+ * is hosted somewhere that spins down when idle and takes ~50s to boot. Without
+ * it, a cold start renders as the deletion test.
+ *
  * `port` is stable across renders and ref-backed, so useAgent can be handed it
  * once instead of threading the pack through every call signature.
  */
 export function useMemory() {
   const [recall, setRecall] = useState<RecallPack>(EMPTY_RECALL);
   const [hydrating, setHydrating] = useState<boolean>(isMemoryConfigured());
+  const [unreachable, setUnreachable] = useState(false);
   const ref = useRef<RecallPack>(EMPTY_RECALL);
   const mounted = useRef(true);
 
@@ -40,18 +47,21 @@ export function useMemory() {
   const load = useCallback(async () => {
     const tenant = resolveTenant();
     if (!tenant) {
+      // Memory switched off, or no tenant: not a failure, so not "unreachable".
       ref.current = EMPTY_RECALL;
       if (mounted.current) {
         setRecall(EMPTY_RECALL);
         setHydrating(false);
+        setUnreachable(false);
       }
       return;
     }
-    const pack = await fetchRecallPack(tenant);
+    const { pack, reachable } = await fetchRecall(tenant);
     ref.current = pack;
     if (mounted.current) {
       setRecall(pack);
       setHydrating(false);
+      setUnreachable(!reachable);
     }
   }, []);
 
@@ -64,5 +74,5 @@ export function useMemory() {
     [load],
   );
 
-  return { recall, hydrating, port };
+  return { recall, hydrating, unreachable, port };
 }

@@ -83,7 +83,56 @@ export const EMPTY_RECALL: RecallPack = {
   remembers: false,
 };
 
+/**
+ * The outcome of a recall read, so the caller can tell "this tenant has nothing
+ * stored" apart from "the service did not answer".
+ *
+ * Both used to collapse into EMPTY_RECALL, which was fine when the sidecar was
+ * always-on and wrong now that it is not. A free host spins the service down
+ * after ~15 minutes idle and takes ~50s to boot, and during that window a
+ * swallowed failure made Stash render EXACTLY the deletion-test greeting: it
+ * claimed to remember nothing about someone it remembers fine. `reachable`
+ * exists so the UI can say "reconnecting" instead of lying.
+ */
+export interface RecallResult {
+  pack: RecallPack;
+  /** False only when the service was asked and did not answer. */
+  reachable: boolean;
+}
+
 export class MemoryWriteError extends Error {}
+
+/**
+ * A failed request, carrying the HTTP status so a caller can tell a permanent
+ * client error from a service that is merely booting. Extends MemoryWriteError
+ * so existing write-failure handling is unchanged.
+ *
+ * `status` is 0 when the request never got a response at all (DNS, offline,
+ * connection refused — which is what a spun-down host looks like from here).
+ */
+export class MemoryRequestError extends MemoryWriteError {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/** Abortable delay. Resolves early on abort; the caller re-checks the signal. */
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true },
+    );
+  });
+}
 
 /**
  * One pending Sibyl write, produced by a tool call and executed by the agent
@@ -225,32 +274,87 @@ async function request(
   init: RequestInit & { query?: Record<string, string> } = {},
 ): Promise<unknown> {
   const params = new URLSearchParams({ path, ...(init.query ?? {}) });
-  const res = await fetch(`${ENDPOINT}?${params}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Stash-Tenant": tenant,
-      ...(init.headers ?? {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${ENDPOINT}?${params}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Stash-Tenant": tenant,
+        ...(init.headers ?? {}),
+      },
+    });
+  } catch (e) {
+    // No response at all: offline, DNS, refused — or a host that has spun the
+    // sidecar down. Status 0 marks it as retryable.
+    throw new MemoryRequestError(
+      `memory ${path} unreachable: ${e instanceof Error ? e.message : String(e)}`,
+      0,
+    );
+  }
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    throw new MemoryWriteError(`memory ${path} failed (${res.status}): ${detail.slice(0, 200)}`);
+    throw new MemoryRequestError(
+      `memory ${path} failed (${res.status}): ${detail.slice(0, 200)}`,
+      res.status,
+    );
   }
   return res.json();
 }
 
-/** Read the whole recall pack. Never throws: failure reads as "remembers nothing". */
+/**
+ * How long to keep trying the cold-start read before settling for "unreachable".
+ *
+ * A free host spins the sidecar down after idle and takes ~50s to boot, so a
+ * single attempt would fail on exactly the first visit of the day — the one a
+ * judge makes. These retries ride that boot out. They cost nothing when the
+ * service is already awake (the first attempt succeeds), and the UI stays fully
+ * rendered throughout, so this only ever delays the greeting getting warmer.
+ */
+const RECALL_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 15_000, 30_000];
+
+/**
+ * Read the whole recall pack. Never throws.
+ *
+ * Returns `reachable: false` when the service did not answer, so a cold start is
+ * distinguishable from an empty tenant. `pack` is ALWAYS a renderable
+ * RecallPack, so every existing caller stays correct whether or not it looks at
+ * `reachable`: content is never gated on this resolving.
+ *
+ * Retries while the service is unreachable, because "asleep" and "gone" look
+ * identical on the first attempt and only one of them is worth reporting. A 4xx
+ * is NOT retried: a rejected tenant or a misconfigured proxy will not fix itself.
+ */
+export async function fetchRecall(
+  tenant: string,
+  signal?: AbortSignal,
+): Promise<RecallResult> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const pack = (await request("recall-pack", tenant, { signal })) as RecallPack;
+      if (pack && typeof pack === "object") return { pack, reachable: true };
+      // A 200 carrying a non-object is a broken service, not an empty tenant.
+      return { pack: EMPTY_RECALL, reachable: false };
+    } catch (e) {
+      if (signal?.aborted) return { pack: EMPTY_RECALL, reachable: false };
+      // Client errors are permanent; only a transport failure or a 5xx (which is
+      // what a booting or crashed service returns) is worth waiting on.
+      if (e instanceof MemoryRequestError && e.status >= 400 && e.status < 500) {
+        return { pack: EMPTY_RECALL, reachable: false };
+      }
+      const delay = RECALL_RETRY_DELAYS_MS[attempt];
+      if (delay === undefined) return { pack: EMPTY_RECALL, reachable: false };
+      await sleep(delay, signal);
+    }
+  }
+}
+
+/** Back-compat: the pack alone, for callers that do not care why it is empty. */
 export async function fetchRecallPack(
   tenant: string,
   signal?: AbortSignal,
 ): Promise<RecallPack> {
-  try {
-    const pack = (await request("recall-pack", tenant, { signal })) as RecallPack;
-    return pack && typeof pack === "object" ? pack : EMPTY_RECALL;
-  } catch {
-    return EMPTY_RECALL;
-  }
+  return (await fetchRecall(tenant, signal)).pack;
 }
 
 /**

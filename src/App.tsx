@@ -67,7 +67,12 @@ export default function App() {
   const { ledger, applyLedger, initProfile } = useLedger();
   // Sibyl memory: hydrated once on mount and handed to the agent as a port, so
   // every turn recalls from it and any write refreshes it.
-  const { recall, hydrating: recalling, port: memoryPort } = useMemory();
+  const {
+    recall,
+    hydrating: recalling,
+    unreachable: memoryUnreachable,
+    port: memoryPort,
+  } = useMemory();
   // The connected account decides WHOSE memory that is, so any change to it
   // has to re-read the pack. Without this the tenant would move while the
   // previous account's remembered habits stayed on screen — and, worse, fed
@@ -126,6 +131,12 @@ export default function App() {
   const [welcome, setWelcome] = useState<WelcomeBackData | null>(null);
   useEffect(() => {
     if (!onboarded || recalling) return;
+    // Memory unreachable: the recall pack is empty because the service did not
+    // answer, not because there is nothing to recall. Deriving a greeting from it
+    // would say "nice to meet you" to a returning user — and bumping last-visit
+    // would BURN the since-last-visit window, so the delta would be lost for
+    // good once memory came back. Leave both alone and let the marker explain.
+    if (memoryUnreachable) return;
     const last = localStorage.getItem(LAST_VISIT_KEY);
     setWelcome(deriveWelcomeBack(ledger, last, recall));
     // The transcript's first line is the same recall, as prose. Computed here so
@@ -135,7 +146,7 @@ export default function App() {
     // Intentionally keyed on hydration settling, not on every ledger change —
     // the greeting is a one-shot snapshot of "since last visit". It also waits
     // on the Sibyl read, since what Stash remembers IS the greeting.
-  }, [onboarded, recalling]);
+  }, [onboarded, recalling, memoryUnreachable]);
 
   /**
    * Finish first run: seed the ledger, then seed MEMORY.
@@ -346,6 +357,20 @@ export default function App() {
           </MarkerIcon>
           <MarkerContent className="shimmer">
             Recalling what I know about you…
+          </MarkerContent>
+        </Marker>
+      ) : memoryUnreachable ? (
+        /* Not the same as remembering nothing, and it must not read that way.
+           The numbers below are all local and fully correct; only the memory
+           layer is out of reach, so say exactly that. */
+        <Marker role="status">
+          <MarkerIcon>
+            <MemoryIcon className="size-4" />
+          </MarkerIcon>
+          <MarkerContent>
+            I can&rsquo;t reach my memory right now, so I&rsquo;m greeting you
+            as a stranger. Your numbers are all here and correct. Reload in a
+            moment and I should know you again.
           </MarkerContent>
         </Marker>
       ) : (

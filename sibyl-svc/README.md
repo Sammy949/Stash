@@ -121,7 +121,12 @@ Three things it is careful about:
   usable database on disk, so on a host with a real volume the local file always wins.
 
 The debounce window is the worst-case loss on a *hard* kill. A graceful stop (SIGTERM on
-redeploy) flushes it, and `POST /snapshot` forces it.
+redeploy) flushes it, and `POST /snapshot` forces it. Note the windows cannot collide with a
+host's idle spin-down: that needs ~15 minutes of silence, the debounce is seconds.
+
+Deployed to **Render free** (`deploy/RENDER.md`, blueprint in `render.yaml` at the repo
+root), with a private HF **dataset** as the snapshot store. `deploy/HUGGINGFACE.md` covers
+hosting on a Space, which needs PRO and is not the current plan.
 
 ```bash
 STASH_SVC_TOKEN=$STASH_SVC_TOKEN .venv/bin/python verify_persistence.py

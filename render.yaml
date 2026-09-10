@@ -1,0 +1,44 @@
+# Render blueprint for the Sibyl memory sidecar.
+#
+# Free web services have an EPHEMERAL filesystem and cannot attach a disk, so
+# durability comes from persist.py snapshotting to a private Hugging Face dataset
+# (SIBYL_SNAPSHOT_REPO + SIBYL_SNAPSHOT_HF_TOKEN). See deploy/RENDER.md.
+#
+# Apply from the repo root:  render.yaml must sit at the root, and rootDir points
+# Render at the sidecar, so the Dockerfile's COPY paths resolve unchanged.
+services:
+  - type: web
+    name: stash-sibyl-svc
+    runtime: docker
+    plan: free
+    rootDir: sibyl-svc
+    dockerfilePath: ./Dockerfile
+    # Free services are US-only in practice; keep it near the Vercel function.
+    region: oregon
+    healthCheckPath: /healthz
+    envVars:
+      # Set these in the Render dashboard (or `sync: false` prompts on apply).
+      # NEVER commit their values.
+      - key: STASH_SVC_TOKEN
+        sync: false
+      - key: SIBYL_SNAPSHOT_REPO
+        sync: false
+      - key: SIBYL_SNAPSHOT_HF_TOKEN
+        sync: false
+      - key: SIBYL_ACCOUNT_ID
+        sync: false
+      - key: SIBYL_SESSION_TOKEN
+        sync: false
+      - key: SIBYL_TIER
+        value: stake
+      # 5s, not the 20s default. Spin-down needs 15 minutes of silence so either
+      # value is safe against it, but a smaller window shrinks the loss on a hard
+      # kill and a ~300 KB upload does not need long to coalesce.
+      - key: SIBYL_SNAPSHOT_DEBOUNCE_S
+        value: "5"
+      - key: SIBYL_MEMORY_TELEMETRY
+        value: "0"
+      # Render injects $PORT and the Dockerfile's CMD honours it. Pinned anyway so
+      # the container's port is explicit rather than inherited.
+      - key: PORT
+        value: "8000"

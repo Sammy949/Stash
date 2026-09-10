@@ -1,4 +1,18 @@
-# Deploying the memory sidecar to a free Hugging Face Space
+# Deploying the memory sidecar to a Hugging Face Space
+
+> **NOT the current plan, and not free.** Creating a **Docker** Space requires
+> PRO ($9/mo) for a personal account — HF's Spaces overview: "Gradio and Docker
+> Spaces run on compute and require a paid plan to create". CPU Basic hardware is
+> $0/hr, but *creating the Space* is the gate, and the free ZeroGPU allowance is
+> Gradio-only. A **private** Space also serves no app at all (its embed URL 404s);
+> the reachable-app-with-hidden-source variant is **Protected**, also PRO.
+>
+> The sidecar is deployed to **Render** instead — see `RENDER.md`. HF is still
+> used, but only as the **snapshot store**: a private *dataset* repo, which is
+> free (100 GB of private storage on a free account).
+>
+> Kept because it is accurate if you ever hold PRO, and because the snapshot-store
+> setup in step 1–2 is the part Render also needs.
 
 The free tier's disk is ephemeral: wiped on every restart, sleep-wake and rebuild.
 `persist.py` makes that survivable by snapshotting to a **private dataset repo**,
