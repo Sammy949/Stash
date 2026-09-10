@@ -153,8 +153,10 @@ npm run build    # tsc -b && vite build
 
 Copy `.env.example` to `.env` and fill in:
 
-- `VITE_AI_BASE_URL` / `VITE_AI_API_KEY` / `VITE_AI_MODEL` — any
-  OpenAI-compatible provider
+- `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL` / `AI_FALLBACK_MODEL` — any
+  OpenAI-compatible provider. Server-side only: production uses `api/agent.ts`,
+  and the Vite dev proxy forwards to that same server route without exposing the
+  key to the browser bundle. There are no `VITE_AI_*` secrets in this app.
 - `SIBYL_SVC_URL` / `SIBYL_SVC_TOKEN` — the memory sidecar (server-side only,
   deliberately no `VITE_` prefix: a public service token would let anyone read
   any tenant's memory)

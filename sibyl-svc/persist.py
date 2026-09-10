@@ -196,7 +196,9 @@ def _is_usable_db(path: Path) -> bool:
 class Persister:
     """Restore on boot, debounced snapshots after writes, a final flush on exit."""
 
-    def __init__(self, db_path: str, store: SnapshotStore, debounce_s: float = 20.0) -> None:
+    def __init__(
+        self, db_path: str, store: SnapshotStore, debounce_s: float = 20.0
+    ) -> None:
         self._db_path = Path(db_path).expanduser()
         self._store = store
         self._debounce_s = max(0.0, debounce_s)
@@ -210,9 +212,13 @@ class Persister:
         self._restore_blocked = False
         raw_key = os.getenv("SIBYL_SNAPSHOT_KEY", "").strip()
         if self.enabled and not raw_key:
-            raise RuntimeError("SIBYL_SNAPSHOT_KEY is required when snapshot persistence is enabled")
+            raise RuntimeError(
+                "SIBYL_SNAPSHOT_KEY is required when snapshot persistence is enabled"
+            )
         try:
-            self._snapshot_key = base64.urlsafe_b64decode(raw_key.encode()) if raw_key else None
+            self._snapshot_key = (
+                base64.urlsafe_b64decode(raw_key.encode()) if raw_key else None
+            )
         except Exception as e:
             raise RuntimeError("SIBYL_SNAPSHOT_KEY must be URL-safe base64") from e
         if self._snapshot_key is not None and len(self._snapshot_key) != 32:
@@ -308,7 +314,9 @@ class Persister:
             try:
                 # A separate read connection sees the WAL, and VACUUM INTO folds it
                 # into a single self-contained file. Destination must not exist.
-                conn = sqlite3.connect(f"file:{self._db_path}?mode=ro", uri=True, timeout=30.0)
+                conn = sqlite3.connect(
+                    f"file:{self._db_path}?mode=ro", uri=True, timeout=30.0
+                )
                 try:
                     conn.execute("PRAGMA busy_timeout = 30000")
                     conn.execute("VACUUM INTO ?", (str(tmp),))
@@ -359,7 +367,9 @@ class Persister:
         nonce = os.urandom(12)
         target = destination or path
         target.write_bytes(
-            SNAPSHOT_MAGIC + nonce + AESGCM(self._snapshot_key).encrypt(nonce, plaintext, None)
+            SNAPSHOT_MAGIC
+            + nonce
+            + AESGCM(self._snapshot_key).encrypt(nonce, plaintext, None)
         )
 
     def _decrypt_snapshot(self, path: Path) -> None:

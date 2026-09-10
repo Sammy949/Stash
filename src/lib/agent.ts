@@ -30,53 +30,14 @@ import { proactiveDeadlineNudge } from "@/lib/scholarshipContext";
  * Calls an OpenAI-compatible chat endpoint with the live ledger injected
  * into the system prompt, so every reply is specific to Samuel.
  *
- * PROVIDER: any OpenAI-compatible chat-completions endpoint, named entirely by
- * environment (VITE_AI_BASE_URL / _API_KEY / _MODEL). The agent loop does not
- * know or care which provider is behind it.
+ * PROVIDER: any OpenAI-compatible chat-completions endpoint. The provider is
+ * called by /api/agent so its URL and credentials never enter the Vite bundle.
  */
 
 /**
- * Resolved provider config.
- *
- * One provider, named entirely by environment. There used to be a hardcoded
- * default pointing at the 0G Compute Router, with the env vars treated as an
- * override; that inverted the truth (the Router was never the thing actually
- * serving requests) and left a URL in the bundle nothing would ever call.
- * Unset means unconfigured, and the agent says so plainly.
+ * Inference configuration is server-side. Model selection and fallback happen
+ * in /api/agent; the client only knows the stable same-origin endpoint.
  */
-const BASE_URL = import.meta.env.VITE_AI_BASE_URL?.replace(/\/$/, "") || "";
-const API_KEY = import.meta.env.VITE_AI_API_KEY;
-export const STASH_MODEL = import.meta.env.VITE_AI_MODEL || "";
-
-/**
- * Optional SAME-PROVIDER fallback model. Groq rate-limits PER MODEL, so when
- * the primary (e.g. gpt-oss-120b, 8k TPM) is exhausted even after backoff,
- * retrying the identical request on a different model (e.g.
- * openai/gpt-oss-20b, a separate bucket) gets a fresh budget —
- * same key, same endpoint, no new credentials. Empty = no fallback (we throw
- * the calm limit message as before). The fallback model must be tool-call capable (the agent loop
- * depends on it) and it must still EXIST: the previous value here,
- * llama-3.3-70b-versatile, was decommissioned by the provider, so every
- * fallback attempt 404'd and the rate-limit path was dead in the water.
- * openai/gpt-oss-20b is verified: HTTP 200, correct tool call, ~1.3s.
- *
- * IF THE PRIMARY'S DAILY CAP BITES AGAIN, the swap is one env edit and no code
- * change: set VITE_AI_MODEL=openai/gpt-oss-20b (and either leave
- * VITE_AI_FALLBACK_MODEL on 120b, or clear it). Both models were re-probed
- * against this exact tool schema with tool_choice:required — 120b and 20b each
- * returned HTTP 200 and a correctly-shaped log_expense call, and a full
- * runAgentTurn on each committed the right ledger delta — so 20b is a
- * drop-in for the primary slot, not just a rate-limit parachute. Kept as the
- * fallback for now because the primary is answering normally again; promoting
- * it early would trade the better model for a cap that is not currently hit.
- */
-export const FALLBACK_MODEL = import.meta.env.VITE_AI_FALLBACK_MODEL || "";
-
-/** True when an API key is present for the active provider. */
-export function isComputeConfigured(): boolean {
-  return Boolean(API_KEY);
-}
-
 /** Thrown for known, user-actionable Router failures (e.g. empty balance). */
 export class StashComputeError extends Error {}
 
@@ -377,23 +338,17 @@ async function chatCompletion(
   signal?: AbortSignal,
   maxTokens = 320,
 ): Promise<{ content: string | null; tool_calls?: ToolCall[] }> {
-  // The model can change mid-loop: once the primary's rate-limit budget is
-  // spent, we switch to FALLBACK_MODEL (a separate bucket) and keep going.
-  let model = STASH_MODEL;
-  let usedFallback = false;
+  // The server owns the provider key and selects the primary/fallback model.
   for (let attempt = 0; ; attempt++) {
     let res: Response;
     try {
-      res = await fetch(`${BASE_URL}/chat/completions`, {
+      res = await fetch("/api/agent", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${API_KEY}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model,
           messages,
-          temperature: 0.5,
           max_tokens: maxTokens,
           ...(tools ? { tools, tool_choice: toolChoice } : {}),
         }),
@@ -416,6 +371,11 @@ async function chatCompletion(
     }
 
     const detail = await res.json().catch(() => null);
+    if (res.status === 503) {
+      throw new StashComputeError(
+        "The model provider is not configured on the server. Set AI_BASE_URL, AI_API_KEY and AI_MODEL.",
+      );
+    }
     const code = detail?.error?.code;
     // Rate / token limit. Usually a transient per-minute reset — wait the
     // provider's hint out and retry rather than dumping the user. Only give up
@@ -426,16 +386,6 @@ async function chatCompletion(
         parseRetryWaitMs(res, detail) ?? RATE_LIMIT_BASE_WAIT_MS * (attempt + 1);
       if (attempt < RATE_LIMIT_MAX_RETRIES && wait <= RATE_LIMIT_MAX_WAIT_MS) {
         await abortableSleep(wait, signal); // AbortError → settles as "Stopped."
-        continue;
-      }
-      // Backoff exhausted on this model. Before giving up, fail over to the
-      // fallback model ONCE — it has its own rate-limit bucket, so the same
-      // request often succeeds there. Reset the attempt budget (-1 → 0 after the
-      // loop's ++) so the fallback gets its own backoff allowance.
-      if (FALLBACK_MODEL && !usedFallback && model !== FALLBACK_MODEL) {
-        usedFallback = true;
-        model = FALLBACK_MODEL;
-        attempt = -1;
         continue;
       }
       throw new StashComputeError(
@@ -792,12 +742,6 @@ async function runAgentTurnInner(
   nudge: { id: string; facts: string } | null,
   signal?: AbortSignal,
 ): Promise<AgentTurn> {
-  if (!isComputeConfigured()) {
-    throw new StashComputeError(
-      "The model provider is not configured — set VITE_AI_BASE_URL, VITE_AI_API_KEY and VITE_AI_MODEL.",
-    );
-  }
-
   let working = ledger;
   // The proactive nudge's scholarship is surfaced on every return path so the
   // card attaches regardless of whether a tool also ran this turn.

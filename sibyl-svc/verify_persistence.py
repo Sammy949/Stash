@@ -33,9 +33,16 @@ import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).parent
-PYTHON = str(HERE / ".venv/bin/python") if (HERE / ".venv/bin/python").exists() else sys.executable
+PYTHON = (
+    str(HERE / ".venv/bin/python")
+    if (HERE / ".venv/bin/python").exists()
+    else sys.executable
+)
 TOKEN = os.environ.get("STASH_SVC_TOKEN") or "verify-token-" + os.urandom(8).hex()
-SNAPSHOT_KEY = os.environ.get("SIBYL_SNAPSHOT_KEY") or base64.urlsafe_b64encode(os.urandom(32)).decode()
+SNAPSHOT_KEY = (
+    os.environ.get("SIBYL_SNAPSHOT_KEY")
+    or base64.urlsafe_b64encode(os.urandom(32)).decode()
+)
 TENANT = "0x" + "7e" * 20
 PORT = int(os.environ.get("VERIFY_PORT", "8799"))
 BASE = f"http://127.0.0.1:{PORT}"
@@ -64,7 +71,9 @@ def call(method: str, path: str, body=None, *, token=TOKEN):
         return e.code, json.loads(e.read() or b"null")
 
 
-def boot(db_dir: Path, snapshot_env: dict[str, str], debounce: str = "1") -> subprocess.Popen:
+def boot(
+    db_dir: Path, snapshot_env: dict[str, str], debounce: str = "1"
+) -> subprocess.Popen:
     """Start uvicorn on a given disk and wait for it to answer.
 
     `debounce` is raised to something long when a stage needs to prove the
@@ -85,7 +94,16 @@ def boot(db_dir: Path, snapshot_env: dict[str, str], debounce: str = "1") -> sub
     # in that file cannot win over what we set here. Belt and braces: drop the keys
     # this test owns from anything inherited.
     proc = subprocess.Popen(
-        [PYTHON, "-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", str(PORT)],
+        [
+            PYTHON,
+            "-m",
+            "uvicorn",
+            "app:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(PORT),
+        ],
         cwd=str(HERE),
         env=env,
         stdout=subprocess.PIPE,
@@ -131,10 +149,15 @@ def main() -> int:
         print(f"backend: private HF dataset {repo}")
     else:
         durable = workspace / "durable-store"
-        backend = {"SIBYL_SNAPSHOT_DIR": str(durable), "SIBYL_SNAPSHOT_REPO": "",
-                   "SIBYL_SNAPSHOT_HF_TOKEN": ""}
+        backend = {
+            "SIBYL_SNAPSHOT_DIR": str(durable),
+            "SIBYL_SNAPSHOT_REPO": "",
+            "SIBYL_SNAPSHOT_HF_TOKEN": "",
+        }
         print(f"backend: offline local dir {durable}")
-        print("        (set SIBYL_SNAPSHOT_REPO + SIBYL_SNAPSHOT_HF_TOKEN to test the Hub path)")
+        print(
+            "        (set SIBYL_SNAPSHOT_REPO + SIBYL_SNAPSHOT_HF_TOKEN to test the Hub path)"
+        )
 
     before: dict = {}
 
@@ -142,26 +165,65 @@ def main() -> int:
     proc = boot(disk_a, backend)
     try:
         status, st = call("GET", "/persistence")
-        check("snapshot layer enabled", status == 200 and st.get("enabled"), st.get("store", ""))
-        check("nothing restored on a first-ever boot", st.get("restored_on_boot") is False)
+        check(
+            "snapshot layer enabled",
+            status == 200 and st.get("enabled"),
+            st.get("store", ""),
+        )
+        check(
+            "nothing restored on a first-ever boot", st.get("restored_on_boot") is False
+        )
 
         status, pack = call("GET", "/recall-pack")
-        check("fresh tenant remembers nothing", status == 200 and pack["remembers"] is False)
+        check(
+            "fresh tenant remembers nothing",
+            status == 200 and pack["remembers"] is False,
+        )
 
-        call("POST", "/entity", {"category": "identity", "name": "profile",
-                                 "body": {"name": "Ada", "currency": "GBP"}})
-        call("POST", "/entity", {"category": "goal", "name": "MacBook Pro",
-                                 "body": {"target": 1500, "saved": 240}})
-        call("POST", "/entity", {"category": "habit", "name": "post-payday spike",
-                                 "body": {"note": "spends the week after a client pays"}})
+        call(
+            "POST",
+            "/entity",
+            {
+                "category": "identity",
+                "name": "profile",
+                "body": {"name": "Ada", "currency": "GBP"},
+            },
+        )
+        call(
+            "POST",
+            "/entity",
+            {
+                "category": "goal",
+                "name": "MacBook Pro",
+                "body": {"target": 1500, "saved": 240},
+            },
+        )
+        call(
+            "POST",
+            "/entity",
+            {
+                "category": "habit",
+                "name": "post-payday spike",
+                "body": {"note": "spends the week after a client pays"},
+            },
+        )
         call("POST", "/state", {"body": {"balance": 612.5, "runwayDays": 41}})
-        status, ev = call("POST", "/event", {"evaluated": {"kind": "income", "amount": 600},
-                                             "acted": {"newBalance": 612.5},
-                                             "forward": {"goalGap": 1260}})
+        status, ev = call(
+            "POST",
+            "/event",
+            {
+                "evaluated": {"kind": "income", "amount": 600},
+                "acted": {"newBalance": 612.5},
+                "forward": {"goalGap": 1260},
+            },
+        )
         check("money event journalled", status == 200 and ev.get("id"))
 
         status, before = call("GET", "/recall-pack")
-        check("memory reads back before the wipe", status == 200 and before["remembers"] is True)
+        check(
+            "memory reads back before the wipe",
+            status == 200 and before["remembers"] is True,
+        )
 
         # Prove the WAL point: the live main file is a stub, the data is in -wal.
         main_size = (disk_a / "memory.db").stat().st_size
@@ -170,15 +232,23 @@ def main() -> int:
         print(f"        live disk: memory.db={main_size}B  memory.db-wal={wal_size}B")
 
         status, snap = call("POST", "/snapshot")
-        check("forced snapshot succeeded", status == 200 and snap.get("ok"),
-              snap.get("last_error") or "")
+        check(
+            "forced snapshot succeeded",
+            status == 200 and snap.get("ok"),
+            snap.get("last_error") or "",
+        )
         if durable is not None:
             durable_snapshot = (durable / "memory.db").read_bytes()
-            check("durable snapshot contains no known plaintext",
-              b"post-payday spike" not in durable_snapshot and b"Ada" not in durable_snapshot)
+            check(
+                "durable snapshot contains no known plaintext",
+                b"post-payday spike" not in durable_snapshot
+                and b"Ada" not in durable_snapshot,
+            )
         if wal_size > main_size:
-            print("        (a naive copy of memory.db would have backed up the stub, "
-                  "not the WAL — this is why VACUUM INTO)")
+            print(
+                "        (a naive copy of memory.db would have backed up the stub, "
+                "not the WAL — this is why VACUUM INTO)"
+            )
     finally:
         shutdown(proc)
 
@@ -190,43 +260,68 @@ def main() -> int:
     proc = boot(disk_b, backend)
     try:
         status, st = call("GET", "/persistence")
-        check("restored on boot", status == 200 and st.get("restored_on_boot") is True,
-              st.get("last_error") or "")
-        check("restored file is not a symlink (Sibyl's Storage guard)",
-              (disk_b / "memory.db").exists() and not (disk_b / "memory.db").is_symlink())
+        check(
+            "restored on boot",
+            status == 200 and st.get("restored_on_boot") is True,
+            st.get("last_error") or "",
+        )
+        check(
+            "restored file is not a symlink (Sibyl's Storage guard)",
+            (disk_b / "memory.db").exists() and not (disk_b / "memory.db").is_symlink(),
+        )
 
         status, after = call("GET", "/recall-pack")
-        check("tenant is remembered again", status == 200 and after["remembers"] is True)
+        check(
+            "tenant is remembered again", status == 200 and after["remembers"] is True
+        )
 
         # The real assertion: identical memory, not merely non-empty.
         def shape(pack: dict) -> dict:
             return {
                 "counts": pack["counts"],
                 "identity": pack["identity"]["body"] if pack["identity"] else None,
-                "goals": sorted((g["name"], json.dumps(g["body"], sort_keys=True))
-                                for g in pack["goals"]),
-                "habits": sorted((h["name"], json.dumps(h["body"], sort_keys=True))
-                                 for h in pack["habits"]),
+                "goals": sorted(
+                    (g["name"], json.dumps(g["body"], sort_keys=True))
+                    for g in pack["goals"]
+                ),
+                "habits": sorted(
+                    (h["name"], json.dumps(h["body"], sort_keys=True))
+                    for h in pack["habits"]
+                ),
                 "snapshot": pack["snapshot"]["body"] if pack["snapshot"] else None,
                 "events": [e.get("id") for e in pack["recent_events"]],
             }
 
-        check("recall-pack is IDENTICAL across the wipe", shape(before) == shape(after),
-              "" if shape(before) == shape(after)
-              else f"\n    before={json.dumps(shape(before), sort_keys=True)}"
-                   f"\n    after ={json.dumps(shape(after), sort_keys=True)}")
+        check(
+            "recall-pack is IDENTICAL across the wipe",
+            shape(before) == shape(after),
+            (
+                ""
+                if shape(before) == shape(after)
+                else f"\n    before={json.dumps(shape(before), sort_keys=True)}"
+                f"\n    after ={json.dumps(shape(after), sort_keys=True)}"
+            ),
+        )
 
         status, found = call("GET", "/entities?q=macbook")
-        check("FTS5 index survived the round-trip (not just the rows)",
-              status == 200 and len(found["results"]) >= 1,
-              f"{len(found.get('results', []))} hit(s)")
+        check(
+            "FTS5 index survived the round-trip (not just the rows)",
+            status == 200 and len(found["results"]) >= 1,
+            f"{len(found.get('results', []))} hit(s)",
+        )
 
         # A restored container must keep backing itself up, not go read-only.
-        call("POST", "/entity", {"category": "opportunity", "name": "tutoring gig",
-                                 "body": {"rate": 25}})
+        call(
+            "POST",
+            "/entity",
+            {"category": "opportunity", "name": "tutoring gig", "body": {"rate": 25}},
+        )
         status, snap2 = call("POST", "/snapshot")
-        check("restored container can snapshot again", status == 200 and snap2.get("ok"),
-              snap2.get("last_error") or "")
+        check(
+            "restored container can snapshot again",
+            status == 200 and snap2.get("ok"),
+            snap2.get("last_error") or "",
+        )
     finally:
         shutdown(proc)
 
@@ -237,9 +332,11 @@ def main() -> int:
     proc = boot(disk_c, backend)
     try:
         status, pack = call("GET", "/recall-pack")
-        check("the write made after the first restore also survived",
-              status == 200 and len(pack["opportunities"]) == 1,
-              f"opportunities={len(pack.get('opportunities', []))}")
+        check(
+            "the write made after the first restore also survived",
+            status == 200 and len(pack["opportunities"]) == 1,
+            f"opportunities={len(pack.get('opportunities', []))}",
+        )
     finally:
         shutdown(proc)
 
@@ -247,8 +344,10 @@ def main() -> int:
     proc = boot(disk_c, backend)
     try:
         status, st = call("GET", "/persistence")
-        check("boot with a usable local db does NOT restore over it",
-              status == 200 and st.get("restored_on_boot") is False)
+        check(
+            "boot with a usable local db does NOT restore over it",
+            status == 200 and st.get("restored_on_boot") is False,
+        )
     finally:
         shutdown(proc)
 
@@ -260,12 +359,20 @@ def main() -> int:
     disk_d.mkdir()
     proc = boot(disk_d, backend, debounce="3600")
     try:
-        status, _ = call("POST", "/entity", {"category": "preference",
-                                            "name": "flush on sigterm",
-                                            "body": {"written": "just before the stop"}})
+        status, _ = call(
+            "POST",
+            "/entity",
+            {
+                "category": "preference",
+                "name": "flush on sigterm",
+                "body": {"written": "just before the stop"},
+            },
+        )
         check("write accepted", status == 200)
         status, st = call("GET", "/persistence")
-        check("write is still pending, not yet uploaded", st.get("pending_write") is True)
+        check(
+            "write is still pending, not yet uploaded", st.get("pending_write") is True
+        )
     finally:
         shutdown(proc)  # SIGTERM -> lifespan finally -> persister.close() -> flush
 
@@ -276,13 +383,20 @@ def main() -> int:
     try:
         status, pack = call("GET", "/recall-pack")
         names = [p["name"] for p in pack.get("preferences", [])]
-        check("the pending write survived the restart", "flush-on-sigterm" in names,
-              f"preferences={names}")
+        check(
+            "the pending write survived the restart",
+            "flush-on-sigterm" in names,
+            f"preferences={names}",
+        )
     finally:
         shutdown(proc)
 
     shutil.rmtree(workspace, ignore_errors=True)
-    print(f"\n{len(_failures)} failure(s): {_failures}" if _failures else "\nall checks passed")
+    print(
+        f"\n{len(_failures)} failure(s): {_failures}"
+        if _failures
+        else "\nall checks passed"
+    )
     return 1 if _failures else 0
 
 

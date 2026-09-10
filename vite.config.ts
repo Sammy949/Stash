@@ -30,6 +30,11 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const svcUrl = (env.SIBYL_SVC_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
   const svcToken = env.SIBYL_SVC_TOKEN || "";
+  const aiBaseUrl = (env.AI_BASE_URL || "").replace(/\/$/, "");
+  const aiKey = env.AI_API_KEY || "";
+  const aiProxyHeaders: Record<string, string> = aiKey
+    ? { Authorization: `Bearer ${aiKey}` }
+    : {};
   // X-Stash-Auth, matching api/memory.ts: the sidecar's host may own the
   // Authorization header for its own gate, so the service token gets its own.
   const proxyHeaders: Record<string, string> = svcToken
@@ -53,6 +58,12 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       proxy: {
+        "/api/agent": {
+          target: aiBaseUrl || "http://127.0.0.1:1",
+          changeOrigin: true,
+          headers: aiProxyHeaders,
+          rewrite: () => "/chat/completions",
+        },
         // Dev stand-in for api/memory.ts (the Vercel function): same ?path=
         // contract, same server-side token injection, so the client code path
         // is identical locally and in production.
