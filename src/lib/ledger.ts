@@ -111,10 +111,21 @@ export function balanceSeries(
 
   // Opening balance plus everything that happened BEFORE the window: that is
   // where the trace starts, otherwise the first point would ignore all history.
+  // Sort chronologically before the walk. The line is a time series, and the app
+  // can accumulate transactions in arbitrary insertion order; a ledger that was
+  // edited or restored is still expected to draw forward in date order.
   let running = ledger.openingBalance;
   const inWindow: { day: number; delta: number }[] = [];
+  const ordered = [...ledger.transactions].sort((a, b) => {
+    const ta = Date.parse(a.createdAt);
+    const tb = Date.parse(b.createdAt);
+    if (!Number.isFinite(ta) && !Number.isFinite(tb)) return 0;
+    if (!Number.isFinite(ta)) return 1;
+    if (!Number.isFinite(tb)) return -1;
+    return ta - tb;
+  });
 
-  for (const t of ledger.transactions) {
+  for (const t of ordered) {
     const delta = t.type === "income" ? t.amount : -t.amount;
     const ts = new Date(t.createdAt).getTime();
     // A malformed date must not poison the series; treat it as pre-window so it
