@@ -22,7 +22,6 @@ import {
   MarkerIcon,
 } from "@/components/shadcn/marker";
 import { ensureStorageSchema } from "@/lib/localLedger";
-import { deriveObservation } from "@/lib/observations";
 import { journalCommittedTurn } from "@/lib/memoryJournal";
 import { deriveWelcomeBack } from "@/lib/welcomeBack";
 import type { WelcomeBack as WelcomeBackData } from "@/lib/welcomeBack";
@@ -87,7 +86,6 @@ export default function App() {
     isThinking,
     send,
     stop,
-    pushAssistant,
     pushCard,
     editMessage,
     openerFromMemory,
@@ -198,11 +196,6 @@ export default function App() {
       applyLedger(updated);
       const changed = changedSection(before, updated);
       if (changed) setHighlight(changed);
-      // Proactive observation — code (not the model) notices when a money
-      // event collides with something Stash remembers, and adds one nudge
-      // after the agent's reply. Stays silent when there's nothing to say.
-      const observation = deriveObservation(before, updated, memoryPort.read());
-      if (observation) pushAssistant(observation);
       // Second home for the event: local is the instant working copy, Sibyl's
       // COLD tier is the durable temporal history. Fired from here because
       // this callback runs only on a COMMITTED mutation, so the journal can
@@ -242,8 +235,6 @@ export default function App() {
           applyLedger(updated);
           const changed = changedSection(before, updated);
           if (changed) setHighlight(changed);
-          const observation = deriveObservation(before, updated, memoryPort.read());
-          if (observation) pushAssistant(observation);
           // Same journal write as a normal turn. `before` is the RESTORED
           // snapshot the edit rewound to, so the diff is what the edited turn
           // actually did, not what the original one did.

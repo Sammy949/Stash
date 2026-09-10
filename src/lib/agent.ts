@@ -23,6 +23,7 @@ import { AGENT_TOOLS, applyAction } from "@/lib/agentTools";
 import { extractTextToolCalls, sanitizeToolCall } from "@/lib/toolCalls";
 import { extractPrimaryAmount, purchaseImpactFacts } from "@/lib/goalContext";
 import { proactiveDeadlineNudge } from "@/lib/scholarshipContext";
+import { deriveObservation } from "@/lib/observations";
 
 /**
  * The Stash AI agent.
@@ -821,6 +822,12 @@ async function runAgentTurnInner(
     // the reply can't claim a memory that didn't save.
     const memory = await commitMemoryOps(memoryOps);
     if (memory.note) summaries.push(memory.note);
+    const observation = deriveObservation(ledger, working, recall);
+    if (observation) {
+      summaries.push(
+        `PROACTIVE OBSERVATION (weave this into the single reply, do not send a second message): ${observation}`,
+      );
+    }
     const relatedGoalIds = [...new Set(goalIds)];
     const relatedScholarshipIds = [...new Set([...scholarshipIds, ...nudgeIds])];
     const didMutate = working !== ledger;
@@ -885,12 +892,16 @@ async function runAgentTurnInner(
       if (result.memoryOps) textMemoryOps.push(...result.memoryOps);
     }
     const textMemory = await commitMemoryOps(textMemoryOps);
+    const observation = deriveObservation(ledger, working, recall);
     messages[0] = { role: "system", content: buildFinalizePrompt(working) };
     messages.push({
       role: "user",
       content:
         "Confirm what changed in one short, warm sentence. State the new balance from the snapshot. Do NOT output any function/tool syntax." +
-        (textMemory.note ? `\n${textMemory.note}` : ""),
+        (textMemory.note ? `\n${textMemory.note}` : "") +
+        (observation
+          ? `\nPROACTIVE OBSERVATION (weave this into the single reply, do not send a second message): ${observation}`
+          : ""),
     });
     const final = await chatCompletion(messages, undefined, "auto", signal);
     const text = stripDashes((final.content ?? cleaned).trim());
