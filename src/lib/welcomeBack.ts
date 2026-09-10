@@ -6,6 +6,7 @@ import {
   movedSince,
   rememberedGoal,
   rememberedHabit,
+  rememberedRisk,
   rememberedName,
 } from "@/lib/opener";
 import { formatMoney } from "@/lib/currency";
@@ -62,8 +63,13 @@ export function deriveWelcomeBack(
 
   // The habit Stash remembers. This is the line that reads as "it knows me"
   // rather than "it stored my data", so it sits high in the list.
+  const risk = rememberedRisk(recall);
   const habit = rememberedHabit(recall);
-  if (habit) facts.push({ text: `You flagged: “${habit}”`, tone: "default" });
+  if (risk) {
+    facts.push({ text: `You flagged: “${risk}”`, tone: "default" });
+  } else if (habit) {
+    facts.push({ text: `You mentioned: “${habit}”`, tone: "default" });
+  }
 
   // Money that actually moved while they were away (createdAt-based, exact).
   const since = lastVisitAt ? Date.parse(lastVisitAt) : NaN;

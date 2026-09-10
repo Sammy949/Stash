@@ -51,6 +51,15 @@ export function rememberedHabit(recall: RecallPack): string | null {
   return habit ? memoryLine(habit) : null;
 }
 
+/** Only memories explicitly marked as user-confirmed risks earn "flagged". */
+export function rememberedRisk(recall: RecallPack): string | null {
+  const risk = (recall.habits ?? []).find(
+    (entity) =>
+      entity.body.role === "risk" && entity.body.explicitlyConfirmed === true,
+  );
+  return risk ? memoryLine(risk) : null;
+}
+
 /** Money that moved since `since`, from the local ledger (code owns the maths). */
 export function movedSince(
   ledger: Ledger,
@@ -121,8 +130,13 @@ export function deterministicOpener(
     }
   }
 
+  const risk = rememberedRisk(recall);
   const habit = rememberedHabit(recall);
-  if (habit) parts.push(`You've flagged before: “${habit}”.`);
+  if (risk) {
+    parts.push(`You've flagged before: “${risk}”.`);
+  } else if (habit) {
+    parts.push(`You mentioned before: “${habit}”.`);
+  }
 
   const ctx = decisionContext(ledger);
   if (ctx.inTheRed) {

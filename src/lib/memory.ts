@@ -536,7 +536,12 @@ export async function rememberOnboarding(profile: {
       op: "write",
       category: "habit",
       name: "income-shape",
-      body: { content: profile.incomeMemory },
+      body: {
+        content: profile.incomeMemory,
+        origin: "onboarding",
+        role: "context",
+        explicitlyConfirmed: true,
+      },
     });
   }
 

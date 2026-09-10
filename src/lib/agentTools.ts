@@ -765,6 +765,11 @@ export function applyAction(
       // never dropped for want of a label — it just consolidates less well.
       const name = memorySubject(args.subject) || memorySubject(content);
       if (!name) return { ledger, summary: "No memory subject given." };
+      const isRisk =
+        kind === "habit" &&
+        /overspend|over-spend|splurge|spree|impulse|blow (?:it|through|my|the)|burn through|waste|wasteful|go(?:es)? overboard|too much|can'?t (?:help|stop)|lose track|bad (?:at|with)|struggle/i.test(
+          content,
+        );
       return {
         ledger,
         summary: `Remembered (${kind} · ${name}): ${content}. Acknowledge naturally; don't read it back like a robot.`,
@@ -773,7 +778,14 @@ export function applyAction(
             op: "write",
             category: kind,
             name,
-            body: { content, kind, notedAt: new Date().toISOString() },
+            body: {
+              content,
+              kind,
+              origin: "user",
+              role: isRisk ? "risk" : "context",
+              explicitlyConfirmed: isRisk,
+              notedAt: new Date().toISOString(),
+            },
           },
         ],
       };
