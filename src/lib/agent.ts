@@ -19,7 +19,7 @@ import {
   type RecallPack,
 } from "@/lib/memory";
 import { CURRENCIES, formatMoney } from "@/lib/currency";
-import { AGENT_TOOLS, applyAction } from "@/lib/agentTools";
+import { AGENT_TOOLS, applyAction, coerceAmount } from "@/lib/agentTools";
 import { extractTextToolCalls, sanitizeToolCall } from "@/lib/toolCalls";
 import { extractPrimaryAmount, purchaseImpactFacts } from "@/lib/goalContext";
 import { proactiveDeadlineNudge } from "@/lib/scholarshipContext";
@@ -548,6 +548,41 @@ function looksLikeAmbiguousGoalRemoval(text: string, ledger: Ledger): boolean {
   return mentionsGoal;
 }
 
+/** Explicit earmarking language should never depend on a sampled tool call. */
+function looksLikeGoalFunding(text: string): boolean {
+  const t = text.toLowerCase();
+  const hasAmount = /\d/.test(t) || /\b(k|thousand|million|hundred)\b/.test(t);
+  const hasFundingVerb =
+    /\b(put|set aside|save|saved|earmark|earmarked|contribute|contributed|add)\b/.test(
+      t,
+    );
+  const hasGoalTarget =
+    /\b(goal|fund|toward|for the|for my|into the|into my)\b/.test(t);
+  return hasAmount && hasFundingVerb && hasGoalTarget;
+}
+
+function goalFundingNote(text: string): string {
+  return `EXPLICIT GOAL FUNDING REQUEST: The user used goal-directed earmarking language in this message: "${text}". Use contribute_to_goal for the amount they want to put toward the named goal. This is not an expense and must not change the balance. If this same message creates a new goal and says to put an amount into it, call add_goal for the target AND contribute_to_goal for the initial amount before replying. Do not silently create only the target.`;
+}
+
+/** Extract only the amount attached to an explicit earmarking verb. */
+function extractGoalFundingAmount(text: string): number | null {
+  const match = text.match(
+    /\b(?:put|set aside|save|saved|earmark|earmarked|contribute|contributed|add)\s+(?:about\s+)?([₦$£€]?\s*[\d,.]+\s*(?:k|m|thousand|million)?)/i,
+  );
+  if (!match) return null;
+  const amount = coerceAmount(match[1]);
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
+function goalFundingName(text: string, ledger: Ledger): string | null {
+  const t = text.toLowerCase();
+  const named = ledger.goals.find((goal) => t.includes(goal.name.toLowerCase()));
+  if (named) return named.name;
+  const forMatch = text.match(/\b(?:for|toward|into)\s+(?:the|my|a|an)?\s*([a-z][a-z0-9 ]*)/i);
+  return forMatch?.[1]?.trim().replace(/\b(goal|fund|savings?)\b.*$/i, "").trim() || null;
+}
+
 function goalRemovalClarification(ledger: Ledger): string {
   const names = ledger.goals.map((goal) => `“${goal.name}”`).join(" or ");
   const target = names ? ` from ${names}` : " from a savings goal";
@@ -713,8 +748,9 @@ export async function runAgentTurn(
       memoryChanged: false,
     };
   }
+  const goalFunding = lastUser && looksLikeGoalFunding(lastUser.content);
   const forceTool = lastUser
-    ? looksLikeMoneyEvent(lastUser.content) &&
+    ? (looksLikeMoneyEvent(lastUser.content) || Boolean(goalFunding)) &&
       !looksLikePreSpendIntent(lastUser.content) &&
       !looksLikeObligation(lastUser.content)
     : false;
@@ -723,6 +759,10 @@ export async function runAgentTurn(
   // code-computed fact or instruction the model weaves into its reply. Order is
   // priority (freshest last is what the model weighs most).
   const extraNotes: string[] = [];
+
+  if (lastUser && goalFunding) {
+    extraNotes.push(goalFundingNote(lastUser.content));
+  }
 
   // Living goal context at the pre-spend moment: when they're WEIGHING a
   // purchase ("should I buy a 50k jacket?") and an open goal exists, hand the
@@ -780,6 +820,10 @@ async function runAgentTurnInner(
   signal?: AbortSignal,
 ): Promise<AgentTurn> {
   let working = ledger;
+  const latestUser = [...history]
+    .reverse()
+    .find((message) => !message.pending && message.role === "user");
+  const goalFunding = latestUser && looksLikeGoalFunding(latestUser.content);
   // The proactive nudge's scholarship is surfaced on every return path so the
   // card attaches regardless of whether a tool also ran this turn.
   const nudgeIds = nudge ? [nudge.id] : [];
@@ -844,7 +888,8 @@ async function runAgentTurnInner(
     const goalIds: string[] = [];
     const scholarshipIds: string[] = [];
     const memoryOps: MemoryOp[] = [];
-    for (const c of dedupeCalls(usable)) {
+    const appliedCalls = dedupeCalls(usable);
+    for (const c of appliedCalls) {
       const result = applyAction(working, c.name, c.args);
       working = result.ledger;
       summaries.push(result.summary);
@@ -852,6 +897,28 @@ async function runAgentTurnInner(
       if (result.relatedScholarshipIds)
         scholarshipIds.push(...result.relatedScholarshipIds);
       if (result.memoryOps) memoryOps.push(...result.memoryOps);
+    }
+    // A required tool choice guarantees at least one call, not that a compound
+    // goal request gets both mutations. Complete an explicit initial earmark
+    // when the model created the target but omitted contribute_to_goal.
+    if (
+      goalFunding &&
+      !appliedCalls.some((call) => call.name === "contribute_to_goal")
+    ) {
+      const amount = extractGoalFundingAmount(latestUser?.content ?? "");
+      const name =
+        appliedCalls.find((call) => call.name === "add_goal")?.args.name ??
+        goalFundingName(latestUser?.content ?? "", working);
+      if (amount && typeof name === "string" && name.trim()) {
+        const result = applyAction(working, "contribute_to_goal", {
+          name,
+          amount,
+        });
+        working = result.ledger;
+        summaries.push(result.summary);
+        if (result.relatedGoalIds) goalIds.push(...result.relatedGoalIds);
+        if (result.memoryOps) memoryOps.push(...result.memoryOps);
+      }
     }
     // Memory writes land HERE, never inside a reducer: applyAction stays pure
     // and the network call is the turn's job. A failed write appends a note so
