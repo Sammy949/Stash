@@ -217,9 +217,6 @@ export function memorySubject(raw: unknown): string {
 
 const TENANT_RE = /^0x[0-9a-f]{40}$/;
 
-/** Session flag set by `?nomemory`, cleared by `?memory`. */
-const NOMEMORY_KEY = "stash_nomemory";
-
 /**
  * Whose memory we are reading.
  *
@@ -229,9 +226,10 @@ const NOMEMORY_KEY = "stash_nomemory";
  * chain feature this app no longer has, so it was removed rather than left on
  * screen as a control that does nothing.
  *
- * `?nomemory` wins, and is checked first: no tenant means no reads, no writes,
- * and every recall resolves to EMPTY_RECALL — the app keeps working and Stash
- * meets a stranger. That is the deletion test the demo leans on.
+ * `?nomemory` is the source of truth: no tenant means no reads, no writes, and
+ * every recall resolves to EMPTY_RECALL — the app keeps working and Stash meets
+ * a stranger. Removing the parameter therefore restores memory on the next
+ * navigation or reload without a stale session flag.
  *
  * Synchronous on purpose: this is called during render and from non-async code,
  * so an await here would fire the first memory read against no tenant at all.
@@ -252,16 +250,7 @@ export function resolveTenant(): string | null {
  */
 export function memoryDisabled(): boolean {
   if (typeof window === "undefined") return false;
-  const params = new URLSearchParams(window.location.search);
-  if (params.has("nomemory")) {
-    sessionStorage.setItem(NOMEMORY_KEY, "1");
-    return true;
-  }
-  if (params.has("memory")) {
-    sessionStorage.removeItem(NOMEMORY_KEY);
-    return false;
-  }
-  return sessionStorage.getItem(NOMEMORY_KEY) === "1";
+  return new URLSearchParams(window.location.search).has("nomemory");
 }
 
 export function isMemoryConfigured(): boolean {

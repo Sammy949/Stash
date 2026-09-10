@@ -20,6 +20,7 @@ the exact code path a deployed Space uses:
 from __future__ import annotations
 
 import json
+import base64
 import os
 import shutil
 import signal
@@ -34,6 +35,7 @@ from pathlib import Path
 HERE = Path(__file__).parent
 PYTHON = str(HERE / ".venv/bin/python") if (HERE / ".venv/bin/python").exists() else sys.executable
 TOKEN = os.environ.get("STASH_SVC_TOKEN") or "verify-token-" + os.urandom(8).hex()
+SNAPSHOT_KEY = os.environ.get("SIBYL_SNAPSHOT_KEY") or base64.urlsafe_b64encode(os.urandom(32)).decode()
 TENANT = "0x" + "7e" * 20
 PORT = int(os.environ.get("VERIFY_PORT", "8799"))
 BASE = f"http://127.0.0.1:{PORT}"
@@ -73,6 +75,7 @@ def boot(db_dir: Path, snapshot_env: dict[str, str], debounce: str = "1") -> sub
     env = {
         **os.environ,
         "STASH_SVC_TOKEN": TOKEN,
+        "SIBYL_SNAPSHOT_KEY": SNAPSHOT_KEY,
         "SIBYL_DB_PATH": str(db_dir / "memory.db"),
         "SIBYL_MEMORY_TELEMETRY": "0",
         "SIBYL_SNAPSHOT_DEBOUNCE_S": debounce,
@@ -121,6 +124,7 @@ def main() -> int:
     disk_b = workspace / "container-2"
     disk_a.mkdir()
     disk_b.mkdir()
+    durable: Path | None = None
 
     if repo and hf_token:
         backend = {"SIBYL_SNAPSHOT_REPO": repo, "SIBYL_SNAPSHOT_HF_TOKEN": hf_token}
@@ -168,6 +172,10 @@ def main() -> int:
         status, snap = call("POST", "/snapshot")
         check("forced snapshot succeeded", status == 200 and snap.get("ok"),
               snap.get("last_error") or "")
+        if durable is not None:
+            durable_snapshot = (durable / "memory.db").read_bytes()
+            check("durable snapshot contains no known plaintext",
+              b"post-payday spike" not in durable_snapshot and b"Ada" not in durable_snapshot)
         if wal_size > main_size:
             print("        (a naive copy of memory.db would have backed up the stub, "
                   "not the WAL — this is why VACUUM INTO)")

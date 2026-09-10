@@ -4,6 +4,8 @@ fastapi==0.141.1
 uvicorn[standard]==0.52.4
 # Loads sibyl-svc/.env so the service starts identically from any cwd.
 python-dotenv==1.2.3
+# AES-GCM encryption for durable memory snapshots.
+cryptography==50.0.1
 # Snapshot/restore backend for ephemeral hosts (persist.py). Only imported when
 # SIBYL_SNAPSHOT_REPO is configured, but pinned so the Space build is reproducible.
 huggingface_hub==1.31.0

@@ -30,6 +30,7 @@ closed on graceful shutdown and by `POST /snapshot`.
 
 from __future__ import annotations
 
+import base64
 import os
 import shutil
 import sqlite3
@@ -39,10 +40,13 @@ import time
 from pathlib import Path
 from typing import Protocol
 
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
 # Name the snapshot carries inside the durable store. Fixed: each push replaces
 # the previous one, so the dataset holds one current file plus git history,
 # rather than an ever-growing pile of dated copies.
 SNAPSHOT_NAME = "memory.db"
+SNAPSHOT_MAGIC = b"STASH-SNAPSHOT-AESGCM\x01"
 
 
 class SnapshotStore(Protocol):
@@ -203,6 +207,16 @@ class Persister:
         self.last_error: str | None = None
         self.last_saved_at: float | None = None
         self.restored: bool = False
+        self._restore_blocked = False
+        raw_key = os.getenv("SIBYL_SNAPSHOT_KEY", "").strip()
+        if self.enabled and not raw_key:
+            raise RuntimeError("SIBYL_SNAPSHOT_KEY is required when snapshot persistence is enabled")
+        try:
+            self._snapshot_key = base64.urlsafe_b64decode(raw_key.encode()) if raw_key else None
+        except Exception as e:
+            raise RuntimeError("SIBYL_SNAPSHOT_KEY must be URL-safe base64") from e
+        if self._snapshot_key is not None and len(self._snapshot_key) != 32:
+            raise RuntimeError("SIBYL_SNAPSHOT_KEY must decode to exactly 32 bytes")
 
     @property
     def enabled(self) -> bool:
@@ -225,8 +239,23 @@ class Persister:
         try:
             if not self._store.load(staging):
                 return False
+            legacy_plaintext = self._is_plaintext_snapshot(staging)
+            if not legacy_plaintext:
+                self._decrypt_snapshot(staging)
             if not _is_usable_db(staging):
                 raise RuntimeError("downloaded snapshot is not a valid Sibyl database")
+            if legacy_plaintext:
+                encrypted = staging.with_name(staging.name + ".encrypted")
+                try:
+                    self._encrypt_snapshot(staging, encrypted)
+                    self._store.save(encrypted)
+                except Exception as e:
+                    self.last_error = (
+                        f"legacy snapshot migration failed: {type(e).__name__}: {e}"
+                    )
+                    self._restore_blocked = True
+                finally:
+                    encrypted.unlink(missing_ok=True)
             # Clear WAL/SHM sidecars from any previous life: they belong to the
             # database we are replacing, and SQLite would try to apply them.
             for suffix in ("-wal", "-shm"):
@@ -237,6 +266,7 @@ class Persister:
             return True
         except Exception as e:  # a failed restore must not stop the service booting
             self.last_error = f"restore failed: {type(e).__name__}: {e}"
+            self._restore_blocked = True
             return False
         finally:
             staging.unlink(missing_ok=True)
@@ -269,7 +299,7 @@ class Persister:
 
     def flush(self) -> bool:
         """Snapshot now: VACUUM INTO a temp file, publish it, delete the temp."""
-        if not self.enabled:
+        if not self.enabled or self._restore_blocked:
             return False
         with self._flush_lock:
             if not _is_usable_db(self._db_path):
@@ -284,6 +314,7 @@ class Persister:
                     conn.execute("VACUUM INTO ?", (str(tmp),))
                 finally:
                     conn.close()
+                self._encrypt_snapshot(tmp)
                 self._store.save(tmp)
                 self.last_saved_at = time.time()
                 self.last_error = None
@@ -314,4 +345,31 @@ class Persister:
             "debounce_seconds": self._debounce_s,
             "last_saved_at": self.last_saved_at,
             "last_error": self.last_error,
+            "restore_blocked": self._restore_blocked,
         }
+
+    @staticmethod
+    def _is_plaintext_snapshot(path: Path) -> bool:
+        return path.read_bytes()[:16] == b"SQLite format 3\x00"
+
+    def _encrypt_snapshot(self, path: Path, destination: Path | None = None) -> None:
+        if self._snapshot_key is None:
+            raise RuntimeError("snapshot encryption key is not configured")
+        plaintext = path.read_bytes()
+        nonce = os.urandom(12)
+        target = destination or path
+        target.write_bytes(
+            SNAPSHOT_MAGIC + nonce + AESGCM(self._snapshot_key).encrypt(nonce, plaintext, None)
+        )
+
+    def _decrypt_snapshot(self, path: Path) -> None:
+        if self._snapshot_key is None:
+            raise RuntimeError("snapshot encryption key is not configured")
+        payload = path.read_bytes()
+        if not payload.startswith(SNAPSHOT_MAGIC):
+            raise RuntimeError("snapshot is not encrypted")
+        nonce_start = len(SNAPSHOT_MAGIC)
+        nonce = payload[nonce_start : nonce_start + 12]
+        ciphertext = payload[nonce_start + 12 :]
+        plaintext = AESGCM(self._snapshot_key).decrypt(nonce, ciphertext, None)
+        path.write_bytes(plaintext)

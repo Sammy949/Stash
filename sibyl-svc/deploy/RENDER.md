@@ -67,6 +67,7 @@ reading a committed value:
 STASH_SVC_TOKEN         = <the same value Vercel has>
 SIBYL_SNAPSHOT_REPO     = YOUR_USERNAME/stash-memory
 SIBYL_SNAPSHOT_HF_TOKEN = hf_...            (write scope)
+SIBYL_SNAPSHOT_KEY      = <URL-safe base64 32-byte key; keep it safe>
 SIBYL_ACCOUNT_ID        = <from `sibyl init`>
 SIBYL_SESSION_TOKEN     = <from `sibyl init`>
 ```
@@ -135,10 +136,9 @@ covers you if you forget.
 
 - **The 20s→5s debounce shrinks but does not close** the hard-kill loss window.
   A SIGTERM (which Render sends on redeploy) flushes it; `SIGKILL` does not.
-- **The snapshot is plaintext.** Sibyl does not encrypt at rest — verified: a
-  written value is greppable in `memory.db`. So a private HF dataset now holds
-  readable financial memory for every tenant. Same exposure as any host's disk,
-  but one more copy in one more place. Encrypting before upload is a small change
-  and adds a key you can lose the memory by losing.
+- **The snapshot is encrypted before upload.** AES-GCM protects the SQLite export
+  in the private HF dataset. Keep `SIBYL_SNAPSHOT_KEY` safe and backed up outside
+  the repository: losing it makes existing snapshots unreadable, and a wrong key
+  fails closed instead of overwriting the durable backup with an empty database.
 - **One shared service token still means one trust boundary.** Any holder can read
   or write any tenant until SIWE lands. Unchanged by this move, still true.

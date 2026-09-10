@@ -102,12 +102,17 @@ restart, sleep-wake and rebuild, and losing it fails *quietly*: `/recall-pack` j
 ```
 SIBYL_SNAPSHOT_REPO=your-username/stash-memory
 SIBYL_SNAPSHOT_HF_TOKEN=hf_...
+SIBYL_SNAPSHOT_KEY=<URL-safe base64 key for AES-GCM>
 SIBYL_SNAPSHOT_DEBOUNCE_S=20
 ```
 
 and the service restores on boot and snapshots after every write. Offline alternative with
 no token and no network: `SIBYL_SNAPSHOT_DIR=/some/dir`. With none of them set the service
 still runs, disk-only, and `/persistence` says so.
+
+`SIBYL_SNAPSHOT_KEY` is required whenever snapshot persistence is enabled. Generate it once
+with `python -c "import base64,secrets;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"`
+and keep it outside the repository. Losing it makes existing snapshots unreadable.
 
 Three things it is careful about:
 

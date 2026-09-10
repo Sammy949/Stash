@@ -77,8 +77,7 @@ export default function App() {
   // has to re-read the pack. Without this the tenant would move while the
   // previous account's remembered habits stayed on screen — and, worse, fed
   // the next turn's observations.
-  // Read once per mount: the flag is a session decision, not live state.
-  const [memoryOff] = useState(memoryDisabled);
+  const memoryOff = memoryDisabled();
   // Owned here, not inside AccountMenu, so the Toaster can be painted in the
   // same mode. Two useTheme() callers would each hold their own state and
   // silently drift apart the moment one of them changed it.

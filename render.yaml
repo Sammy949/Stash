@@ -25,6 +25,8 @@ services:
         sync: false
       - key: SIBYL_SNAPSHOT_HF_TOKEN
         sync: false
+      - key: SIBYL_SNAPSHOT_KEY
+        sync: false
       - key: SIBYL_ACCOUNT_ID
         sync: false
       - key: SIBYL_SESSION_TOKEN
