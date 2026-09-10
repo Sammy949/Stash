@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { AgentCard, ChatMessage, Ledger } from "@/types";
 import { runAgentTurn, StashComputeError } from "@/lib/agent";
+import type { PendingDuplicateConfirmation } from "@/lib/agentTools";
 import { getGoals } from "@/lib/ledger";
 import { EMPTY_RECALL, type MemoryPort } from "@/lib/memory";
 import { PLAIN_OPENER, deterministicOpener } from "@/lib/opener";
@@ -55,6 +56,7 @@ export function useAgent(memory?: MemoryPort) {
   // flight is dropped, so a second Save (e.g. from another open editor) can
   // never spawn a concurrent loop that races on the shared transcript.
   const inFlightRef = useRef(false);
+  const pendingDuplicateConfirmationRef = useRef<PendingDuplicateConfirmation | null>(null);
 
   const commit = (next: ChatMessage[]) => {
     ref.current = next;
@@ -141,7 +143,14 @@ export function useAgent(memory?: MemoryPort) {
 
     try {
       const recall = memory?.read() ?? EMPTY_RECALL;
-      const turn = await runAgentTurn(history, ledger, recall, controller.signal);
+      const turn = await runAgentTurn(
+        history,
+        ledger,
+        recall,
+        controller.signal,
+        pendingDuplicateConfirmationRef.current,
+      );
+      pendingDuplicateConfirmationRef.current = turn.pendingDuplicateConfirmation;
       if (turn.mutated) onLedgerUpdate?.(turn.ledger);
       // A turn that wrote to Sibyl: re-read so the NEXT prompt already carries
       // what was just learned. Not awaited — the reply must not wait on it.

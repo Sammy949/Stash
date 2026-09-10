@@ -431,6 +431,11 @@ export const AGENT_TOOLS = [
 
 export type ToolName = (typeof AGENT_TOOLS)[number]["function"]["name"];
 
+export interface PendingDuplicateConfirmation {
+  tool: "log_income" | "log_expense";
+  args: Record<string, unknown>;
+}
+
 /** Result of applying one tool call. */
 export interface ActionResult {
   ledger: Ledger;
@@ -456,6 +461,8 @@ export interface ActionResult {
    * makes deleting Sibyl actually break recall.
    */
   memoryOps?: MemoryOp[];
+  /** Set when this action needs an explicit confirmation before retrying. */
+  pendingDuplicateConfirmation?: PendingDuplicateConfirmation;
 }
 
 /**
@@ -565,6 +572,10 @@ export function applyAction(
         return {
           ledger,
           summary: `DUPLICATE_CONFIRM: a matching expense (${formatMoney(amount, cur)}, ${label}) was logged moments ago and was NOT logged again yet. Ask the user if they really mean to log it a SECOND time (a genuine repeat purchase). Only if they confirm, call log_expense again with force=true. Do NOT log it otherwise.`,
+          pendingDuplicateConfirmation: {
+            tool: "log_expense",
+            args: { amount, label, category },
+          },
         };
       }
       const next = addTransaction(ledger, parsed);
@@ -579,6 +590,10 @@ export function applyAction(
         return {
           ledger,
           summary: `DUPLICATE_CONFIRM: matching income (${formatMoney(amount, cur)}, ${label}) was logged moments ago and was NOT logged again yet. Ask the user if they really mean to log it a SECOND time. Only if they confirm, call log_income again with force=true. Do NOT log it otherwise.`,
+          pendingDuplicateConfirmation: {
+            tool: "log_income",
+            args: { amount, label },
+          },
         };
       }
       const next = addTransaction(ledger, parsed);

@@ -19,7 +19,12 @@ import {
   type RecallPack,
 } from "@/lib/memory";
 import { CURRENCIES, formatMoney } from "@/lib/currency";
-import { AGENT_TOOLS, applyAction, coerceAmount } from "@/lib/agentTools";
+import {
+  AGENT_TOOLS,
+  applyAction,
+  coerceAmount,
+  type PendingDuplicateConfirmation,
+} from "@/lib/agentTools";
 import { extractTextToolCalls, sanitizeToolCall } from "@/lib/toolCalls";
 import { extractPrimaryAmount, purchaseImpactFacts } from "@/lib/goalContext";
 import { proactiveDeadlineNudge } from "@/lib/scholarshipContext";
@@ -689,6 +694,20 @@ export interface AgentTurn {
    * and the NEXT prompt already sees what was just learned.
    */
   memoryChanged: boolean;
+  /** Duplicate action awaiting a clear affirmative confirmation. */
+  pendingDuplicateConfirmation: PendingDuplicateConfirmation | null;
+}
+
+function isAffirmativeConfirmation(text: string): boolean {
+  return /^(yes|yeah|yep|yup|confirm|confirmed|do it|go ahead|log it|record it|add it)[.! ]*$/i.test(
+    text.trim(),
+  );
+}
+
+function isNegativeConfirmation(text: string): boolean {
+  return /^(no|nope|nah|don't|do not|cancel|leave it|leave it unchanged)[.! ]*$/i.test(
+    text.trim(),
+  );
 }
 
 /**
@@ -728,6 +747,7 @@ export async function runAgentTurn(
   ledger: Ledger,
   recall: RecallPack = EMPTY_RECALL,
   signal?: AbortSignal,
+  pendingDuplicateConfirmation: PendingDuplicateConfirmation | null = null,
 ): Promise<AgentTurn> {
   // If the latest user message describes money moving, force a tool call so
   // the model can't narrate a fake mutation. But a PRE-SPEND intent ("should
@@ -738,6 +758,32 @@ export async function runAgentTurn(
   const lastUser = [...history]
     .reverse()
     .find((m) => !m.pending && m.role === "user");
+  if (lastUser && pendingDuplicateConfirmation && isAffirmativeConfirmation(lastUser.content)) {
+    const confirmed = applyAction(ledger, pendingDuplicateConfirmation.tool, {
+      ...pendingDuplicateConfirmation.args,
+      force: true,
+    });
+    return {
+      reply: confirmed.summary,
+      ledger: confirmed.ledger,
+      mutated: confirmed.ledger !== ledger,
+      relatedGoalIds: [],
+      relatedScholarshipIds: [],
+      memoryChanged: false,
+      pendingDuplicateConfirmation: null,
+    };
+  }
+  if (lastUser && pendingDuplicateConfirmation && isNegativeConfirmation(lastUser.content)) {
+    return {
+      reply: "Okay, I left that second entry unchanged.",
+      ledger,
+      mutated: false,
+      relatedGoalIds: [],
+      relatedScholarshipIds: [],
+      memoryChanged: false,
+      pendingDuplicateConfirmation: null,
+    };
+  }
   if (lastUser && looksLikeAmbiguousGoalRemoval(lastUser.content, ledger)) {
     return {
       reply: goalRemovalClarification(ledger),
@@ -746,6 +792,7 @@ export async function runAgentTurn(
       relatedGoalIds: [],
       relatedScholarshipIds: [],
       memoryChanged: false,
+      pendingDuplicateConfirmation: null,
     };
   }
   const goalFunding = lastUser && looksLikeGoalFunding(lastUser.content);
@@ -888,6 +935,7 @@ async function runAgentTurnInner(
     const goalIds: string[] = [];
     const scholarshipIds: string[] = [];
     const memoryOps: MemoryOp[] = [];
+    let pendingConfirmation: PendingDuplicateConfirmation | null = null;
     const appliedCalls = dedupeCalls(usable);
     for (const c of appliedCalls) {
       const result = applyAction(working, c.name, c.args);
@@ -897,6 +945,9 @@ async function runAgentTurnInner(
       if (result.relatedScholarshipIds)
         scholarshipIds.push(...result.relatedScholarshipIds);
       if (result.memoryOps) memoryOps.push(...result.memoryOps);
+      if (result.pendingDuplicateConfirmation) {
+        pendingConfirmation = result.pendingDuplicateConfirmation;
+      }
     }
     // A required tool choice guarantees at least one call, not that a compound
     // goal request gets both mutations. Complete an explicit initial earmark
@@ -976,6 +1027,7 @@ async function runAgentTurnInner(
       relatedGoalIds,
       relatedScholarshipIds,
       memoryChanged: memory.changed,
+      pendingDuplicateConfirmation: pendingConfirmation,
     };
   }
 
@@ -986,6 +1038,7 @@ async function runAgentTurnInner(
     const goalIds: string[] = [];
     const scholarshipIds: string[] = [];
     const textMemoryOps: MemoryOp[] = [];
+    let pendingConfirmation: PendingDuplicateConfirmation | null = null;
     for (const c of dedupeCalls(calls)) {
       const result = applyAction(working, c.name, c.args);
       working = result.ledger;
@@ -993,6 +1046,9 @@ async function runAgentTurnInner(
       if (result.relatedScholarshipIds)
         scholarshipIds.push(...result.relatedScholarshipIds);
       if (result.memoryOps) textMemoryOps.push(...result.memoryOps);
+      if (result.pendingDuplicateConfirmation) {
+        pendingConfirmation = result.pendingDuplicateConfirmation;
+      }
     }
     const textMemory = await commitMemoryOps(textMemoryOps);
     const observation = deriveObservation(ledger, working, recall);
@@ -1018,6 +1074,7 @@ async function runAgentTurnInner(
       relatedGoalIds: [...new Set(goalIds)],
       relatedScholarshipIds: [...new Set([...scholarshipIds, ...nudgeIds])],
       memoryChanged: textMemory.changed,
+      pendingDuplicateConfirmation: pendingConfirmation,
     };
   }
 
@@ -1034,6 +1091,7 @@ async function runAgentTurnInner(
       relatedGoalIds: [],
       relatedScholarshipIds: nudgeIds,
       memoryChanged: false,
+      pendingDuplicateConfirmation: null,
     };
   }
 
@@ -1046,5 +1104,6 @@ async function runAgentTurnInner(
     relatedGoalIds: [],
     relatedScholarshipIds: nudgeIds,
     memoryChanged: false,
+    pendingDuplicateConfirmation: null,
   };
 }
