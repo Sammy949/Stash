@@ -1,3 +1,14 @@
+---
+title: Stash Sibyl Memory
+emoji: 🧠
+colorFrom: indigo
+colorTo: gray
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: Encrypted financial memory sidecar for Stash
+---
+
 # stash-sibyl-svc
 
 The TS↔Sibyl boundary. [Sibyl Memory](https://github.com/Sibyl-Labs/Sibyl-Memory) is a
@@ -24,8 +35,14 @@ Combined with Sibyl's `UNIQUE(tenant_id, category, name)`, re-writing an entity
 
 ## Endpoints
 
-Every route except `/healthz` needs `Authorization: Bearer $STASH_SVC_TOKEN` and
+Every route except `/healthz` needs `X-Stash-Auth: $STASH_SVC_TOKEN` and
 `X-Stash-Tenant: 0x…`.
+
+The service token is **not** in `Authorization`. A private Hugging Face Space
+reserves `Authorization: Bearer <hf token>` for its own gate, so putting ours
+there would collide and lock the proxy out of its own app. `Authorization:
+Bearer` is still accepted as a fallback so the proxy and the service can be
+rolled forward independently, and `probe.py` covers both.
 
 ```
 GET  /healthz       liveness only, no tenant data
@@ -39,6 +56,8 @@ GET  /state         read it
 POST /event         journal a money event
 GET  /events        ?limit=&since=
 GET  /tier          server-verified tier + storage headroom
+GET  /persistence   snapshot backend, boot outcome, last error
+POST /snapshot      snapshot NOW, synchronously (run before a redeploy)
 ```
 
 `/recall-pack` returns `remembers: false` when a tenant has nothing stored. The client
@@ -72,5 +91,43 @@ per **account** across every store on the machine, so splitting into one db per 
 would not buy headroom. An empty schema already occupies ~283 KB (FTS5 tables), leaving
 roughly 4.96 MB for real data: plenty at demo scale, and the ceiling to name out loud.
 
-A deployed host needs a **persistent volume**; container-local disks are wiped on
-redeploy and the memory would go with them.
+## Durability on an ephemeral host
+
+Memory is one SQLite file. A free Hugging Face Space wipes container-local disk on every
+restart, sleep-wake and rebuild, and losing it fails *quietly*: `/recall-pack` just returns
+`remembers: false`, which is indistinguishable from a brand-new tenant.
+
+`persist.py` closes that. Set a private dataset repo and a write-scoped token:
+
+```
+SIBYL_SNAPSHOT_REPO=your-username/stash-memory
+SIBYL_SNAPSHOT_HF_TOKEN=hf_...
+SIBYL_SNAPSHOT_DEBOUNCE_S=20
+```
+
+and the service restores on boot and snapshots after every write. Offline alternative with
+no token and no network: `SIBYL_SNAPSHOT_DIR=/some/dir`. With none of them set the service
+still runs, disk-only, and `/persistence` says so.
+
+Three things it is careful about:
+
+- **`VACUUM INTO`, never a file copy.** In WAL mode the committed rows sit in
+  `memory.db-wal`; mid-flight the main file is a 4 KB stub. Measured on a live service:
+  `memory.db=4096B`, `memory.db-wal=898192B`. Copying `memory.db` would back up nothing.
+- **The restored file is never a symlink.** Sibyl's `Storage` refuses to open a symlinked
+  database, and the Hub cache is built from symlinks into `blobs/`. Restore downloads to a
+  scratch dir and `copyfile`s to the real path.
+- **A snapshot never clobbers live local state.** Restore only fires when there is no
+  usable database on disk, so on a host with a real volume the local file always wins.
+
+The debounce window is the worst-case loss on a *hard* kill. A graceful stop (SIGTERM on
+redeploy) flushes it, and `POST /snapshot` forces it.
+
+```bash
+STASH_SVC_TOKEN=$STASH_SVC_TOKEN .venv/bin/python verify_persistence.py
+```
+
+boots the real service, writes real memory, deletes the whole database directory the way a
+container wipe does, boots again on an empty disk and asserts `/recall-pack` comes back
+identical, FTS index included. Export `SIBYL_SNAPSHOT_REPO` + `SIBYL_SNAPSHOT_HF_TOKEN`
+first to run the same cycle against the real dataset.

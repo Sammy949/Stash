@@ -21,6 +21,13 @@
 
 const SVC_URL = (process.env.SIBYL_SVC_URL || "").replace(/\/$/, "");
 const SVC_TOKEN = process.env.SIBYL_SVC_TOKEN || "";
+/**
+ * Only set when the sidecar is a PRIVATE Hugging Face Space, whose reverse proxy
+ * demands an HF token before the request ever reaches our app. Read-scoped, and
+ * distinct from SIBYL_SNAPSHOT_HF_TOKEN (which the sidecar uses to write
+ * snapshots). Unset for a public Space or any other host.
+ */
+const HF_TOKEN = process.env.SIBYL_SVC_HF_TOKEN || "";
 
 /** Only these sidecar routes are reachable, so this can't be used as an open proxy. */
 const ALLOWED_PATHS = new Set([
@@ -62,7 +69,13 @@ export default async function handler(req: any, res: any) {
     const upstream = await fetch(`${SVC_URL}/${path}${query ? `?${query}` : ""}`, {
       method: req.method,
       headers: {
-        Authorization: `Bearer ${SVC_TOKEN}`,
+        // The service token goes in X-Stash-Auth, NOT Authorization. When the
+        // sidecar is a PRIVATE Hugging Face Space, the Space's own gate owns
+        // `Authorization: Bearer <hf token>`; sending ours there would collide
+        // and we would be locked out of our own app. Keeping the two on separate
+        // headers lets both gates run at once.
+        "X-Stash-Auth": SVC_TOKEN,
+        ...(HF_TOKEN ? { Authorization: `Bearer ${HF_TOKEN}` } : {}),
         "X-Stash-Tenant": tenant.toLowerCase(),
         "Content-Type": "application/json",
       },

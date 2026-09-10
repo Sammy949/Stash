@@ -34,10 +34,16 @@ BOB = "0x" + "b2" * 2 + _RUN
 _failures: list[str] = []
 
 
-def call(method: str, path: str, body=None, *, tenant=ALICE, token=TOKEN):
+def call(method: str, path: str, body=None, *, tenant=ALICE, token=TOKEN, legacy_header=False):
     req = urllib.request.Request(f"{BASE}{path}", method=method)
     if token is not None:
-        req.add_header("Authorization", f"Bearer {token}")
+        # X-Stash-Auth is the header the proxy sends: `Authorization` belongs to a
+        # private Space's own gate. `legacy_header` exercises the compatibility
+        # path so the fallback stays proven, not just claimed.
+        if legacy_header:
+            req.add_header("Authorization", f"Bearer {token}")
+        else:
+            req.add_header("X-Stash-Auth", token)
     if tenant is not None:
         req.add_header("X-Stash-Tenant", tenant)
     data = None
@@ -68,6 +74,10 @@ status, _ = call("GET", "/recall-pack", token="wrong-token")
 check("wrong token rejected", status == 401)
 status, _ = call("GET", "/recall-pack", tenant="not-a-wallet")
 check("malformed tenant rejected", status == 400)
+status, _ = call("GET", "/recall-pack", legacy_header=True)
+check("legacy Authorization header still accepted (rollout compat)", status == 200)
+status, _ = call("GET", "/recall-pack", token="wrong-token", legacy_header=True)
+check("legacy header with a wrong token still rejected", status == 401)
 
 status, pack = call("GET", "/recall-pack")
 check("fresh tenant remembers nothing (the deletion-test path)",
