@@ -77,12 +77,15 @@ export function traceGeometry(points: BalancePoint[]): TraceGeometry | null {
   const range = flat ? 1 : max - min;
 
   const usableH = VIEW_H - PAD_Y * 2;
-  const x = (i: number) =>
-    points.length === 1 ? VIEW_W / 2 : (i / (points.length - 1)) * VIEW_W;
+  const firstT = points[0].t;
+  const lastT = points[points.length - 1].t;
+  const timeRange = Math.max(1, lastT - firstT);
+  const x = (point: BalancePoint) =>
+    points.length === 1 ? VIEW_W / 2 : ((point.t - firstT) / timeRange) * VIEW_W;
   const y = (v: number) =>
     flat ? VIEW_H / 2 : PAD_Y + (1 - (v - min) / range) * usableH;
 
-  const coords = points.map((p, i) => [x(i), y(p.balance)] as const);
+  const coords = points.map((p) => [x(p), y(p.balance)] as const);
 
   const line = coords
     .map(([px, py], i) => `${i === 0 ? "M" : "L"}${px.toFixed(2)} ${py.toFixed(2)}`)

@@ -82,8 +82,9 @@ export interface BalancePoint {
 const DAY_MS = 86_400_000;
 
 /**
- * Running balance per day over the last `days` days, oldest first, one point per
- * day inclusive of today (so `days = 30` yields 30 points).
+ * Running balance over the last `days` days, oldest first. It includes one
+ * anchor per day and preserves individual transaction points, so several
+ * entries made on the same day still produce visible movement.
  *
  * Walks transactions forward in `createdAt` order, exactly the way `balance()`
  * derives the figure, so the series and the headline number can never disagree.
@@ -115,7 +116,7 @@ export function balanceSeries(
   // can accumulate transactions in arbitrary insertion order; a ledger that was
   // edited or restored is still expected to draw forward in date order.
   let running = ledger.openingBalance;
-  const inWindow: { day: number; delta: number }[] = [];
+  const inWindow: { day: number; timestamp: number; delta: number }[] = [];
   const ordered = [...ledger.transactions].sort((a, b) => {
     const ta = Date.parse(a.createdAt);
     const tb = Date.parse(b.createdAt);
@@ -137,20 +138,29 @@ export function balanceSeries(
     const d = new Date(ts);
     d.setHours(0, 0, 0, 0);
     // Future-dated entries collapse into today, so they cannot fall off the end.
-    inWindow.push({ day: Math.min(d.getTime(), today.getTime()), delta });
+    inWindow.push({
+      day: Math.min(d.getTime(), today.getTime()),
+      timestamp: Math.min(ts, now.getTime()),
+      delta,
+    });
   }
 
-  // Sum per day once, so the walk below is a single pass over the window.
-  const byDay = new Map<number, number>();
-  for (const { day, delta } of inWindow) {
-    byDay.set(day, (byDay.get(day) ?? 0) + delta);
+  const byDay = new Map<number, typeof inWindow>();
+  for (const entry of inWindow) {
+    const entries = byDay.get(entry.day) ?? [];
+    entries.push(entry);
+    byDay.set(entry.day, entries);
   }
 
   const points: BalancePoint[] = [];
   for (let i = 0; i < span; i++) {
     const t = firstDay + i * DAY_MS;
-    running += byDay.get(t) ?? 0;
     points.push({ t, balance: running });
+
+    for (const { timestamp, delta } of byDay.get(t) ?? []) {
+      running += delta;
+      points.push({ t: timestamp, balance: running });
+    }
   }
   return points;
 }
