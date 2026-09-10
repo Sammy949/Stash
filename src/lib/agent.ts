@@ -529,6 +529,32 @@ function looksLikeActionRequest(text: string): boolean {
 }
 
 /**
+ * A goal-related removal is ambiguous until the user says what is being
+ * removed. "Take out 100k from Macbook" could reduce earmarked progress,
+ * revise the target, cancel a commitment, or describe a real expense. Pause
+ * the whole turn before tools run so a compound request cannot partially land.
+ */
+function looksLikeAmbiguousGoalRemoval(text: string, ledger: Ledger): boolean {
+  const t = text.toLowerCase();
+  const hasAmount = /\d/.test(t) || /\b(k|thousand|million|hundred)\b/.test(t);
+  if (!hasAmount) return false;
+  const hasRemoval =
+    /\b(take|pull|remove|undo|reverse|reduce|lower|cancel|drop)\b/.test(t) &&
+    /\b(out|back|from|off|down|away|remove|reverse|reduce|lower|cancel)\b/.test(t);
+  if (!hasRemoval) return false;
+  const mentionsGoal =
+    /\b(goal|savings?|saved|earmarked|set aside|commitment|monthly fee)\b/.test(t) ||
+    ledger.goals.some((goal) => t.includes(goal.name.toLowerCase()));
+  return mentionsGoal;
+}
+
+function goalRemovalClarification(ledger: Ledger): string {
+  const names = ledger.goals.map((goal) => `“${goal.name}”`).join(" or ");
+  const target = names ? ` from ${names}` : " from a savings goal";
+  return `Before I change anything, what should “take out” mean${target}: reduce the amount earmarked, lower the goal target, cancel the goal, or record a real expense? I’ll leave this request unchanged until you confirm.`;
+}
+
+/**
  * A RELATIVE amount — a percentage of their money ("invest 6% of my remaining
  * cash", "put 10% of my balance aside"). The model must NEVER do arithmetic
  * (the code-owns-the-math invariant), so a bare "%" would otherwise be dropped
@@ -677,6 +703,16 @@ export async function runAgentTurn(
   const lastUser = [...history]
     .reverse()
     .find((m) => !m.pending && m.role === "user");
+  if (lastUser && looksLikeAmbiguousGoalRemoval(lastUser.content, ledger)) {
+    return {
+      reply: goalRemovalClarification(ledger),
+      ledger,
+      mutated: false,
+      relatedGoalIds: [],
+      relatedScholarshipIds: [],
+      memoryChanged: false,
+    };
+  }
   const forceTool = lastUser
     ? looksLikeMoneyEvent(lastUser.content) &&
       !looksLikePreSpendIntent(lastUser.content) &&

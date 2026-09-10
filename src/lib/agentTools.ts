@@ -340,7 +340,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "contribute_to_goal",
       description:
-        "Earmark money toward an existing goal when the user says they SET ASIDE / saved / put money toward it (e.g. 'I put £200 toward the phone fund'). This bumps the goal's progress ONLY. It is NOT spending and does NOT change their balance. Never use this for an actual purchase (that's log_expense).",
+        "Earmark money toward an existing goal when the user says they SET ASIDE / saved / put money toward it (e.g. 'I put £200 toward the phone fund'). This bumps the goal's progress ONLY. It is NOT spending and does NOT change their balance. For an explicitly confirmed correction, a negative amount removes money from the goal's earmarked progress and still does not change the balance. Never use this for an actual purchase (that's log_expense), and never use a negative amount until the user has clarified that they mean removing earmarked progress.",
       parameters: {
         type: "object",
         properties: {
@@ -712,11 +712,22 @@ export function applyAction(
       const g = getGoals(next).find((x) => x.name.toLowerCase().includes(match.toLowerCase()));
       if (!g) return { ledger: next, summary: "Goal updated." };
       const done = goalRemaining(g) === 0;
+      const applied = g.savedAmount -
+        (getGoals(ledger).find((x) => x.id === g.id)?.savedAmount ?? g.savedAmount);
+      const appliedMoney = formatMoney(Math.abs(applied), cur);
+      if (applied < 0) {
+        return {
+          ledger: next,
+          summary: `Removed ${appliedMoney} from the earmarked progress for "${g.name}". ${formatMoney(g.savedAmount, cur)} of ${formatMoney(g.targetAmount, cur)} remains saved, and the spendable balance is unchanged.`,
+          relatedGoalIds: [g.id],
+          memoryOps: goalJournalOps(g, note),
+        };
+      }
       return {
         ledger: next,
         summary: done
-          ? `Earmarked ${formatMoney(amount, cur)} toward "${g.name}" , which is the full ${formatMoney(g.targetAmount, cur)} target reached! (Earmark only; their spendable balance is unchanged.)`
-          : `Earmarked ${formatMoney(amount, cur)} toward "${g.name}". FACTS (use verbatim): ${formatMoney(g.savedAmount, cur)} of ${formatMoney(g.targetAmount, cur)} saved (${Math.round(goalProgressPct(g))}%), ${formatMoney(goalRemaining(g), cur)} to go. Earmark only; balance unchanged.`,
+          ? `Earmarked ${appliedMoney} toward "${g.name}" , which is the full ${formatMoney(g.targetAmount, cur)} target reached! (Earmark only; their spendable balance is unchanged.)`
+          : `Earmarked ${appliedMoney} toward "${g.name}". FACTS (use verbatim): ${formatMoney(g.savedAmount, cur)} of ${formatMoney(g.targetAmount, cur)} saved (${Math.round(goalProgressPct(g))}%), ${formatMoney(goalRemaining(g), cur)} to go. Earmark only; balance unchanged.`,
         relatedGoalIds: [g.id],
         memoryOps: goalJournalOps(g, note),
       };
