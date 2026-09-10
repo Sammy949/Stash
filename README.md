@@ -2,7 +2,7 @@
 
 **A personal finance agent that already knows you.**
 
-Built for students and young people whose money arrives in bursts — freelance
+Built for students and young people whose money arrives in bursts: freelance
 work, gigs, allowances, scholarships. Not a budgeting app: a companion that
 remembers who you are between sessions and acts on it.
 
@@ -13,7 +13,7 @@ Live: **[heystash.app](https://heystash.app)**
 ## What makes it work: persistent memory
 
 Stash's transcript is session-local. Reload the page and the conversation is
-gone. What survives is everything that matters about *you* — stored in
+gone. What survives is everything that matters about *you*, stored in
 [Sibyl Memory](https://sibyllabs.org) through a sidecar service, filed under a
 tenant id.
 
@@ -26,7 +26,7 @@ Append `?nomemory` to the URL. `resolveTenant()` returns null, every read
 resolves to `EMPTY_RECALL`, nothing is written. Then:
 
 1. **The cold-start opener goes generic.** With memory, Stash's first line names
-   your goal, your habit, and the delta since your last visit — rebuilt entirely
+  your goal, your habit, and the delta since your last visit, rebuilt entirely
    from Sibyl, because the transcript is gone. Without it, you get a greeting
    that could be addressed to anyone.
 
@@ -37,18 +37,18 @@ resolves to `EMPTY_RECALL`, nothing is written. Then:
    naming your own words back to you. With `EMPTY_RECALL`, the same event
    produces `null`. Silence.
 
-3. **Stash stops being able to act on who you are** — which is the entire
+3. **Stash stops being able to act on who you are**, which is the entire
    product claim.
 
 **What honestly does not break:** the arithmetic. Balance is
 `openingBalance + Σincome − Σexpenses`, computed in code, and maths does not need
 recall. We are not going to pretend otherwise. The gate is not "nothing works
-without memory" — it is "the thing this product claims to be does not work
+without memory": it is "the thing this product claims to be does not work
 without memory."
 
 ### Three-line walkthrough
 
-**Persist** — two paths, both through the sidecar.
+**Persist:** two paths, both through the sidecar.
 
 Entities (identity, goals, habits, preferences, opportunities) come from the
 agent's own `remember` / `forget_memory` tools and land via `applyMemoryOps()`
@@ -60,19 +60,19 @@ Money events and the financial snapshot are written by
 on every COMMITTED turn: each new transaction is journalled to the COLD tier and
 the derived snapshot is rewritten. It fires from the ledger-update callback, so
 a rejected tool call cannot produce a journal entry, and it can neither throw
-nor be awaited — memory must never be able to break a turn.
+nor be awaited. Memory must never be able to break a turn.
 
 Both go [`src/lib/memory.ts`](src/lib/memory.ts) →
 [`api/memory.ts`](api/memory.ts) → [`sibyl-svc/`](sibyl-svc/), which injects the
 service token server-side.
 
-**Recall** — one round-trip. `fetchRecallPack()` calls `/recall-pack`, which
+**Recall:** one round-trip. `fetchRecallPack()` calls `/recall-pack`, which
 returns identity, goals, habits, preferences, opportunities, the financial
 snapshot and recent events *together*, so the cold-start opener needs a single
 fetch. A tenant with nothing stored returns `remembers: false` and Stash greets
 plainly rather than showing a blank screen.
 
-**Changes the decision by** — code, not the model, matches the event against
+**Changes the decision by:** code, not the model, matches the event against
 what is remembered. A remembered *risk* habit plus a committed income event
 produces a deterministic intervention. The model never decides whether to
 intervene, so it cannot be lost to a sampling roll or a rate limit.
@@ -83,9 +83,9 @@ intervene, so it cannot be lost to a sampling roll or a rate limit.
 
 Two we deliberately do **not** claim:
 
-- **semantic search** — the sidecar exposes FTS5 keyword search
+- **semantic search:** the sidecar exposes FTS5 keyword search
   (`GET /entities?q=`), not embeddings.
-- **reflection** — not built. Sibyl's native `Learner` is available on this
+- **reflection:** not built. Sibyl's native `Learner` is available on this
   account (`stake` tier, so it clears the client's paid-tier gate) and its
   default summarizer needs no LLM, but nothing in this codebase calls it. It
   reads the COLD journal and needs three matching events to surface a pattern;
@@ -108,7 +108,7 @@ every change, so the UI never waits on a network call.
 
 **The memory sidecar.** Sibyl Memory is a Python library over local SQLite, so it
 runs as a small FastAPI service ([`sibyl-svc/`](sibyl-svc/)) that the browser
-never talks to directly — every call goes through `/api/memory`, which injects
+never talks to directly. Every call goes through `/api/memory`, which injects
 the service token server-side. Nothing secret reaches the bundle.
 [`sibyl-svc/probe.py`](sibyl-svc/probe.py) is the end-to-end proof: 12 checks
 over real HTTP including auth rejection, tenant isolation, consolidation
@@ -136,7 +136,7 @@ actually lost anything.
 What replaced it is not a like-for-like swap, and the distinction is worth being
 precise about. The ledger is now local-first and local-only. Durability moved to
 the memory layer, which holds who you are, what you are working toward and a
-journal of money events — the things worth carrying between sessions. The
+journal of money events, the things worth carrying between sessions. The
 balance in front of you is reconstructable from your own entries; who you are
 is not, which is why that is the part Sibyl keeps.
 
@@ -153,14 +153,14 @@ npm run build    # tsc -b && vite build
 
 Copy `.env.example` to `.env` and fill in:
 
-- `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL` / `AI_FALLBACK_MODEL` — any
+- `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL` / `AI_FALLBACK_MODEL`: any
   OpenAI-compatible provider. Server-side only: production uses `api/agent.ts`,
   and the Vite dev proxy forwards to that same server route without exposing the
   key to the browser bundle. There are no `VITE_AI_*` secrets in this app.
-- `SIBYL_SVC_URL` / `SIBYL_SVC_TOKEN` — the memory sidecar (server-side only,
+- `SIBYL_SVC_URL` / `SIBYL_SVC_TOKEN`: the memory sidecar (server-side only,
   deliberately no `VITE_` prefix: a public service token would let anyone read
   any tenant's memory)
-- `VITE_MEMORY_TENANT` — whose memory to read. An address-shaped id, because
+- `VITE_MEMORY_TENANT`: whose memory to read. An address-shaped id, because
   the sidecar validates that shape; nothing in the app connects a wallet
 
 Running the sidecar and verifying it:
