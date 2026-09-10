@@ -48,12 +48,23 @@ without memory."
 
 ### Three-line walkthrough
 
-**Persist** — facts and money events are written to Sibyl through the sidecar.
-Entities via `writeMemory()` (consolidating in place when the subject already
-exists), money events journalled to the COLD tier via `writeMoneyEvent()`, the
-financial snapshot via `writeSnapshot()`. All in
-[`src/lib/memory.ts`](src/lib/memory.ts) → [`api/memory.ts`](api/memory.ts) →
-[`sibyl-svc/`](sibyl-svc/).
+**Persist** — two paths, both through the sidecar.
+
+Entities (identity, goals, habits, preferences, opportunities) come from the
+agent's own `remember` / `forget_memory` tools and land via `applyMemoryOps()`
+([`src/lib/memory.ts`](src/lib/memory.ts)), which consolidates in place when the
+subject already exists rather than appending a second row.
+
+Money events and the financial snapshot are written by
+`journalCommittedTurn()` ([`src/lib/memoryJournal.ts`](src/lib/memoryJournal.ts))
+on every COMMITTED turn: each new transaction is journalled to the COLD tier and
+the derived snapshot is rewritten. It fires from the ledger-update callback, so
+a rejected tool call cannot produce a journal entry, and it can neither throw
+nor be awaited — memory must never be able to break a turn.
+
+Both go [`src/lib/memory.ts`](src/lib/memory.ts) →
+[`api/memory.ts`](api/memory.ts) → [`sibyl-svc/`](sibyl-svc/), which injects the
+service token server-side.
 
 **Recall** — one round-trip. `fetchRecallPack()` calls `/recall-pack`, which
 returns identity, goals, habits, preferences, opportunities, the financial
@@ -74,7 +85,11 @@ Two we deliberately do **not** claim:
 
 - **semantic search** — the sidecar exposes FTS5 keyword search
   (`GET /entities?q=`), not embeddings.
-- **reflection** — designed, not built.
+- **reflection** — not built. Sibyl's native `Learner` is available on this
+  account (`stake` tier, so it clears the client's paid-tier gate) and its
+  default summarizer needs no LLM, but nothing in this codebase calls it. It
+  reads the COLD journal and needs three matching events to surface a pattern;
+  one committed turn writes one event.
 
 ---
 
