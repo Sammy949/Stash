@@ -227,9 +227,7 @@ function StepName({
         What should Stash call you?
       </h1>
       <p className="mt-2.5 text-sm leading-relaxed text-muted-foreground">
-        Stash is a financial memory: it keeps track of your money and what you
-        are working toward. No email, no password, and nothing leaves this
-        device unless you ask it to.
+        No email, no password.
       </p>
       <Input
         autoFocus
